@@ -1,3 +1,6 @@
+// =============================
+// File: components/LoginScreen.tsx
+// =============================
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -21,22 +24,30 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // 🚦 Välj rätt clientId beroende på om appen körs i Expo Go (web client) eller native/dev build (android client)
+  // 🚦 Expo Go vs Native: använd Web Client ID i Expo Go (med custom redirectUri),
+  // och Android Client ID i native (utan redirectUri – Google genererar rätt).
   const isExpoGo = Constants.appOwnership === 'expo';
-  const clientId = isExpoGo
-    ? '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com' // Web Client ID
-    : '614824946458-8k41e2qtudhao8e2las2ohh3hvmatc7m.apps.googleusercontent.com'; // Android Client ID
 
-  // 🔗 Redirect URI baserat på scheme i app.json ("musikquiz")
-  const redirectUri = makeRedirectUri({ scheme: 'musikquiz' });
+  const WEB_CLIENT_ID =
+    '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com';
+  const ANDROID_CLIENT_ID =
+    '614824946458-8k41e2qtudhao8e2las2ohh3hvmatc7m.apps.googleusercontent.com';
 
-  const [request, response, promptAsync] = useAuthRequest({
-    clientId,
-    responseType: 'id_token',
-    scopes: ['openid', 'profile', 'email'],
-    redirectUri,
-  });
+  const [request, response, promptAsync] = useAuthRequest(
+    isExpoGo
+      ? {
+          clientId: WEB_CLIENT_ID,
+          responseType: 'id_token',
+          scopes: ['openid', 'profile', 'email'],
+          redirectUri: makeRedirectUri({ scheme: 'musikquiz' }),
+        }
+      : {
+          androidClientId: ANDROID_CLIENT_ID,
+          responseType: 'id_token',
+          scopes: ['openid', 'profile', 'email'],
+          // inget redirectUri här
+        }
+  );
 
   useEffect(() => {
     if (response?.type === 'success') {
