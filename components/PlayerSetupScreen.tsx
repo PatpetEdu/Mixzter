@@ -1,13 +1,6 @@
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Button,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { VStack, Heading, Input, InputField, Button, ButtonText, Center, Text } from '@gluestack-ui/themed';
 
 type Props = {
   onStart: (player1: string, player2: string) => void;
@@ -31,66 +24,43 @@ export default function PlayerSetupScreen({ onStart }: Props) {
   const isFormValid = player1.trim() !== '' && player2.trim() !== '';
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Text style={styles.title}>👥 Duo-läge – Lag/Namn</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Center style={{ flex: 1, paddingHorizontal: 24 }}>
+        <VStack style={{ width: '100%', maxWidth: 420 }} space="lg">
+          <Heading size="xl" textAlign="center">👥 Duo-läge – Lag/Namn</Heading>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Spelare 1"
-        value={player1}
-        onChangeText={setPlayer1}
-        returnKeyType="next"
-        onSubmitEditing={() => player2InputRef.current?.focus()}
-        blurOnSubmit={false}
-        autoFocus
-        accessibilityLabel="Spelare 1"
-      />
+          <Input>
+            <InputField
+              placeholder="Spelare 1"
+              value={player1}
+              onChangeText={setPlayer1}
+              returnKeyType="next"
+              onSubmitEditing={() => player2InputRef.current?.focus()}
+              blurOnSubmit={false}
+              autoFocus
+              accessibilityLabel="Spelare 1"
+            />
+          </Input>
 
-      <TextInput
-        ref={player2InputRef}
-        style={styles.input}
-        placeholder="Spelare 2"
-        value={player2}
-        onChangeText={setPlayer2}
-        returnKeyType="done"
-        onSubmitEditing={handleStart}
-        accessibilityLabel="Spelare 2"
-      />
+          <Input>
+            <InputField
+              ref={player2InputRef as any}
+              placeholder="Spelare 2"
+              value={player2}
+              onChangeText={setPlayer2}
+              returnKeyType="done"
+              onSubmitEditing={handleStart}
+              accessibilityLabel="Spelare 2"
+            />
+          </Input>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={{ color: '#b91c1c', textAlign: 'center' }}>{error}</Text> : null}
 
-      <Button title="Starta spel" onPress={handleStart} disabled={!isFormValid} />
+          <Button onPress={handleStart} isDisabled={!isFormValid}>
+            <ButtonText>Starta spel</ButtonText>
+          </Button>
+        </VStack>
+      </Center>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 24,
-    marginBottom: 24,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#aaa',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  error: {
-    color: 'red',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-});

@@ -1,41 +1,24 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React from 'react';
+import { TouchableOpacity } from 'react-native';
+import { Box, Text, VStack } from '@gluestack-ui/themed';
 
 interface Props {
   artist: string;
   title: string;
-  year: string; // Ändrat till string
+  year: string;
   onFlip: () => void;
 }
 
 export default function CardBack({ artist, title, year, onFlip }: Props) {
   return (
-    <TouchableOpacity onPress={onFlip} style={styles.card}>
-      <Text style={styles.artist}>{artist}</Text>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.year}>{year}</Text>
+    <TouchableOpacity onPress={onFlip}>
+      <Box style={{ padding: 24, borderRadius: 16, backgroundColor: '#f2f2f2', alignItems: 'center' }}>
+        <VStack space="xs" style={{ alignItems: 'center' }}>
+          <Text size="xl" style={{ fontWeight: 'bold' }}>{artist}</Text>
+          <Text size="md">{title}</Text>
+          <Text size="3xl" style={{ color: '#6b7280' }}>{year}</Text>
+        </VStack>
+      </Box>
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  artist: {
-    fontSize: 22,
-    fontWeight: "bold",
-  },
-  title: {
-    fontSize: 18,
-    marginTop: 8,
-  },
-  year: {
-    fontSize: 36,
-    marginTop: 16,
-    color: "#666",
-  },
-});

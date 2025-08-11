@@ -1,28 +1,31 @@
 import React from 'react';
-import { View, StyleSheet, Button, Platform, Alert, Linking } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { Box, Button, ButtonText, VStack } from '@gluestack-ui/themed';
 
 type Props = {
   spotifyUrl: string;
   onFlip: () => void;
-  showFlipButton?: boolean; // valfri prop
+  showFlipButton?: boolean;
 };
 
 export default function CardFront({ spotifyUrl, onFlip, showFlipButton = true }: Props) {
   const handleOpenSpotify = () => openSpotify(spotifyUrl);
 
   return (
-    <View style={styles.container}>
+    <Box style={{ alignItems: 'center', padding: 24, backgroundColor: '#f2f2f2', borderRadius: 16 }}>
       <QRCode value={spotifyUrl} size={180} />
-      <View style={{ marginTop: 20 }}>
-        <Button title="🎧 Öppna i Spotify" onPress={handleOpenSpotify} />
-       </View>
-      {showFlipButton && (
-        <View style={{ marginTop: 20 }}>
-          <Button title="Vänd kortet" onPress={onFlip} />
-        </View>
-      )}
-    </View>
+      <VStack space="md" style={{ marginTop: 20, width: '100%', alignItems: 'center' }}>
+        <Button onPress={handleOpenSpotify}>
+          <ButtonText>🎧 Öppna i Spotify</ButtonText>
+        </Button>
+        {showFlipButton && (
+          <Button variant="outline" onPress={onFlip}>
+            <ButtonText>Vänd kortet</ButtonText>
+          </Button>
+        )}
+      </VStack>
+    </Box>
   );
 }
 
@@ -38,28 +41,16 @@ async function openSpotify(spotifyUrl: string) {
     const trackId = match?.[1];
 
     if (!trackId) {
-      Alert.alert("Ogiltig länk", "Kunde inte läsa ut låt-ID från länken.");
+      Alert.alert('Ogiltig länk', 'Kunde inte läsa ut låt-ID från länken.');
       return;
     }
 
     const appUrl = `spotify:track:${trackId}`;
     const supported = await Linking.canOpenURL(appUrl);
 
-    if (supported) {
-      await Linking.openURL(appUrl); // Försök öppna i Spotify-appen
-    } else {
-      await Linking.openURL(spotifyUrl); // Fallback: öppna i webbläsare
-    }
+    if (supported) await Linking.openURL(appUrl);
+    else await Linking.openURL(spotifyUrl);
   } catch (error) {
-    Alert.alert("Fel vid öppning", String(error));
+    Alert.alert('Fel vid öppning', String(error));
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 12,
-  },
-});
