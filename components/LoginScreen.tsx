@@ -1,0 +1,84 @@
+// =============================
+// File: components/LoginScreen.tsx
+// =============================
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator } from 'react-native';
+import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
+import { useAuth } from '../hooks/useAuth';
+
+// Gluestack UI
+import { Text, Button, ButtonText, Heading, Input, InputField, VStack, Center } from '@gluestack-ui/themed';
+
+import * as WebBrowser from 'expo-web-browser';
+import { useAuthRequest } from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
+
+export default function LoginScreen() {
+  const { continueAnonymously } = useAuth();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [request, response, promptAsync] = useAuthRequest({
+    webClientId: '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com',
+    androidClientId: '614824946458-0qctkehgujo66vha41m9htp8uqvsf1p9.apps.googleusercontent.com',
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params as { id_token: string };
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential).catch((e) =>
+        setError('Fel: ' + ((e as any)?.code ?? 'unknown'))
+      );
+    }
+  }, [response]);
+
+  const handleAuthAction = async (action: 'signIn' | 'signUp') => {
+    setLoading(true);
+    setError('');
+    try {
+      if (action === 'signIn') await signInWithEmailAndPassword(auth, email, password);
+      else await createUserWithEmailAndPassword(auth, email, password);
+    } catch (e: any) {
+      setError('Fel: ' + e.code);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Center flex={1} px="$4">
+      <VStack space="lg" alignItems="center" w="$full" maxWidth={400}>
+        <Heading size="2xl">🎵 Musikquiz</Heading>
+
+        <Input variant="outline" size="lg" w="$full">
+          <InputField placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+        </Input>
+        <Input variant="outline" size="lg" w="$full">
+          <InputField placeholder="Lösenord" value={password} onChangeText={setPassword} secureTextEntry />
+        </Input>
+
+        {error ? <Text color="$red700" mt="$2">{error}</Text> : null}
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 16 }} />
+        ) : (
+          <VStack space="md" w="$full" mt="$4">
+            <Button onPress={() => handleAuthAction('signIn')}><ButtonText>Logga in</ButtonText></Button>
+            <Button onPress={() => handleAuthAction('signUp')} variant="outline"><ButtonText>Registrera konto</ButtonText></Button>
+            <Button isDisabled={!request} onPress={() => promptAsync()} variant="solid" action="secondary">
+              <ButtonText>Logga in med Google</ButtonText>
+            </Button>
+            <Button onPress={continueAnonymously} variant="link" mt="$8">
+              <ButtonText color="$textLight500">Fortsätt utan att logga in (Test)</ButtonText>
+            </Button>
+          </VStack>
+        )}
+      </VStack>
+    </Center>
+  );
+}

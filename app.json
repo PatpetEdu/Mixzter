@@ -2,6 +2,7 @@
   "expo": {
     "name": "musikquiz",
     "slug": "musikquiz",
+    "scheme": "musikquiz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,10 +21,23 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.clyd3frog.musikquiz"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bccb9723-b429-4f50-9167-dfc8c9c8d83c"
+      }
+    },
+ "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/bccb9723-b429-4f50-9167-dfc8c9c8d83c"
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

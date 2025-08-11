@@ -35,3 +35,12 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Expo / RN native folders (prebuild/EAS Build)
+android/
+ios/
+.expo-shared/
+
+# Firebase Functions build-artifacts
+functions/lib/
+functions/node_modules/

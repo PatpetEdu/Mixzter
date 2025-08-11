@@ -1,22 +1,47 @@
 {
   "name": "musikquiz",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "DARK_MODE=media expo run:android",
+    "ios": "DARK_MODE=media expo run:ios",
+    "web": "DARK_MODE=media expo start --web"
   },
   "dependencies": {
-    "expo": "~53.0.17",
+    "@gluestack-style/react": "1",
+    "@gluestack-ui/config": "1",
+    "@gluestack-ui/icon": "^0.1.27",
+    "@gluestack-ui/nativewind-utils": "^1.0.26",
+    "@gluestack-ui/overlay": "^0.1.22",
+    "@gluestack-ui/themed": "1",
+    "@gluestack-ui/toast": "^1.0.9",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "axios": "^1.10.0",
+    "babel-plugin-module-resolver": "^5.0.2",
+    "expo": "53.0.20",
+    "expo-auth-session": "~6.2.1",
+    "expo-crypto": "~14.1.5",
+    "expo-dev-client": "~5.2.4",
     "expo-status-bar": "~2.2.3",
+    "expo-updates": "~0.28.17",
+    "expo-web-browser": "~14.2.0",
+    "firebase": "^12.0.0",
+    "nativewind": "^4.1.23",
     "react": "19.0.0",
-    "react-native": "0.79.5"
+    "react-native": "0.79.5",
+    "react-native-css-interop": "^0.1.22",
+    "react-native-qrcode-svg": "^6.3.15",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-svg": "15.11.2",
+    "react-native-worklets": "^0.4.1",
+    "tailwindcss": "^3.4.17"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
+    "jscodeshift": "^0.15.2",
     "typescript": "~5.8.3"
   },
   "private": true
