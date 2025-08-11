@@ -317,6 +317,7 @@ export default function DuoGameScreen({
           <Input
             w="$full"
             maxWidth={220}
+            alignSelf="center" 
             variant="outline"
             size="md"
             // röd kant när ogiltigt

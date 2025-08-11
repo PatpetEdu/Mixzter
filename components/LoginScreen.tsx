@@ -1,6 +1,3 @@
-// =============================
-// File: components/LoginScreen.tsx
-// =============================
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -12,6 +9,8 @@ import { Text, Button, ButtonText, Heading, Input, InputField, VStack, Center } 
 
 import * as WebBrowser from 'expo-web-browser';
 import { useAuthRequest } from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,18 +22,33 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 🚦 Välj rätt clientId beroende på om appen körs i Expo Go (web client) eller native/dev build (android client)
+  const isExpoGo = Constants.appOwnership === 'expo';
+  const clientId = isExpoGo
+    ? '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com' // Web Client ID
+    : '614824946458-8k41e2qtudhao8e2las2ohh3hvmatc7m.apps.googleusercontent.com'; // Android Client ID
+
+  // 🔗 Redirect URI baserat på scheme i app.json ("musikquiz")
+  const redirectUri = makeRedirectUri({ scheme: 'musikquiz' });
+
   const [request, response, promptAsync] = useAuthRequest({
-    webClientId: '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com',
-    androidClientId: '614824946458-0qctkehgujo66vha41m9htp8uqvsf1p9.apps.googleusercontent.com',
+    clientId,
+    responseType: 'id_token',
+    scopes: ['openid', 'profile', 'email'],
+    redirectUri,
   });
 
   useEffect(() => {
     if (response?.type === 'success') {
-      const { id_token } = response.params as { id_token: string };
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential).catch((e) =>
-        setError('Fel: ' + ((e as any)?.code ?? 'unknown'))
-      );
+      const { id_token } = response.params as { id_token?: string };
+      if (id_token) {
+        const credential = GoogleAuthProvider.credential(id_token);
+        signInWithCredential(auth, credential).catch((e) =>
+          setError('Fel: ' + ((e as any)?.code ?? 'unknown'))
+        );
+      }
+    } else if (response?.type === 'error') {
+      setError('Google-inloggning misslyckades. Försök igen.');
     }
   }, [response]);
 
@@ -70,7 +84,12 @@ export default function LoginScreen() {
           <VStack space="md" w="$full" mt="$4">
             <Button onPress={() => handleAuthAction('signIn')}><ButtonText>Logga in</ButtonText></Button>
             <Button onPress={() => handleAuthAction('signUp')} variant="outline"><ButtonText>Registrera konto</ButtonText></Button>
-            <Button isDisabled={!request} onPress={() => promptAsync()} variant="solid" action="secondary">
+            <Button
+              isDisabled={!request}
+              onPress={() => promptAsync()}
+              variant="solid"
+              action="secondary"
+            >
               <ButtonText>Logga in med Google</ButtonText>
             </Button>
             <Button onPress={continueAnonymously} variant="link" mt="$8">
