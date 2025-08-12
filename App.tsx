@@ -143,7 +143,3 @@ export default function App() {
     </GluestackUIProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 24, width: '100%' },
-});
