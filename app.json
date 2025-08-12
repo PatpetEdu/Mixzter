@@ -13,31 +13,34 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
+    "ios": { "supportsTablet": true },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.clyd3frog.musikquiz"
+      "package": "com.clyd3frog.musikquiz",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "musikquiz-app.web.app", "pathPrefix": "/oauth2redirect/google" }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [ { "scheme": "musikquiz", "host": "oauthredirect" } ]
+        }
+      ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "bccb9723-b429-4f50-9167-dfc8c9c8d83c"
-      }
-    },
- "runtimeVersion": "1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/bccb9723-b429-4f50-9167-dfc8c9c8d83c"
-    },
-    "plugins": [
-      "expo-web-browser"
-    ]
+    "web": { "favicon": "./assets/favicon.png" },
+    "extra": { "eas": { "projectId": "bccb9723-b429-4f50-9167-dfc8c9c8d83c" } },
+    "runtimeVersion": "1.0.0",
+    "updates": { "url": "https://u.expo.dev/bccb9723-b429-4f50-9167-dfc8c9c8d83c" },
+    "plugins": [ "expo-web-browser" ]
   }
 }

@@ -1,4 +1,3 @@
-// =============================
 // File: components/LoginScreen.tsx
 // =============================
 import React, { useEffect, useState } from 'react';
@@ -12,6 +11,7 @@ import { Text, Button, ButtonText, Heading, Input, InputField, VStack, Center } 
 
 import * as WebBrowser from 'expo-web-browser';
 import { useAuthRequest } from 'expo-auth-session/providers/google';
+import type { GoogleAuthRequestConfig } from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
 
@@ -24,30 +24,41 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // 🚦 Expo Go vs Native: använd Web Client ID i Expo Go (med custom redirectUri),
-  // och Android Client ID i native (utan redirectUri – Google genererar rätt).
+
+  // 🚦 Expo Go/Dev Client vs riktig APK/AAB
   const isExpoGo = Constants.appOwnership === 'expo';
 
-  const WEB_CLIENT_ID =
-    '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com';
-  const ANDROID_CLIENT_ID =
-    '614824946458-8k41e2qtudhao8e2las2ohh3hvmatc7m.apps.googleusercontent.com';
+  // 🔑 Google WEB client (används både i dev och prod med HTTPS redirect)
+  const WEB_CLIENT_ID = '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com';
 
-  const [request, response, promptAsync] = useAuthRequest(
-    isExpoGo
-      ? {
-          clientId: WEB_CLIENT_ID,
-          responseType: 'id_token',
-          scopes: ['openid', 'profile', 'email'],
-          redirectUri: makeRedirectUri({ scheme: 'musikquiz' }),
-        }
-      : {
-          androidClientId: ANDROID_CLIENT_ID,
-          responseType: 'id_token',
-          scopes: ['openid', 'profile', 'email'],
-          // inget redirectUri här
-        }
-  );
+  // 🌐 HTTPS App Link host (Firebase Hosting)
+  const APP_LINK_HOST = 'musikquiz-app.web.app';
+  const HTTPS_REDIRECT_URI = `https://${APP_LINK_HOST}/oauth2redirect/google`;
+
+  // Debug
+  console.log('[Auth] appOwnership =', Constants.appOwnership);
+  console.log('[Auth] using WEB_CLIENT_ID =', WEB_CLIENT_ID);
+  console.log('[Auth] HTTPS redirect =', HTTPS_REDIRECT_URI);
+
+  const baseConfig: Partial<GoogleAuthRequestConfig> = {
+    responseType: 'id_token',
+    scopes: ['openid', 'profile', 'email'] as string[],
+  };
+
+  // ✅ I Expo Go använder vi appens egna scheme; i riktig app använder vi HTTPS App Link
+  const googleConfig: Partial<GoogleAuthRequestConfig> = isExpoGo
+    ? {
+        ...baseConfig,
+        clientId: WEB_CLIENT_ID,
+        redirectUri: makeRedirectUri({ scheme: 'musikquiz' }),
+      }
+    : {
+        ...baseConfig,
+        clientId: WEB_CLIENT_ID,
+        redirectUri: HTTPS_REDIRECT_URI,
+      };
+
+  const [request, response, promptAsync] = useAuthRequest(googleConfig);
 
   useEffect(() => {
     if (response?.type === 'success') {
@@ -57,11 +68,21 @@ export default function LoginScreen() {
         signInWithCredential(auth, credential).catch((e) =>
           setError('Fel: ' + ((e as any)?.code ?? 'unknown'))
         );
+      } else {
+        setError('Saknar id_token i Google-svaret.');
       }
     } else if (response?.type === 'error') {
+      console.log('[Auth] Google response error:', response);
       setError('Google-inloggning misslyckades. Försök igen.');
     }
   }, [response]);
+
+  // 🔎 Debug: logga vilken redirectUri providern faktiskt använder
+  useEffect(() => {
+    if (request?.redirectUri) {
+      console.log('[Auth] resolved redirectUri =', request.redirectUri);
+    }
+  }, [request]);
 
   const handleAuthAction = async (action: 'signIn' | 'signUp') => {
     setLoading(true);
@@ -95,12 +116,7 @@ export default function LoginScreen() {
           <VStack space="md" w="$full" mt="$4">
             <Button onPress={() => handleAuthAction('signIn')}><ButtonText>Logga in</ButtonText></Button>
             <Button onPress={() => handleAuthAction('signUp')} variant="outline"><ButtonText>Registrera konto</ButtonText></Button>
-            <Button
-              isDisabled={!request}
-              onPress={() => promptAsync()}
-              variant="solid"
-              action="secondary"
-            >
+            <Button isDisabled={!request} onPress={() => promptAsync()} variant="solid" action="secondary">
               <ButtonText>Logga in med Google</ButtonText>
             </Button>
             <Button onPress={continueAnonymously} variant="link" mt="$8">
