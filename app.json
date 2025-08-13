@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "musikquiz",
+    "name": "MIXZTER",
     "slug": "musikquiz",
     "scheme": "musikquiz",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+   "icon": "./assets/mixzter-icon-1024.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/mixzter-splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0b0b0c"
     },
     "ios": { "supportsTablet": true },
-    "android": {
+      "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/mixzter-adaptive-foreground.png",
+        "backgroundColor": "#0b0b0c"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.clyd3frog.musikquiz",

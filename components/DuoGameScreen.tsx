@@ -11,11 +11,13 @@ import {
   HStack,
   Input,
   InputField,
+  Image,
 } from '@gluestack-ui/themed';
 import CardFront from './CardFront';
 import CardBack from './CardBack';
 import { useGenerateSongs } from './useGenerateSongs';
 
+const MIXZTER_LOGO = require('../assets/mixzter-icon-1024.png');
 // Typer
 export type Card = {
   title: string;
@@ -264,9 +266,13 @@ export default function DuoGameScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Heading size="xl" style={{ textAlign: 'center' }}>
-        🎯 Duo-läge
-      </Heading>
+      <Box alignItems="center" mb="$2">
+ <Image
+  source={MIXZTER_LOGO}
+  alt="MIXZTER"
+  style={{ width: 96, height: 96, resizeMode: 'contain' }}
+/>
+</Box>
       <Text style={{ fontSize: 16, marginBottom: 8 }}>Nu spelar: {activePlayer}</Text>
 
       {renderTimeline(current, true)}

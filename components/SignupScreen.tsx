@@ -176,7 +176,7 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
               />
             </Input>
             {confirm && password && password !== confirm ? (
-              <Text color="#f87171">Lösenorden matchar inte</Text>
+              <Text color="#f87171">Password doesn't match</Text>
             ) : null}
           </FormControl>
 
