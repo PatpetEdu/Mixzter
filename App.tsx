@@ -139,30 +139,33 @@ function AppContent() {
   }
 
   return (
-    <Box flex={1} w="$full" bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' }}}>
-      <AppHeader />
-      <Box flex={1} justifyContent="center" alignItems="center" w="$full">
-        {mode === 'menu' && (
+    <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+      {/* Skärminnehållet renderas här. ScrollView i DuoGameScreen kommer att scrolla oberoende. */}
+      {mode === 'menu' && (
+        <Center flex={1}>
           <VStack space="lg" alignItems="center">
             <Heading size="2xl" color="$textLight900" sx={{ _dark: { color: '$textDark50' }}}>🎵 Musikquiz</Heading>
             <Text size="md" color="$textLight500" sx={{ _dark: { color: '$textDark400' }}}>{user ? `Inloggad som: ${user.email}` : 'Spelar som gäst'}</Text>
             <Button onPress={() => setMode('duo-setup')}><ButtonText>Start Duo</ButtonText></Button>
             <Button onPress={signOut} variant="link"><ButtonText>{user ? 'Logga ut' : 'Logga in'}</ButtonText></Button>
           </VStack>
-        )}
+        </Center>
+      )}
 
-        {mode === 'duo-setup' && <PlayerSetupScreen onStart={startDuoGame} />}
+      {mode === 'duo-setup' && <PlayerSetupScreen onStart={startDuoGame} />}
 
-        {mode === 'duo' && players && (
-          <DuoGameScreen
-            player1={players.player1}
-            player2={players.player2}
-            onBackToMenu={returnToMenu}
-            initialPreloadedCard={preloadedDuoCard}
-            onPreloadComplete={() => setPreloadedDuoCard(null)}
-          />
-        )}
-      </Box>
+      {mode === 'duo' && players && (
+        <DuoGameScreen
+          player1={players.player1}
+          player2={players.player2}
+          onBackToMenu={returnToMenu}
+          initialPreloadedCard={preloadedDuoCard}
+          onPreloadComplete={() => setPreloadedDuoCard(null)}
+        />
+      )}
+      
+      {/* AppHeader ligger utanför skärmlogiken och kommer inte att scrolla */}
+      <AppHeader />
     </Box>
   );
 }
