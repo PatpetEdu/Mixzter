@@ -301,6 +301,7 @@ export default function DuoGameScreen({
             >
               <Text style={{ textAlign: 'center' }}>Artist: {card.artist}</Text>
               <Text style={{ textAlign: 'center' }}>Låt: {card.title}</Text>
+              <Text style={{ textAlign: 'center' }}>Låt: {card.year}</Text>
             </Box>
           )}
 
