@@ -1,62 +1,108 @@
-// File: components/LoginScreen.tsx
-// =============================
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
-import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
-import { useAuth } from '../hooks/useAuth';
-
-// Gluestack UI
-import { Text, Button, ButtonText, Heading, Input, InputField, VStack, Center } from '@gluestack-ui/themed';
-
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  Box,
+  Center,
+  VStack,
+  HStack,
+  Heading,
+  Text,
+  Link,
+  Divider,
+  Button,
+  ButtonText,
+  FormControl,
+  FormControlLabel,
+  FormControlLabelText,
+  Input,
+  InputField,
+  InputSlot,
+  InputIcon,
+  Checkbox,
+  CheckboxIndicator,
+  CheckboxIcon,
+  CheckboxLabel,
+  Icon,
+} from '@gluestack-ui/themed';
+import { EyeIcon, EyeOffIcon, GlobeIcon, CheckIcon } from '@gluestack-ui/themed';
+import { Chrome } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuthRequest } from 'expo-auth-session/providers/google';
 import type { GoogleAuthRequestConfig } from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
+import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../firebase';
+import { useAuth } from '../hooks/useAuth';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export default function LoginScreen() {
+// Props to allow hosting component (App.tsx) to navigate to Signup
+export type LoginScreenProps = {
+  onGoToSignup: () => void;
+};
+
+export default function LoginScreen({ onGoToSignup }: LoginScreenProps) {
   const { continueAnonymously } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // 🚦 Expo Go/Dev Client vs riktig APK/AAB
+  const [info, setInfo] = useState('');
+ // 🚦 Expo Go/Dev Client vs riktig APK/AAB
   const isExpoGo = Constants.appOwnership === 'expo';
-
-  // 🔑 Google WEB client (används både i dev och prod med HTTPS redirect)
+    // 🔑 Google WEB client (används både i dev och prod med HTTPS redirect)
   const WEB_CLIENT_ID = '614824946458-t1i0kmeou1s9nrfngo5k0f7mm8t1ll7v.apps.googleusercontent.com';
-
-  // 🌐 HTTPS App Link host (Firebase Hosting)
+   // 🌐 HTTPS App Link host (Firebase Hosting)
   const APP_LINK_HOST = 'musikquiz-app.web.app';
   const HTTPS_REDIRECT_URI = `https://${APP_LINK_HOST}/oauth2redirect/google`;
 
-  // Debug
-  console.log('[Auth] appOwnership =', Constants.appOwnership);
-  console.log('[Auth] using WEB_CLIENT_ID =', WEB_CLIENT_ID);
-  console.log('[Auth] HTTPS redirect =', HTTPS_REDIRECT_URI);
+  // Remember Me: spara e-post lokalt när aktiverat
+  const REMEMBER_KEY = 'auth.remember';
+  const REMEMBER_EMAIL_KEY = 'auth.email';
 
-  const baseConfig: Partial<GoogleAuthRequestConfig> = {
-    responseType: 'id_token',
-    scopes: ['openid', 'profile', 'email'] as string[],
-  };
+  useEffect(() => {
+    (async () => {
+      try {
+        const remember = await AsyncStorage.getItem(REMEMBER_KEY);
+        const savedEmail = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
+        if (remember === '1') {
+          setRememberMe(true);
+          if (savedEmail) setEmail(savedEmail);
+        } else {
+          setRememberMe(false);
+        }
+      } catch {}
+    })();
+  }, []);
 
-  // ✅ I Expo Go använder vi appens egna scheme; i riktig app använder vi HTTPS App Link
+  useEffect(() => {
+    (async () => {
+      try {
+        if (rememberMe) {
+          await AsyncStorage.setItem(REMEMBER_KEY, '1');
+          await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, email);
+        } else {
+          await AsyncStorage.removeItem(REMEMBER_KEY);
+          await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
+        }
+      } catch {}
+    })();
+  }, [rememberMe, email]);
+
+  const baseConfig: Partial<GoogleAuthRequestConfig> = useMemo(
+    () => ({ responseType: 'id_token', scopes: ['openid', 'profile', 'email'] as string[] }),
+    []
+  );
+
+   // ✅ I Expo Go använder vi appens egna scheme; i riktig app använder vi HTTPS App Link
   const googleConfig: Partial<GoogleAuthRequestConfig> = isExpoGo
-    ? {
-        ...baseConfig,
-        clientId: WEB_CLIENT_ID,
-        redirectUri: makeRedirectUri({ scheme: 'musikquiz' }),
-      }
-    : {
-        ...baseConfig,
-        clientId: WEB_CLIENT_ID,
-        redirectUri: HTTPS_REDIRECT_URI,
-      };
+    ? { ...baseConfig, clientId: WEB_CLIENT_ID, redirectUri: makeRedirectUri({ scheme: 'musikquiz' }) }
+    : { ...baseConfig, clientId: WEB_CLIENT_ID, redirectUri: HTTPS_REDIRECT_URI };
 
   const [request, response, promptAsync] = useAuthRequest(googleConfig);
 
@@ -65,31 +111,29 @@ export default function LoginScreen() {
       const { id_token } = response.params as { id_token?: string };
       if (id_token) {
         const credential = GoogleAuthProvider.credential(id_token);
-        signInWithCredential(auth, credential).catch((e) =>
-          setError('Fel: ' + ((e as any)?.code ?? 'unknown'))
-        );
+        const wasAnon = !!auth.currentUser?.isAnonymous;
+        signInWithCredential(auth, credential)
+          .then(async () => {
+            if (wasAnon) {
+              try { await AsyncStorage.removeItem('duoSeenSongsHistory'); } catch {}
+            }
+          })
+          .catch((e) => setError('Fel: ' + ((e as any)?.code ?? 'unknown')));
       } else {
         setError('Saknar id_token i Google-svaret.');
       }
     } else if (response?.type === 'error') {
-      console.log('[Auth] Google response error:', response);
       setError('Google-inloggning misslyckades. Försök igen.');
     }
   }, [response]);
 
-  // 🔎 Debug: logga vilken redirectUri providern faktiskt använder
-  useEffect(() => {
-    if (request?.redirectUri) {
-      console.log('[Auth] resolved redirectUri =', request.redirectUri);
-    }
-  }, [request]);
-
-  const handleAuthAction = async (action: 'signIn' | 'signUp') => {
+  const doEmailSignIn = async () => {
     setLoading(true);
     setError('');
+    setInfo('');
     try {
-      if (action === 'signIn') await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      // RN uses persistent auth by default. The checkbox is UI-only for now.
     } catch (e: any) {
       setError('Fel: ' + e.code);
     } finally {
@@ -97,34 +141,121 @@ export default function LoginScreen() {
     }
   };
 
+  const doResetPassword = async () => {
+  try {
+    setError('');
+    setInfo('');
+    const em = email.trim();
+    if (!em) {
+      setError('Fyll i din e-post för återställning.');
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+      setError('Ogiltig e-postadress.');
+      return;
+    }
+    await sendPasswordResetEmail(auth, em, {
+      url: 'https://musikquiz-app.web.app',
+      handleCodeInApp: false,
+    });
+    setInfo('Återställningslänk skickad till din e-post.');
+    Alert.alert('Skickat', 'Vi har skickat en återställningslänk till din e-post.');
+  } catch (e: any) {
+    console.error('sendPasswordResetEmail error:', e);
+    const msg = e?.code ? `${e.code}: ${e.message ?? ''}` : String(e);
+    setError('Kunde inte skicka återställningslänk: ' + msg);
+    Alert.alert('Fel', `Kunde inte skicka återställningslänk.
+${msg}`);
+  }
+};
+
   return (
-    <Center flex={1} px="$4">
-      <VStack space="lg" alignItems="center" w="$full" maxWidth={400}>
-        <Heading size="2xl">🎵 Musikquiz</Heading>
+    <Center flex={1} px="$4" bg="#0b0b0c">
+      <Box
+        w="$full"
+        maxWidth={480}
+        px="$6"
+        py="$8"
+        style={{ backgroundColor: '#111216', borderRadius: 16, borderWidth: 1, borderColor: '#ffffff' }}
+      >
+        <VStack space="lg" w="$full">
+          <Heading size="xl" color="#fff">Login to your account</Heading>
+          <HStack alignItems="center" space="xs">
+            <Text color="#9ca3af">Don’t have an account?</Text>
+            <Link onPress={onGoToSignup}><Text color="#fff">Sign up</Text></Link>
+          </HStack>
 
-        <Input variant="outline" size="lg" w="$full">
-          <InputField placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-        </Input>
-        <Input variant="outline" size="lg" w="$full">
-          <InputField placeholder="Lösenord" value={password} onChangeText={setPassword} secureTextEntry />
-        </Input>
+          {/* Email */}
+          <FormControl isRequired>
+            <FormControlLabel>
+              <FormControlLabelText color="#e5e7eb">Email</FormControlLabelText>
+            </FormControlLabel>
+            <Input>
+              <InputField placeholder="abc@gmail.com" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} style={{ color: '#fff' }} placeholderTextColor="#9ca3af" />
+            </Input>
+          </FormControl>
 
-        {error ? <Text color="$red700" mt="$2">{error}</Text> : null}
-        {loading ? (
-          <ActivityIndicator style={{ marginTop: 16 }} />
-        ) : (
-          <VStack space="md" w="$full" mt="$4">
-            <Button onPress={() => handleAuthAction('signIn')}><ButtonText>Logga in</ButtonText></Button>
-            <Button onPress={() => handleAuthAction('signUp')} variant="outline"><ButtonText>Registrera konto</ButtonText></Button>
-            <Button isDisabled={!request} onPress={() => promptAsync()} variant="solid" action="secondary">
-              <ButtonText>Logga in med Google</ButtonText>
+          {/* Password */}
+          <FormControl isRequired>
+            <FormControlLabel>
+              <FormControlLabelText color="#e5e7eb">Password</FormControlLabelText>
+            </FormControlLabel>
+            <Input>
+              <InputField placeholder="Enter password" secureTextEntry={!showPassword} value={password} onChangeText={setPassword} style={{ color: '#fff' }} placeholderTextColor="#9ca3af" />
+              <InputSlot pr="$3" onPress={() => setShowPassword((s) => !s)}>
+                <InputIcon as={showPassword ? EyeOffIcon : EyeIcon} />
+              </InputSlot>
+            </Input>
+          </FormControl>
+
+          {/* Remember + Forgot */}
+          <HStack alignItems="center">
+            <Checkbox value="remember" isChecked={rememberMe} onChange={() => setRememberMe((v) => !v)}>
+              <CheckboxIndicator mr="$2">
+                <CheckboxIcon as={CheckIcon} />
+              </CheckboxIndicator>
+              <CheckboxLabel color="#e5e7eb">Remember me</CheckboxLabel>
+            </Checkbox>
+            <Button variant="link" onPress={doResetPassword} ml="auto" pl="$2">
+              <ButtonText style={{ color: '#fff' }}>Forgot Password?</ButtonText>
             </Button>
-            <Button onPress={continueAnonymously} variant="link" mt="$8">
-              <ButtonText color="$textLight500">Fortsätt utan att logga in (Test)</ButtonText>
-            </Button>
-          </VStack>
-        )}
-      </VStack>
+          </HStack>
+
+          {/* Errors & info */}
+          {error ? <Text color="#f87171">{error}</Text> : null}
+          {info ? <Text color="#34d399">{info}</Text> : null}
+
+          {/* Primary action */}
+          {loading ? (
+            <ActivityIndicator />
+          ) : (
+            <Button onPress={doEmailSignIn} style={{ backgroundColor: '#1f2937', borderColor: '#ffffff', borderWidth: 1 }}>
+  <ButtonText style={{ color: '#fff' }}>Login</ButtonText>
+</Button>
+          )}
+
+          {/* Divider */}
+          <HStack alignItems="center" space="sm">
+            <Divider style={{ flex: 1, backgroundColor: '#1f2937' }} />
+            <Text color="#9ca3af">OR CONTINUE WITH</Text>
+            <Divider style={{ flex: 1, backgroundColor: '#1f2937' }} />
+          </HStack>
+
+          <HStack space="md" justifyContent="center">
+  <Button isDisabled={!request} onPress={() => promptAsync()} variant="outline" style={{ borderColor: '#ffffff' }}>
+    <HStack space="sm" alignItems="center">
+      <Icon as={Chrome} color="#fff" />
+      <ButtonText style={{ color: '#fff' }}>Google</ButtonText>
+    </HStack>
+  </Button>
+</HStack>
+
+<Button onPress={continueAnonymously} variant="link" mt="$2">
+  <ButtonText color="#9ca3af">Fortsätt utan att logga in (Test)</ButtonText>
+</Button>
+
+</VStack>
+      </Box>
     </Center>
   );
 }

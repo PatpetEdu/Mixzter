@@ -13,6 +13,7 @@ import { config } from '@gluestack-ui/config';
 import PlayerSetupScreen from './components/PlayerSetupScreen';
 import DuoGameScreen from './components/DuoGameScreen';
 import LoginScreen from './components/LoginScreen';
+import SignupScreen from './components/SignupScreen';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { auth } from './firebase';
@@ -72,13 +73,16 @@ function AppContent() {
   const [players, setPlayers] = useState<{ player1: string; player2: string } | null>(null);
   const [preloadedDuoCard, setPreloadedDuoCard] = useState<CardData | null>(null);
 
+  // NEW: control which auth screen to show when unauthenticated
+  const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
+
   useEffect(() => {
     const triggerDuoPreload = async () => {
       if (mode === 'duo-setup' && !preloadedDuoCard) {
-        console.log('App.tsx: Startar pre-loading av första kortet...');
+            console.log('App.tsx: Startar pre-loading av första kortet...');
         const card = await fetchFirstCardForPreload();
         setPreloadedDuoCard(card);
-        if (card) console.log('App.tsx: Pre-loading klar!');
+          if (card) console.log('App.tsx: Pre-loading klar!');
         else console.error('App.tsx: Pre-loading misslyckades.');
       }
     };
@@ -96,6 +100,11 @@ function AppContent() {
     setMode('menu');
   };
 
+  // Reset to login view on sign out
+  useEffect(() => {
+    if (!user && !isAnonymous) setAuthScreen('login');
+  }, [user, isAnonymous]);
+
   if (loadingAuth) {
     return (
       <Center flex={1}>
@@ -105,7 +114,11 @@ function AppContent() {
   }
 
   if (!user && !isAnonymous) {
-    return <LoginScreen />;
+    return authScreen === 'login' ? (
+      <LoginScreen onGoToSignup={() => setAuthScreen('signup')} />
+    ) : (
+      <SignupScreen onGoToLogin={() => setAuthScreen('login')} />
+    );
   }
 
   return (
