@@ -24,9 +24,9 @@ export default function PlayerSetupScreen({ onStart }: Props) {
   const isFormValid = player1.trim() !== '' && player2.trim() !== '';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Center style={{ flex: 1, paddingHorizontal: 24 }}>
-        <VStack style={{ width: '100%', maxWidth: 420 }} space="lg">
+    <KeyboardAvoidingView style={{ flex: 1, width: '100%' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Center flex={1} px="$6">
+        <VStack w="$full" maxWidth={420} space="lg">
           <Heading size="xl" textAlign="center">👥 Duo-läge – Lag/Namn</Heading>
 
           <Input>
@@ -54,7 +54,7 @@ export default function PlayerSetupScreen({ onStart }: Props) {
             />
           </Input>
 
-          {error ? <Text style={{ color: '#b91c1c', textAlign: 'center' }}>{error}</Text> : null}
+          {error ? <Text color="$error700" textAlign="center">{error}</Text> : null}
 
           <Button onPress={handleStart} isDisabled={!isFormValid}>
             <ButtonText>Starta spel</ButtonText>

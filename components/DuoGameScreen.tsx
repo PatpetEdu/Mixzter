@@ -46,6 +46,10 @@ const currentYear = new Date().getFullYear();
 const WINNING_SCORE = 10;
 const MAX_STARS = 5;
 
+function getRandomYear() {
+  return Math.floor(Math.random() * (2025 - 1970 + 1)) + 1970;
+}
+
 export default function DuoGameScreen({
   player1,
   player2,
@@ -98,10 +102,6 @@ export default function DuoGameScreen({
       else setGameOverMessage(`${player2} vinner!`);
     }
   }, [players, activePlayer, player1, player2]);
-
-  function getRandomYear() {
-    return Math.floor(Math.random() * (2025 - 1970 + 1)) + 1970;
-  }
 
   const handleAwardStar = () => {
     setPlayers((prev) => {
@@ -192,61 +192,64 @@ export default function DuoGameScreen({
     const roundTimeline = isCurrentPlayer ? roundCards.map((c) => c.year) : [];
     const yearsToDisplay = [...finalTimeline, ...roundTimeline].sort((a, b) => a - b);
 
-    // 🔵 Aktiv highlight-stil
-    const baseStyle = {
-      borderWidth: 1,
-      borderColor: '#e5e7eb',
-      borderRadius: 10,
-      padding: 12,
-      marginVertical: 8,
-      width: '100%',
-      backgroundColor: '#fff',
-    } as const;
-
-    const activeStyle = isCurrentPlayer
-      ? { borderColor: '#3b82f6', backgroundColor: '#eff6ff' } // blå border + ljusblå bakgrund
-      : null;
-
     return (
-      <Box style={{ ...baseStyle, ...(activeStyle || {}) }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#111827' }}>
+        // 🔵 Aktiv highlight-stil
+      <Box
+        borderWidth={1}
+        borderRadius="$lg"
+        p="$3"
+        my="$2"
+        w="$full"
+        bg={isCurrentPlayer ? "$primary100" : "$backgroundLight100"}
+        borderColor={isCurrentPlayer ? "$primary300" : "$borderLight300"}
+        sx={{
+            _dark: {
+                bg: isCurrentPlayer ? "$primary900" : "$backgroundDark800",
+                borderColor: isCurrentPlayer ? "$primary700" : "$borderDark700"
+            }
+        }}
+      >
+        <HStack justifyContent="space-between" alignItems="center">
+          <Text bold fontSize="$lg" color="$textLight900" sx={{_dark: {color: "$textDark100"}}}>
             {player.name}s tidslinje ({finalTimeline.length - 1} kort)
           </Text>
-          <Text style={{ fontWeight: 'bold', fontSize: 18 }}>⭐ {player.stars}</Text>
-        </View>
+          <Text bold fontSize="$lg" color="$textLight900" sx={{_dark: {color: "$textDark100"}}}>⭐ {player.stars}</Text>
+        </HStack>
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+        <HStack flexWrap="wrap" mt="$2">
           {yearsToDisplay.map((year, idx) => {
             const isPrelim =
               isCurrentPlayer && roundCards.some((c) => c.year === year) && !finalTimeline.includes(year);
             return (
-              <View
+              <Box
                 key={`${year}-${idx}`}
-                style={{
-                  paddingHorizontal: 6,
-                  paddingVertical: 3,
-                  marginRight: 8,
-                  marginBottom: 8,
-                  borderRadius: 6,
-                  backgroundColor: isPrelim ? '#eef2ff' : '#e5e7eb',
+                px="$2"
+                py="$1"
+                mr="$2"
+                mb="$2"
+                borderRadius="$md"
+                bg={isPrelim ? "$primary200" : "$backgroundLight200"}
+                sx={{
+                    _dark: {
+                        bg: isPrelim ? "$primary800" : "$backgroundDark700"
+                    }
                 }}
               >
-                <Text style={{ color: '#374151' }}>{String(year)}</Text>
-              </View>
+                <Text color="$textLight700" sx={{_dark: {color: "$textDark300"}}}>{String(year)}</Text>
+              </Box>
             );
           })}
-        </View>
+        </HStack>
       </Box>
     );
   };
 
   if (gameOverMessage) {
     return (
-      <VStack style={{ flex: 1, paddingHorizontal: 20, paddingVertical: 24, alignItems: 'center' }} space="md">
+      <VStack flex={1} px="$5" py="$6" alignItems="center" space="md">
         <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
-        <Text style={{ fontSize: 18, color: '#2563eb' }}>{gameOverMessage}</Text>
-        <VStack space="xs" style={{ alignItems: 'center', marginVertical: 12 }}>
+        <Text fontSize="$lg" color="$primary600" sx={{_dark: {color: "$primary400"}}}>{gameOverMessage}</Text>
+        <VStack space="xs" alignItems="center" my="$3">
           <Text>
             {player1}: {players[player1].timeline.length} kort
           </Text>
@@ -266,25 +269,25 @@ export default function DuoGameScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Box alignItems="center" mb="$2">
+       <Box alignItems="center" mb="$2">
  <Image
   source={MIXZTER_LOGO}
   alt="MIXZTER"
   style={{ width: 96, height: 96, resizeMode: 'contain' }}
 />
 </Box>
-      <Text style={{ fontSize: 16, marginBottom: 8 }}>Nu spelar: {activePlayer}</Text>
+      <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
 
       {renderTimeline(current, true)}
       {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
 
       {isLoadingCard ? (
-        <VStack style={{ alignItems: 'center', marginTop: 16 }}>
+        <VStack alignItems="center" mt="$4">
           <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 8 }}>Genererar kort...</Text>
+          <Text mt="$2">Genererar kort...</Text>
         </VStack>
       ) : errorMessage ? (
-        <Text style={{ color: '#dc2626' }}>{errorMessage}</Text>
+        <Text color="$error600">{errorMessage}</Text>
       ) : !card ? (
         <Button onPress={() => generateCard(resetInputs)}>
           <ButtonText>Starta spelet</ButtonText>
@@ -292,26 +295,25 @@ export default function DuoGameScreen({
       ) : null}
 
       {card && !guessConfirmed && !isLoadingCard && (
-        <VStack space="md" style={{ width: '100%' }}>
+        <VStack space="md" w="$full">
           <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
 
           {isSongInfoVisible && (
             <Box
-              style={{
-                backgroundColor: '#eef2ff',
-                borderColor: '#c7d2fe',
-                borderWidth: 1,
-                borderRadius: 8,
-                padding: 10,
-              }}
+              bg="$info100"
+              borderColor="$info300"
+              sx={{_dark: {bg: "$info900", borderColor: "$info700"}}}
+              borderWidth={1}
+              borderRadius="$lg"
+              p="$3"
             >
-              <Text style={{ textAlign: 'center' }}>Artist: {card.artist}</Text>
-              <Text style={{ textAlign: 'center' }}>Låt: {card.title}</Text>
-              <Text style={{ textAlign: 'center' }}>Låt: {card.year}</Text>
+              <Text textAlign="center">Artist: {card.artist}</Text>
+              <Text textAlign="center">Låt: {card.title}</Text>
+              <Text textAlign="center">År: {card.year}</Text>
             </Box>
           )}
 
-          <HStack style={{ justifyContent: 'space-around', width: '100%', marginVertical: 8 }}>
+          <HStack justifyContent="space-around" w="$full" my="$2">
             <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}>
               <ButtonText>Hoppa över (-1 ⭐)</ButtonText>
             </Button>
@@ -320,15 +322,13 @@ export default function DuoGameScreen({
             </Button>
           </HStack>
 
-          {/* 🆕 Gluestack Input i stället för RN TextInput */}
           <Input
             w="$full"
             maxWidth={220}
-            alignSelf="center" 
+            alignSelf="center"
             variant="outline"
             size="md"
-            // röd kant när ogiltigt
-            style={isGuessValid ? undefined : { borderColor: '#dc2626' }}
+            isInvalid={!isGuessValid}
           >
             <InputField
               placeholder="Ex: 2012"
@@ -341,7 +341,7 @@ export default function DuoGameScreen({
           </Input>
 
           {!isGuessValid && (
-            <Text style={{ color: '#dc2626' }}>Årtalet måste vara mellan 1900 och {currentYear}</Text>
+            <Text color="$error600" textAlign="center">Årtalet måste vara mellan 1900 och {currentYear}</Text>
           )}
           <Button onPress={handleConfirmGuess}>
             <ButtonText>Bekräfta gissning</ButtonText>
@@ -350,11 +350,11 @@ export default function DuoGameScreen({
       )}
 
       {showBack && card && (
-        <VStack space="md" style={{ alignItems: 'center', width: '100%' }}>
+        <VStack space="md" alignItems="center" w="$full">
           <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
           {wasCorrect ? (
-            <VStack style={{ alignItems: 'center', width: '100%', marginTop: 8 }} space="sm">
-              <Text style={{ color: 'green', fontWeight: 'bold' }}>✅ Rätt gissat!</Text>
+            <VStack alignItems="center" w="$full" mt="$2" space="sm">
+              <Text color="$success600" bold>✅ Rätt gissat!</Text>
               <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}>
                 <ButtonText>Ge stjärna (+1)</ButtonText>
               </Button>
@@ -366,13 +366,13 @@ export default function DuoGameScreen({
               </Button>
             </VStack>
           ) : (
-            <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>❌ Fel svar! Nästa spelares tur...</Text>
+            <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
           )}
         </VStack>
       )}
 
       <TouchableOpacity onPress={onBackToMenu} style={{ marginTop: 16 }}>
-        <Text style={{ textDecorationLine: 'underline', color: '#6b7280' }}>Avsluta till meny</Text>
+        <Text underline color="$textLight500" sx={{_dark: {color: "$textDark500"}}}>Avsluta till meny</Text>
       </TouchableOpacity>
     </ScrollView>
   );

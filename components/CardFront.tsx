@@ -13,9 +13,9 @@ export default function CardFront({ spotifyUrl, onFlip, showFlipButton = true }:
   const handleOpenSpotify = () => openSpotify(spotifyUrl);
 
   return (
-    <Box style={{ alignItems: 'center', padding: 24, backgroundColor: '#f2f2f2', borderRadius: 16 }}>
+    <Box alignItems="center" p="$6" bg="$backgroundLight100" sx={{_dark: {bg: "$backgroundDark800"}}} borderRadius="$xl">
       <QRCode value={spotifyUrl} size={180} />
-      <VStack space="md" style={{ marginTop: 20, width: '100%', alignItems: 'center' }}>
+      <VStack space="md" mt="$5" w="$full" alignItems="center">
         <Button onPress={handleOpenSpotify}>
           <ButtonText>🎧 Öppna i Spotify</ButtonText>
         </Button>

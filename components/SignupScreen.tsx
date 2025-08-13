@@ -31,7 +31,6 @@ export type SignupScreenProps = { onGoToLogin: () => void };
 
 export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
   const { continueAnonymously } = useAuth();
-
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,13 +70,8 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
   };
 
   const isSubmitDisabled =
-    loading ||
-    !acceptTerms ||
-    !email.trim() ||
-    !password ||
-    !confirm ||
-    password !== confirm ||
-    password.length < 6;
+    loading || !acceptTerms || !email.trim() || !password || !confirm ||
+    password !== confirm || password.length < 6;
 
   return (
     <Center flex={1} px="$4" bg="#0b0b0c">
@@ -86,12 +80,10 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
         maxWidth={520}
         px="$6"
         py="$8"
-        style={{
-          backgroundColor: '#111216',
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: '#ffffff',
-        }}
+        bg="#111216"
+        borderRadius={16}
+        borderWidth={1}
+        borderColor="#ffffff"
       >
         <VStack space="lg">
           <Heading size="xl" color="#fff">
@@ -105,7 +97,7 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
             </Link>
           </HStack>
 
-          {/* Display name (optional) */}
+               {/* Display name (optional) */}
           <FormControl>
             <FormControlLabel>
               <FormControlLabelText color="#e5e7eb">
@@ -117,13 +109,13 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
                 placeholder="Ex: Patrik"
                 value={displayName}
                 onChangeText={setDisplayName}
-                style={{ color: '#fff' }}
+                color="#fff"
                 placeholderTextColor="#9ca3af"
               />
             </Input>
           </FormControl>
 
-          {/* Email */}
+            {/* Email */}
           <FormControl isRequired>
             <FormControlLabel>
               <FormControlLabelText color="#e5e7eb">Email</FormControlLabelText>
@@ -135,13 +127,13 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
-                style={{ color: '#fff' }}
+                color="#fff"
                 placeholderTextColor="#9ca3af"
               />
             </Input>
           </FormControl>
 
-          {/* Password */}
+            {/* Password */}
           <FormControl isRequired>
             <FormControlLabel>
               <FormControlLabelText color="#e5e7eb">Password</FormControlLabelText>
@@ -152,16 +144,16 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
-                style={{ color: '#fff' }}
+                color="#fff"
                 placeholderTextColor="#9ca3af"
               />
               <InputSlot pr="$3" onPress={() => setShowPassword((s) => !s)}>
-                <InputIcon as={showPassword ? EyeOffIcon : EyeIcon} />
+                <InputIcon as={showPassword ? EyeOffIcon : EyeIcon} color="#9ca3af" />
               </InputSlot>
             </Input>
           </FormControl>
 
-          {/* Confirm password */}
+            {/* Confirm password */}
           <FormControl isRequired>
             <FormControlLabel>
               <FormControlLabelText color="#e5e7eb">Confirm password</FormControlLabelText>
@@ -171,20 +163,21 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
                 secureTextEntry={!showPassword}
                 value={confirm}
                 onChangeText={setConfirm}
-                style={{ color: '#fff' }}
+                color="#fff"
                 placeholderTextColor="#9ca3af"
               />
             </Input>
             {confirm && password && password !== confirm ? (
-              <Text color="#f87171">Password doesn't match</Text>
+              <Text color="#f87171" size="sm" mt="$1">Password doesn't match</Text>
             ) : null}
           </FormControl>
 
-          {/* Terms checkbox (required) */}
+           {/* Terms checkbox (required) */}
           <Checkbox
             value="terms"
             isChecked={acceptTerms}
             onChange={() => setAcceptTerms((v) => !v)}
+            aria-label="Accept terms"
           >
             <CheckboxIndicator mr="$2">
               <CheckboxIcon as={CheckIcon} />
@@ -194,16 +187,18 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
             </CheckboxLabel>
           </Checkbox>
 
-          {/* Errors */}
+            {/* Errors */}
           {error ? <Text color="#f87171">{error}</Text> : null}
 
-          {/* Submit */}
+            {/* Submit */}
           <Button
             onPress={doSignup}
             isDisabled={isSubmitDisabled}
-            style={{ backgroundColor: '#1f2937', borderColor: '#ffffff', borderWidth: 1 }}
+            bg="#1f2937"
+            borderColor="#ffffff"
+            borderWidth={1}
           >
-            <ButtonText style={{ color: '#fff' }}>
+            <ButtonText color="#fff">
               {loading ? 'Skapar konto…' : 'Skapa konto'}
             </ButtonText>
           </Button>
