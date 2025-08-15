@@ -1,34 +1,11 @@
-import React from 'react';
-import { Platform, Alert, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { Linking, Platform } from 'react-native';
+import { Box, Button, ButtonText, VStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
+import { Music, QrCodeIcon } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { Box, Button, ButtonText, VStack } from '@gluestack-ui/themed';
+import AudioVisualizer from './AudioVisualizer';
 
-type Props = {
-  spotifyUrl: string;
-  onFlip: () => void;
-  showFlipButton?: boolean;
-};
-
-export default function CardFront({ spotifyUrl, onFlip, showFlipButton = true }: Props) {
-  const handleOpenSpotify = () => openSpotify(spotifyUrl);
-
-  return (
-    <Box alignItems="center" p="$6" bg="$backgroundLight100" sx={{_dark: {bg: "$backgroundDark800"}}} borderRadius="$xl">
-      <QRCode value={spotifyUrl} size={180} />
-      <VStack space="md" mt="$5" w="$full" alignItems="center">
-        <Button onPress={handleOpenSpotify}>
-          <ButtonText>🎧 Öppna i Spotify</ButtonText>
-        </Button>
-        {showFlipButton && (
-          <Button variant="outline" onPress={onFlip}>
-            <ButtonText>Vänd kortet</ButtonText>
-          </Button>
-        )}
-      </VStack>
-    </Box>
-  );
-}
-
+// Återställd och mer robust funktion för att öppna Spotify
 async function openSpotify(spotifyUrl: string) {
   try {
     if (Platform.OS === 'web') {
@@ -41,16 +18,83 @@ async function openSpotify(spotifyUrl: string) {
     const trackId = match?.[1];
 
     if (!trackId) {
-      Alert.alert('Ogiltig länk', 'Kunde inte läsa ut låt-ID från länken.');
+      console.error('Ogiltig länk', 'Kunde inte läsa ut låt-ID från länken.');
       return;
     }
 
     const appUrl = `spotify:track:${trackId}`;
     const supported = await Linking.canOpenURL(appUrl);
 
-    if (supported) await Linking.openURL(appUrl);
-    else await Linking.openURL(spotifyUrl);
+    if (supported) {
+      await Linking.openURL(appUrl);
+    } else {
+      await Linking.openURL(spotifyUrl);
+    }
   } catch (error) {
-    Alert.alert('Fel vid öppning', String(error));
+    console.error('Fel vid öppning', String(error));
   }
+}
+
+type Props = {
+  spotifyUrl: string;
+  onFlip: () => void;
+  showFlipButton: boolean;
+};
+
+export default function CardFront({ spotifyUrl }: Props) {
+  const [showQrCode, setShowQrCode] = useState(false);
+  // Använd useColorMode för att bestämma färgen baserat på temat
+  const colorMode = useColorMode();
+  const qrColor = colorMode === 'dark' ? 'white' : 'black';
+
+  const handleOpenSpotify = () => {
+    openSpotify(spotifyUrl);
+  };
+
+  return (
+    <Box
+      p="$5"
+      borderRadius="$lg"
+      borderWidth={1}
+      borderColor="$borderLight300"
+      bg="$backgroundLight50"
+      sx={{
+        _dark: {
+          borderColor: '$borderDark700',
+          bg: '$backgroundDark900',
+        },
+      }}
+    >
+      <Pressable
+        onPress={() => setShowQrCode(!showQrCode)}
+        position="absolute"
+        top={10}
+        right={10}
+        p="$2"
+        zIndex={1}
+      >
+        <Icon as={QrCodeIcon} size="xl" color="$textLight400" sx={{ _dark: { color: '$textDark500' } }} />
+      </Pressable>
+
+      <VStack space="lg" alignItems="center">
+        <Box h={128} w={128} justifyContent="center" alignItems="center">
+          {showQrCode ? (
+            <QRCode
+              value={spotifyUrl}
+              size={128}
+              backgroundColor="transparent"
+              color={qrColor} // Använder nu en färg som garanterat fungerar
+            />
+          ) : (
+            <AudioVisualizer />
+          )}
+        </Box>
+
+        <Button onPress={handleOpenSpotify} w="$full">
+          <Icon as={Music} mr="$2" color="$white" />
+          <ButtonText>Öppna i Spotify</ButtonText>
+        </Button>
+      </VStack>
+    </Box>
+  );
 }
