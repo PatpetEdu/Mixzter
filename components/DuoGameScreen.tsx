@@ -11,12 +11,14 @@ import {
   Input,
   InputField,
   Image,
+  Center,
 } from '@gluestack-ui/themed';
 import CardFront from './CardFront';
 import CardBack from './CardBack';
 import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
 import InGameMenu from './InGameMenu'; // Importera den nya komponenten
+
 
 const MIXZTER_LOGO = require('../assets/mixzter-icon-1024.png');
 // Typer
@@ -49,11 +51,10 @@ const MAX_STARS = 5;
 export default function DuoGameScreen({
   player1,
   player2,
-  onBackToMenu,
   initialPreloadedCard,
   onPreloadComplete,
 }: Props) {
-  // Hooks för data och UI-state
+    // Hooks för data och UI-state
   const { card, setCard, isLoadingCard, errorMessage, generateCard } = useGenerateSongs(
     initialPreloadedCard,
     onPreloadComplete
@@ -63,8 +64,7 @@ export default function DuoGameScreen({
   const [isGuessValid, setIsGuessValid] = useState(true);
   const [showBack, setShowBack] = useState(false);
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
-
-  // Hook för spellogik
+// Hook för spellogik
   const {
     players,
     activePlayer,
@@ -88,7 +88,7 @@ export default function DuoGameScreen({
     },
   });
 
-  // Funktion för att återställa inputs
+    // Funktion för att återställa inputs
   const resetInputs = useCallback(() => {
     setGuess('');
     setGuessConfirmed(false);
@@ -98,7 +98,7 @@ export default function DuoGameScreen({
     resetTurnState();
   }, [resetTurnState]);
 
-  // useEffect för att starta spelet, körs endast en gång
+    // useEffect för att starta spelet, körs endast en gång
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!card && !initialPreloadedCard && !gameOverMessage) {
@@ -106,7 +106,7 @@ export default function DuoGameScreen({
     }
   }, []); // <-- Tom beroendelista säkerställer att detta bara körs vid montering
 
-  // useEffect för 60-sekunders timer vid fel svar
+   // useEffect för 60-sekunders timer vid fel svar
   useEffect(() => {
     let timerId: NodeJS.Timeout;
     if (showBack && !wasCorrect) {
@@ -119,7 +119,7 @@ export default function DuoGameScreen({
     };
   }, [showBack, wasCorrect, switchPlayerTurn]);
 
-
+  
   // Handlers
   const handleAwardStar = () => awardStar();
   const handleSkipSong = () => skipSong();
@@ -167,15 +167,16 @@ export default function DuoGameScreen({
 
   if (gameOverMessage) {
     return (
-      <VStack flex={1} px="$5" py="$6" alignItems="center" space="md">
-        <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
-        <Text fontSize="$lg" color="$primary600" sx={{_dark: {color: "$primary400"}}}>{gameOverMessage}</Text>
-        <VStack space="xs" alignItems="center" my="$3">
-          <Text>{player1}: {players[player1].timeline.length} kort</Text>
-          <Text>{player2}: {players[player2].timeline.length} kort</Text>
+      <Center flex={1} px="$4">
+        <VStack alignItems="center" space="md">
+            <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
+            <Text fontSize="$lg" color="$primary600" sx={{_dark: {color: "$primary400"}}}>{gameOverMessage}</Text>
+            <VStack space="xs" alignItems="center" my="$3">
+              <Text>{player1}: {players[player1].timeline.length} kort</Text>
+              <Text>{player2}: {players[player2].timeline.length} kort</Text>
+            </VStack>
         </VStack>
-        <Button onPress={onBackToMenu}><ButtonText>Tillbaka till menyn</ButtonText></Button>
-      </VStack>
+      </Center>
     );
   }
 
@@ -183,56 +184,52 @@ export default function DuoGameScreen({
   const canAffordSkip = current.stars > 0;
 
   return (
-    <Box flex={1}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
-        <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
-        {renderTimeline(current, true)}
-        {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
-        {isLoadingCard ? (<VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>) : errorMessage ? (<Text color="$error600">{errorMessage}</Text>) : !card ? (<Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>) : null}
-        {card && !guessConfirmed && !isLoadingCard && (
-          <VStack space="md" w="$full">
-            <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
-            {isSongInfoVisible && (<Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: "$info900", borderColor: "$info700"}}} borderWidth={1} borderRadius="$lg" p="$3"><Text textAlign="center">Artist: {card.artist}</Text><Text textAlign="center">Låt: {card.title}</Text><Text textAlign="center">År: {card.year}</Text></Box>)}
-            <HStack justifyContent="space-around" w="$full" my="$2">
-              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
-              <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
-            </HStack>
-            <Input w="$full" maxWidth={220} alignSelf="center" variant="outline" size="md" isInvalid={!isGuessValid}>
-              <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
-            </Input>
-            {!isGuessValid && (<Text color="$error600" textAlign="center">Årtalet måste vara mellan 1900 och {currentYear}</Text>)}
-            <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
-          </VStack>
-        )}
-        {showBack && card && (
-          <VStack space="md" alignItems="center" w="$full">
-            <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
-            {wasCorrect ? (
-              <VStack alignItems="center" w="$full" mt="$2" space="sm">
-                <Text color="$success600" bold>✅ Rätt gissat!</Text>
-                <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
-                <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
-                <Button onPress={handleSave} variant="outline"><ButtonText>Spara & avsluta runda</ButtonText></Button>
-              </VStack>
-            ) : (
-              <VStack alignItems="center" w="$full" mt="$2" space="sm">
-                <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
-                <Button onPress={switchPlayerTurn} variant="solid" action="negative">
-                  <ButtonText>Klar</ButtonText>
-                </Button>
-              </VStack>
-            )}
-          </VStack>
-        )}
-      </ScrollView>
-      {/* Lägg till den nya menyn här, utanför ScrollView */}
-      <InGameMenu onBackToMenu={onBackToMenu} />
-    </Box>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
+      <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
+      {renderTimeline(current, true)}
+      {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
+      {isLoadingCard ? (<VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>) : errorMessage ? (<Text color="$error600">{errorMessage}</Text>) : !card ? (<Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>) : null}
+      {card && !guessConfirmed && !isLoadingCard && (
+        <VStack space="md" w="$full">
+          <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
+          {isSongInfoVisible && (<Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: "$info900", borderColor: "$info700"}}} borderWidth={1} borderRadius="$lg" p="$3"><Text textAlign="center">Artist: {card.artist}</Text><Text textAlign="center">Låt: {card.title}</Text><Text textAlign="center">År: {card.year}</Text></Box>)}
+          <HStack justifyContent="space-around" w="$full" my="$2">
+            <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
+            <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
+          </HStack>
+          <Input w="$full" maxWidth={220} alignSelf="center" variant="outline" size="md" isInvalid={!isGuessValid}>
+            <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
+          </Input>
+          {!isGuessValid && (<Text color="$error600" textAlign="center">Årtalet måste vara mellan 1900 och {currentYear}</Text>)}
+          <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
+        </VStack>
+      )}
+      {showBack && card && (
+        <VStack space="md" alignItems="center" w="$full">
+          <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
+          {wasCorrect ? (
+            <VStack alignItems="center" w="$full" mt="$2" space="sm">
+              <Text color="$success600" bold>✅ Rätt gissat!</Text>
+              <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
+              <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
+              <Button onPress={handleSave} variant="outline"><ButtonText>Spara & avsluta runda</ButtonText></Button>
+            </VStack>
+          ) : (
+            <VStack alignItems="center" w="$full" mt="$2" space="sm">
+              <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
+              <Button onPress={switchPlayerTurn} variant="solid" action="negative">
+                <ButtonText>Klar</ButtonText>
+              </Button>
+            </VStack>
+          )}
+        </VStack>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  // Justera paddingBottom för att ge plats åt den flytande knappen
-  container: { padding: 20, paddingBottom: 80, alignItems: 'center', flexGrow: 1, justifyContent: 'flex-start' },
+  container: { paddingHorizontal: 20, paddingBottom: 20, alignItems: 'center', flexGrow: 1 },
 });
+

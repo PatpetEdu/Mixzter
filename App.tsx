@@ -7,15 +7,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context'; 
 
 // UI & Theme
-import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center, Icon, Pressable } from '@gluestack-ui/themed';
+import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
-import { MoonIcon, SunIcon } from 'lucide-react-native';
 
 
 // Egen kod
 import PlayerSetupScreen from './components/PlayerSetupScreen';
 import DuoGameScreen from './components/DuoGameScreen';
 import LoginScreen from './components/LoginScreen';
+import GameHeader from './components/GameHeader'; 
+import GameFooter from './components/GameFooter'; 
 import SignupScreen from './components/SignupScreen';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext'; // Importera ThemeProvider och useTheme
@@ -52,31 +53,12 @@ const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
       console.error('App.tsx Preload: Fel från servern:', res.status, text);
       return null;
     }
-    try {
-      return JSON.parse(text) as CardData;
-    } catch (jsonError) {
-      console.error('App.tsx Preload: Kunde inte parsa JSON från servern.', jsonError);
-      console.error('App.tsx Preload: Råtext från servern:', text);
-      return null;
-    }
+    return JSON.parse(text) as CardData;
   } catch (err) {
     console.error('App.tsx Preload: Kritiskt fel i nätverksanrop:', err);
     return null;
   }
 };
-
-
-function AppHeader() {
-    const { colorMode, toggleColorMode } = useTheme();
-    return (
-        <Box position="absolute" top={40} right={20} zIndex={1}>
-            <Pressable onPress={toggleColorMode} p="$2">
-                <Icon as={colorMode === 'dark' ? SunIcon : MoonIcon} size="xl" color="$textLight800" sx={{ _dark: { color: '$textDark200'}}} />
-            </Pressable>
-        </Box>
-    );
-}
-
 
 function AppContent() {
   const { user, loadingAuth, isAnonymous, signOut } = useAuth();
@@ -89,11 +71,9 @@ function AppContent() {
   useEffect(() => {
     const triggerDuoPreload = async () => {
       if (mode === 'duo-setup' && !preloadedDuoCard) {
-        console.log('App.tsx: Startar pre-loading av första kortet...');
+        console.log('App.tsx: Startar pre-loading...');
         const card = await fetchFirstCardForPreload();
         setPreloadedDuoCard(card);
-        if (card) console.log('App.tsx: Pre-loading klar!');
-        else console.error('App.tsx: Pre-loading misslyckades.');
       }
     };
     if (user || isAnonymous) triggerDuoPreload();
@@ -123,7 +103,7 @@ function AppContent() {
   }
 
   if (!user && !isAnonymous) {
-    // När användaren är utloggad, visas alltid mörkt tema för login/signup
+     // När användaren är utloggad, visas alltid mörkt tema för login/signup
     // och vi sätter statusfältet manuellt.
     return (
         <>
@@ -139,42 +119,51 @@ function AppContent() {
     );
   }
 
-  return (
-    <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
-      {/* Skärminnehållet renderas här. ScrollView i DuoGameScreen kommer att scrolla oberoende. */}
-      {mode === 'menu' && (
+  // Huvudmenyn har nu en header men ingen footer
+  if (mode === 'menu') {
+    return (
+      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+        <GameHeader />
         <Center flex={1}>
           <VStack space="lg" alignItems="center">
-            <Heading size="2xl" color="$textLight900" sx={{ _dark: { color: '$textDark50' }}}>🎵 Musikquiz</Heading>
+            <Heading size="2xl">🎵 Musikquiz</Heading>
             <Text size="md" color="$textLight500" sx={{ _dark: { color: '$textDark400' }}}>{user ? `Inloggad som: ${user.email}` : 'Spelar som gäst'}</Text>
             <Button onPress={() => setMode('duo-setup')}><ButtonText>Start Duo</ButtonText></Button>
             <Button onPress={signOut} variant="link"><ButtonText>{user ? 'Logga ut' : 'Logga in'}</ButtonText></Button>
           </VStack>
         </Center>
-      )}
+      </Box>
+    );
+  }
 
-      {mode === 'duo-setup' && <PlayerSetupScreen onStart={startDuoGame} />}
+  // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
+  if (mode === 'duo-setup' || (mode === 'duo' && players)) {
+    return (
+      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+        <GameHeader />
+        <Box flex={1}>
+          {mode === 'duo-setup' && <PlayerSetupScreen onStart={startDuoGame} />}
+          {mode === 'duo' && players && (
+            <DuoGameScreen
+              player1={players.player1}
+              player2={players.player2}
+              onBackToMenu={returnToMenu}
+              initialPreloadedCard={preloadedDuoCard}
+              onPreloadComplete={() => setPreloadedDuoCard(null)}
+            />
+          )}
+        </Box>
+        <GameFooter onBackToMenu={returnToMenu} />
+      </Box>
+    );
+  }
 
-      {mode === 'duo' && players && (
-        <DuoGameScreen
-          player1={players.player1}
-          player2={players.player2}
-          onBackToMenu={returnToMenu}
-          initialPreloadedCard={preloadedDuoCard}
-          onPreloadComplete={() => setPreloadedDuoCard(null)}
-        />
-      )}
-      
-      {/* AppHeader ligger utanför skärmlogiken och kommer inte att scrolla */}
-      <AppHeader />
-    </Box>
-  );
+  return null; // Fallback
 }
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      {/* Linda in hela appen */}
       <AuthProvider>
           <ThemeProvider>
               <ThemedApp />
@@ -189,7 +178,6 @@ function ThemedApp() {
     const { colorMode } = useTheme();
     return (
         <>
-            {/* Sätter stilen på statusfältet baserat på temat */}
             <StatusBar barStyle={colorMode === 'dark' ? 'light-content' : 'dark-content'} />
             <GluestackUIProvider config={config} colorMode={colorMode}>
                 <AppContent />
