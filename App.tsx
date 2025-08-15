@@ -1,8 +1,8 @@
 // =============================
 // File: App.tsx (Uppdaterad)
 // =============================
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StatusBar } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context'; 
 
@@ -26,7 +26,8 @@ import { auth } from './firebase';
 export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
 export type GameMode = 'menu' | 'duo-setup' | 'duo';
 
-// Din fetchFirstCardForPreload funktion (inga ändringar här)
+const HEADER_HEIGHT = 85; // Ungefärlig höjd på din header, kan behöva justeras
+
 const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
   const user = auth.currentUser;
   const token = user ? await user.getIdToken() : null;
@@ -68,6 +69,22 @@ function AppContent() {
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
   const { colorMode } = useTheme();
 
+  // Animation logic
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT],
+    outputRange: [0, -HEADER_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: false,
+      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {},
+    }
+  );
+
   useEffect(() => {
     const triggerDuoPreload = async () => {
       if (mode === 'duo-setup' && !preloadedDuoCard) {
@@ -95,31 +112,23 @@ function AppContent() {
   }, [user, isAnonymous]);
 
   if (loadingAuth) {
-    return (
-      <Center flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
-        <ActivityIndicator size="large" color={colorMode === 'dark' ? 'white' : 'black'}/>
-      </Center>
-    );
+    return <Center flex={1}><ActivityIndicator size="large" /></Center>;
   }
 
   if (!user && !isAnonymous) {
-     // När användaren är utloggad, visas alltid mörkt tema för login/signup
+    // När användaren är utloggad, visas alltid mörkt tema för login/signup
     // och vi sätter statusfältet manuellt.
     return (
-        <>
-            <StatusBar barStyle="light-content" />
-            <GluestackUIProvider config={config} colorMode={'dark'}>
-                {authScreen === 'login' ? (
-                    <LoginScreen onGoToSignup={() => setAuthScreen('signup')} />
-                ) : (
-                    <SignupScreen onGoToLogin={() => setAuthScreen('login')} />
-                )}
-            </GluestackUIProvider>
-        </>
+      <>
+        <StatusBar barStyle="light-content" />
+        <GluestackUIProvider config={config} colorMode={'dark'}>
+          {authScreen === 'login' ? <LoginScreen onGoToSignup={() => setAuthScreen('signup')} /> : <SignupScreen onGoToLogin={() => setAuthScreen('login')} />}
+        </GluestackUIProvider>
+      </>
     );
   }
 
-  // Huvudmenyn har nu en header men ingen footer
+   // Huvudmenyn har nu en header men ingen footer
   if (mode === 'menu') {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
@@ -140,9 +149,12 @@ function AppContent() {
   if (mode === 'duo-setup' || (mode === 'duo' && players)) {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
-        <GameHeader />
+        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1, transform: [{ translateY: headerTranslateY }] }}>
+          <GameHeader />
+        </Animated.View>
+        
         <Box flex={1}>
-          {mode === 'duo-setup' && <PlayerSetupScreen onStart={startDuoGame} />}
+          {mode === 'duo-setup' && <PlayerSetupScreen onStart={startDuoGame} onScroll={handleScroll} headerHeight={HEADER_HEIGHT} />}
           {mode === 'duo' && players && (
             <DuoGameScreen
               player1={players.player1}
@@ -150,6 +162,8 @@ function AppContent() {
               onBackToMenu={returnToMenu}
               initialPreloadedCard={preloadedDuoCard}
               onPreloadComplete={() => setPreloadedDuoCard(null)}
+              onScroll={handleScroll}
+              headerHeight={HEADER_HEIGHT}
             />
           )}
         </Box>
@@ -165,9 +179,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-          <ThemeProvider>
-              <ThemedApp />
-          </ThemeProvider>
+        <ThemeProvider>
+          <ThemedApp />
+        </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
@@ -175,13 +189,13 @@ export default function App() {
 
 // En hjälpkomponent för att kunna använda useTheme() inuti GluestackUIProvider
 function ThemedApp() {
-    const { colorMode } = useTheme();
-    return (
-        <>
-            <StatusBar barStyle={colorMode === 'dark' ? 'light-content' : 'dark-content'} />
-            <GluestackUIProvider config={config} colorMode={colorMode}>
-                <AppContent />
-            </GluestackUIProvider>
-        </>
-    );
+  const { colorMode } = useTheme();
+  return (
+    <>
+      <StatusBar barStyle={colorMode === 'dark' ? 'light-content' : 'dark-content'} />
+      <GluestackUIProvider config={config} colorMode={colorMode}>
+        <AppContent />
+      </GluestackUIProvider>
+    </>
+  );
 }

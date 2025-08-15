@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated  } from 'react-native';
 import {
   Box,
   Text,
@@ -43,18 +43,23 @@ type Props = {
   onBackToMenu: () => void;
   initialPreloadedCard: Card | null;
   onPreloadComplete: () => void;
+  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  headerHeight: number;
 };
 
 const currentYear = new Date().getFullYear();
 const MAX_STARS = 5;
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 export default function DuoGameScreen({
   player1,
   player2,
   initialPreloadedCard,
   onPreloadComplete,
+  onScroll,
+  headerHeight,
 }: Props) {
-    // Hooks för data och UI-state
+  // ... (all befintlig logik är oförändrad)
   const { card, setCard, isLoadingCard, errorMessage, generateCard } = useGenerateSongs(
     initialPreloadedCard,
     onPreloadComplete
@@ -64,7 +69,7 @@ export default function DuoGameScreen({
   const [isGuessValid, setIsGuessValid] = useState(true);
   const [showBack, setShowBack] = useState(false);
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
-// Hook för spellogik
+
   const {
     players,
     activePlayer,
@@ -88,7 +93,6 @@ export default function DuoGameScreen({
     },
   });
 
-    // Funktion för att återställa inputs
   const resetInputs = useCallback(() => {
     setGuess('');
     setGuessConfirmed(false);
@@ -98,29 +102,25 @@ export default function DuoGameScreen({
     resetTurnState();
   }, [resetTurnState]);
 
-    // useEffect för att starta spelet, körs endast en gång
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!card && !initialPreloadedCard && !gameOverMessage) {
       generateCard(resetInputs);
     }
-  }, []); // <-- Tom beroendelista säkerställer att detta bara körs vid montering
+  }, []);
 
-   // useEffect för 60-sekunders timer vid fel svar
   useEffect(() => {
     let timerId: NodeJS.Timeout;
     if (showBack && !wasCorrect) {
       timerId = setTimeout(() => {
         switchPlayerTurn();
-      }, 60000); // 60 sekunder
+      }, 60000);
     }
     return () => {
       clearTimeout(timerId);
     };
   }, [showBack, wasCorrect, switchPlayerTurn]);
 
-  
-  // Handlers
   const handleAwardStar = () => awardStar();
   const handleSkipSong = () => skipSong();
   const handleToggleSongInfo = () => setIsSongInfoVisible((prev) => !prev);
@@ -184,7 +184,11 @@ export default function DuoGameScreen({
   const canAffordSkip = current.stars > 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <AnimatedScrollView
+      contentContainerStyle={[styles.container, { paddingTop: headerHeight }]}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+    >
       <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
       <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
       {renderTimeline(current, true)}
@@ -225,7 +229,7 @@ export default function DuoGameScreen({
           )}
         </VStack>
       )}
-    </ScrollView>
+    </AnimatedScrollView>
   );
 }
 
