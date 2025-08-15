@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated  } from 'react-native';
+import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform  } from 'react-native';
 import {
   Box,
   Text,
@@ -184,52 +184,54 @@ export default function DuoGameScreen({
   const canAffordSkip = current.stars > 0;
 
   return (
-    <AnimatedScrollView
-      contentContainerStyle={[styles.container, { paddingTop: headerHeight }]}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-    >
-      <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
-      <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
-      {renderTimeline(current, true)}
-      {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
-      {isLoadingCard ? (<VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>) : errorMessage ? (<Text color="$error600">{errorMessage}</Text>) : !card ? (<Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>) : null}
-      {card && !guessConfirmed && !isLoadingCard && (
-        <VStack space="md" w="$full">
-          <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
-          {isSongInfoVisible && (<Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: "$info900", borderColor: "$info700"}}} borderWidth={1} borderRadius="$lg" p="$3"><Text textAlign="center">Artist: {card.artist}</Text><Text textAlign="center">Låt: {card.title}</Text><Text textAlign="center">År: {card.year}</Text></Box>)}
-          <HStack justifyContent="space-around" w="$full" my="$2">
-            <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
-            <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
-          </HStack>
-          <Input w="$full" maxWidth={220} alignSelf="center" variant="outline" size="md" isInvalid={!isGuessValid}>
-            <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
-          </Input>
-          {!isGuessValid && (<Text color="$error600" textAlign="center">Årtalet måste vara mellan 1900 och {currentYear}</Text>)}
-          <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
-        </VStack>
-      )}
-      {showBack && card && (
-        <VStack space="md" alignItems="center" w="$full">
-          <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
-          {wasCorrect ? (
-            <VStack alignItems="center" w="$full" mt="$2" space="sm">
-              <Text color="$success600" bold>✅ Rätt gissat!</Text>
-              <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
-              <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
-              <Button onPress={handleSave} variant="outline"><ButtonText>Spara & avsluta runda</ButtonText></Button>
-            </VStack>
-          ) : (
-            <VStack alignItems="center" w="$full" mt="$2" space="sm">
-              <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
-              <Button onPress={switchPlayerTurn} variant="solid" action="negative">
-                <ButtonText>Klar</ButtonText>
-              </Button>
-            </VStack>
-          )}
-        </VStack>
-      )}
-    </AnimatedScrollView>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <AnimatedScrollView
+        contentContainerStyle={[styles.container, { paddingTop: headerHeight }]}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
+        <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
+        {renderTimeline(current, true)}
+        {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
+        {isLoadingCard ? (<VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>) : errorMessage ? (<Text color="$error600">{errorMessage}</Text>) : !card ? (<Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>) : null}
+        {card && !guessConfirmed && !isLoadingCard && (
+          <VStack space="md" w="$full">
+            <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
+            {isSongInfoVisible && (<Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: "$info900", borderColor: "$info700"}}} borderWidth={1} borderRadius="$lg" p="$3"><Text textAlign="center">Artist: {card.artist}</Text><Text textAlign="center">Låt: {card.title}</Text><Text textAlign="center">År: {card.year}</Text></Box>)}
+            <HStack justifyContent="space-around" w="$full" my="$2">
+              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
+              <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
+            </HStack>
+            <Input w="$full" maxWidth={220} alignSelf="center" variant="outline" size="md" isInvalid={!isGuessValid}>
+              <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
+            </Input>
+            {!isGuessValid && (<Text color="$error600" textAlign="center">Årtalet måste vara mellan 1900 och {currentYear}</Text>)}
+            <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
+          </VStack>
+        )}
+        {showBack && card && (
+          <VStack space="md" alignItems="center" w="$full">
+            <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
+            {wasCorrect ? (
+              <VStack alignItems="center" w="$full" mt="$2" space="sm">
+                <Text color="$success600" bold>✅ Rätt gissat!</Text>
+                <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
+                <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
+                <Button onPress={handleSave} variant="outline"><ButtonText>Spara & avsluta runda</ButtonText></Button>
+              </VStack>
+            ) : (
+              <VStack alignItems="center" w="$full" mt="$2" space="sm">
+                <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
+                <Button onPress={switchPlayerTurn} variant="solid" action="negative">
+                  <ButtonText>Klar</ButtonText>
+                </Button>
+              </VStack>
+            )}
+          </VStack>
+        )}
+      </AnimatedScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
