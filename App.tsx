@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider } from 'react-native-safe-area-context'; 
 
 // UI & Theme
 import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center, Icon, Pressable } from '@gluestack-ui/themed';
@@ -172,11 +173,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-        <ThemeProvider>
-            <ThemedApp />
-        </ThemeProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      {/* Linda in hela appen */}
+      <AuthProvider>
+          <ThemeProvider>
+              <ThemedApp />
+          </ThemeProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
