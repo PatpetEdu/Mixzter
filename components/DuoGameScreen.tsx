@@ -59,7 +59,6 @@ export default function DuoGameScreen({
   onScroll,
   headerHeight,
 }: Props) {
-  // ... (all befintlig logik är oförändrad)
   const { card, setCard, isLoadingCard, errorMessage, generateCard } = useGenerateSongs(
     initialPreloadedCard,
     onPreloadComplete
@@ -69,6 +68,10 @@ export default function DuoGameScreen({
   const [isGuessValid, setIsGuessValid] = useState(true);
   const [showBack, setShowBack] = useState(false);
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
+  
+  // Ny state för "Före/Efter"-logiken
+  const [showPlacementChoice, setShowPlacementChoice] = useState(false);
+  const [placement, setPlacement] = useState<'before' | 'after' | null>(null);
 
   const {
     players,
@@ -99,6 +102,8 @@ export default function DuoGameScreen({
     setIsGuessValid(true);
     setShowBack(false);
     setIsSongInfoVisible(false);
+    setShowPlacementChoice(false); // Återställ nya staten
+    setPlacement(null);
     resetTurnState();
   }, [resetTurnState]);
 
@@ -131,11 +136,27 @@ export default function DuoGameScreen({
     const valid = /^\d{4}$/.test(guess) && year >= 1900 && year <= currentYear;
     setIsGuessValid(valid);
     if (!valid || !card) return;
-    setGuessConfirmed(true);
-    setShowBack(true);
-    confirmGuess(guess, card);
+
+    const p = players[activePlayer];
+    const fullTimeline = [p.startYear, ...p.timeline, ...roundCards.map((c) => c.year)];
+    
+    if (fullTimeline.includes(year)) {
+      setShowPlacementChoice(true); // Visa Före/Efter-valen
+    } else {
+      setGuessConfirmed(true);
+      setShowBack(true);
+      confirmGuess(guess, card);
+    }
   };
   
+  const handlePlacementConfirm = () => {
+    if (!placement || !card) return;
+    setGuessConfirmed(true);
+    setShowBack(true);
+    setShowPlacementChoice(false);
+    confirmGuess(guess, card, placement);
+  };
+
   const handleContinue = () => {
     resetInputs();
     generateCard(resetInputs);
@@ -195,21 +216,43 @@ export default function DuoGameScreen({
         {renderTimeline(current, true)}
         {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
         {isLoadingCard ? (<VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>) : errorMessage ? (<Text color="$error600">{errorMessage}</Text>) : !card ? (<Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>) : null}
+        
         {card && !guessConfirmed && !isLoadingCard && (
           <VStack space="md" w="$full">
             <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
-            {isSongInfoVisible && (<Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: "$info900", borderColor: "$info700"}}} borderWidth={1} borderRadius="$lg" p="$3"><Text textAlign="center">Artist: {card.artist}</Text><Text textAlign="center">Låt: {card.title}</Text><Text textAlign="center">År: {card.year}</Text></Box>)}
+            {isSongInfoVisible && (
+              <Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: "$info900", borderColor: "$info700"}}} borderWidth={1} borderRadius="$lg" p="$3">
+                <Text textAlign="center">Artist: {card.artist}</Text>
+                <Text textAlign="center">Låt: {card.title}</Text>
+                <Text textAlign="center">År: {card.year}</Text>
+              </Box>
+            )}
             <HStack justifyContent="space-around" w="$full" my="$2">
               <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
               <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
             </HStack>
-            <Input w="$full" maxWidth={220} alignSelf="center" variant="outline" size="md" isInvalid={!isGuessValid}>
-              <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
-            </Input>
-            {!isGuessValid && (<Text color="$error600" textAlign="center">Årtalet måste vara mellan 1900 och {currentYear}</Text>)}
-            <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
+            
+            {showPlacementChoice ? (
+              <VStack space="md" alignItems="center">
+                <Text bold>Året finns redan. Placera kortet före eller efter?</Text>
+                <HStack space="md">
+                  <Button variant={placement === 'before' ? 'solid' : 'outline'} onPress={() => setPlacement('before')}><ButtonText>Före {guess}</ButtonText></Button>
+                  <Button variant={placement === 'after' ? 'solid' : 'outline'} onPress={() => setPlacement('after')}><ButtonText>Efter {guess}</ButtonText></Button>
+                </HStack>
+                <Button onPress={handlePlacementConfirm} isDisabled={!placement}><ButtonText>Bekräfta placering</ButtonText></Button>
+              </VStack>
+            ) : (
+              <>
+                <Input w="$full" maxWidth={220} alignSelf="center" isInvalid={!isGuessValid}>
+                  <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
+                </Input>
+                {!isGuessValid && (<Text color="$error600" textAlign="center">Ogiltigt årtal</Text>)}
+                <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
+              </>
+            )}
           </VStack>
         )}
+        
         {showBack && card && (
           <VStack space="md" alignItems="center" w="$full">
             <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
@@ -218,14 +261,12 @@ export default function DuoGameScreen({
                 <Text color="$success600" bold>✅ Rätt gissat!</Text>
                 <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
                 <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
-                <Button onPress={handleSave} variant="outline"><ButtonText>Spara & avsluta runda</ButtonText></Button>
+                <Button variant="outline" onPress={handleSave}><ButtonText>Spara & avsluta runda</ButtonText></Button>
               </VStack>
             ) : (
               <VStack alignItems="center" w="$full" mt="$2" space="sm">
                 <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
-                <Button onPress={switchPlayerTurn} variant="solid" action="negative">
-                  <ButtonText>Klar</ButtonText>
-                </Button>
+                <Button action="negative" onPress={switchPlayerTurn}><ButtonText>Klar</ButtonText></Button>
               </VStack>
             )}
           </VStack>
@@ -238,4 +279,3 @@ export default function DuoGameScreen({
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, paddingBottom: 20, alignItems: 'center', flexGrow: 1 },
 });
-

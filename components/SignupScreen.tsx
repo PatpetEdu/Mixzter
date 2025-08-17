@@ -106,7 +106,7 @@ export default function SignupScreen({ onGoToLogin }: SignupScreenProps) {
             </FormControlLabel>
             <Input>
               <InputField
-                placeholder="Ex: Patrik"
+                placeholder="Ex: Batman"
                 value={displayName}
                 onChangeText={setDisplayName}
                 color="#fff"
