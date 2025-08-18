@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native'; // Importera AppState
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as firebaseAuth from 'firebase/auth';
 
@@ -22,6 +23,7 @@ export const useGenerateSongs = (initialPreloadedCard: Card | null, onPreloadCom
   const [nextCard, setNextCard] = useState<Card | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoadingCard, setIsLoadingCard] = useState(false);
+  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     seenSongsRef.current = seenSongs;
@@ -44,7 +46,7 @@ export const useGenerateSongs = (initialPreloadedCard: Card | null, onPreloadCom
         body: JSON.stringify({ clientSeenSongs: clientSeenSongsArray }),
       });
       
-      // *** FIX: Robust felhantering för att fånga upp "dolda" fel i APK ***
+       // *** FIX: Robust felhantering för att fånga upp "dolda" fel i APK ***
       if (!res.ok) {
         const errorText = await res.text();
         console.error("useGenerateSongs: Fel från servern:", res.status, errorText);
@@ -52,11 +54,11 @@ export const useGenerateSongs = (initialPreloadedCard: Card | null, onPreloadCom
       }
 
       try {
-          // Försök att parsa svaret som JSON
-          return await res.json() as Card;
+         // Försök att parsa svaret som JSON 
+        return await res.json() as Card;
       } catch (jsonError) {
-          // Om JSON-parsningen misslyckas, logga felet och den råa texten
-          const responseClone = res.clone();
+        // Om JSON-parsningen misslyckas, logga felet och den råa texten  
+        const responseClone = res.clone();
           const rawText = await responseClone.text();
           console.error("useGenerateSongs: Kunde inte parsa JSON från servern.", jsonError);
           console.error("useGenerateSongs: Råtext från servern:", rawText);
@@ -123,14 +125,14 @@ export const useGenerateSongs = (initialPreloadedCard: Card | null, onPreloadCom
     if (!preloadedCard) console.error("Preload: Kunde inte för-ladda ett unikt kort.");
   }, [fetchCardFromServer, nextCard, isLoadingCard]);
 
-  const generateCard = useCallback(async (resetInputs: () => void) => {
+  const generateCard = useCallback(async (resetInputs?: () => void) => {
     setErrorMessage('');
     setCard(null);
 
     if (nextCard) {
       setCard(nextCard);
       setNextCard(null);
-      resetInputs();
+      if (resetInputs) resetInputs();
       markSongAsSeenOnServer(nextCard);
       return;
     }
@@ -160,12 +162,35 @@ export const useGenerateSongs = (initialPreloadedCard: Card | null, onPreloadCom
     setIsLoadingCard(false);
     if (fetchedCard) {
       setCard(fetchedCard);
-      resetInputs();
+      if (resetInputs) resetInputs();
       markSongAsSeenOnServer(fetchedCard);
     } else {
       setErrorMessage('Kunde inte generera ett unikt kort efter flera försök. Försök igen.');
     }
   }, [nextCard, markSongAsSeenOnServer, fetchCardFromServer]);
+  
+  // Ny useEffect för att hantera appens tillstånd
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      // Om appen kommer tillbaka från bakgrunden och blir aktiv...
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // ...och om vi är i ett laddningsläge men inte har något kort (troligtvis ett avbrutet anrop)
+        if (isLoadingCard && !card) {
+          console.log('Appen blev aktiv, försöker hämta kort igen...');
+          generateCard(); // Försök hämta ett nytt kort
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    // Städa upp lyssnaren när komponenten försvinner
+    return () => {
+      subscription.remove();
+    };
+  }, [isLoadingCard, card, generateCard]); // Beroenden för att alltid ha senaste state
 
   useEffect(() => {
     if (card && !nextCard) {

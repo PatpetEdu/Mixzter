@@ -1,32 +1,31 @@
 // =============================
 // File: App.tsx (Uppdaterad)
 // =============================
-import React, { useEffect, useState, useRef } from 'react';
-import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider } from 'react-native-safe-area-context'; 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // UI & Theme
 import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
 
-
 // Egen kod
 import PlayerSetupScreen from './components/PlayerSetupScreen';
 import DuoGameScreen from './components/DuoGameScreen';
 import LoginScreen from './components/LoginScreen';
-import GameHeader from './components/GameHeader'; 
-import GameFooter from './components/GameFooter'; 
 import SignupScreen from './components/SignupScreen';
+import GameHeader from './components/GameHeader';
+import GameFooter from './components/GameFooter';
 import { AuthProvider } from './context/AuthContext';
-import { ThemeProvider, useTheme } from './context/ThemeContext'; // Importera ThemeProvider och useTheme
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { useAuth } from './hooks/useAuth';
 import { auth } from './firebase';
 
 export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
 export type GameMode = 'menu' | 'duo-setup' | 'duo';
 
-const HEADER_HEIGHT = 85; // Ungefärlig höjd på din header, kan behöva justeras
+const HEADER_HEIGHT = 100; // Ungefärlig höjd på din header, kan behöva justeras
 
 const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
   const user = auth.currentUser;
@@ -34,7 +33,7 @@ const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
   try {
     const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
     const storedSongs = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-    // Säker parse av lokal cache – behåller namnen storedSongs & clientSeenSongsArray
+       // Säker parse av lokal cache – behåller namnen storedSongs & clientSeenSongsArray
     const clientSeenSongsArray: string[] = (() => {
       try {
         return storedSongs ? JSON.parse(storedSongs) : [];
@@ -49,12 +48,12 @@ const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
       headers,
       body: JSON.stringify({ clientSeenSongs: clientSeenSongsArray }),
     });
-    const text = await res.text();
     if (!res.ok) {
-      console.error('App.tsx Preload: Fel från servern:', res.status, text);
+      const errorText = await res.text();
+      console.error('App.tsx Preload: Fel från servern:', res.status, errorText);
       return null;
     }
-    return JSON.parse(text) as CardData;
+    return await res.json() as CardData;
   } catch (err) {
     console.error('App.tsx Preload: Kritiskt fel i nätverksanrop:', err);
     return null;
@@ -68,8 +67,11 @@ function AppContent() {
   const [preloadedDuoCard, setPreloadedDuoCard] = useState<CardData | null>(null);
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
   const { colorMode } = useTheme();
+  
+  const [isPreloading, setIsPreloading] = useState(false);
+  const appState = useRef(AppState.currentState);
 
-  // Animation logic
+    // Animation logic
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, HEADER_HEIGHT],
@@ -85,16 +87,41 @@ function AppContent() {
     }
   );
 
-  useEffect(() => {
-    const triggerDuoPreload = async () => {
-      if (mode === 'duo-setup' && !preloadedDuoCard) {
-        console.log('App.tsx: Startar pre-loading...');
+  const triggerDuoPreload = useCallback(async () => {
+    if (mode === 'duo-setup' && !preloadedDuoCard && !isPreloading) {
+      console.log('App.tsx: Startar pre-loading...');
+      setIsPreloading(true);
+      try {
         const card = await fetchFirstCardForPreload();
         setPreloadedDuoCard(card);
+      } finally {
+        setIsPreloading(false);
       }
+    }
+  }, [mode, preloadedDuoCard, isPreloading]);
+
+  useEffect(() => {
+    if (user || isAnonymous) {
+      triggerDuoPreload();
+    }
+  }, [mode, user, isAnonymous, triggerDuoPreload]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        console.log('Appen blev aktiv, kollar om preload behövs...');
+        triggerDuoPreload();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
     };
-    if (user || isAnonymous) triggerDuoPreload();
-  }, [mode, preloadedDuoCard, user, isAnonymous]);
+  }, [triggerDuoPreload]);
 
   const startDuoGame = (player1: string, player2: string) => {
     setPlayers({ player1, player2 });
@@ -116,7 +143,7 @@ function AppContent() {
   }
 
   if (!user && !isAnonymous) {
-    // När användaren är utloggad, visas alltid mörkt tema för login/signup
+     // När användaren är utloggad, visas alltid mörkt tema för login/signup
     // och vi sätter statusfältet manuellt.
     return (
       <>
@@ -128,7 +155,7 @@ function AppContent() {
     );
   }
 
-   // Huvudmenyn har nu en header men ingen footer
+    // Huvudmenyn har nu en header men ingen footer
   if (mode === 'menu') {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
@@ -145,7 +172,7 @@ function AppContent() {
     );
   }
 
-  // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
+    // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
   if (mode === 'duo-setup' || (mode === 'duo' && players)) {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
