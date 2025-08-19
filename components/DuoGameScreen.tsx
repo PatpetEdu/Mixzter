@@ -78,7 +78,7 @@ export default function DuoGameScreen({
   const [showPlacementChoice, setShowPlacementChoice] = useState(false);
   const [placement, setPlacement] = useState<'before' | 'after' | null>(null);
 
-  // Separat flagga för återställning av spelsessionen (players/roundCards/UI)
+  // 🔄 separat flagga för återställning av spelsessionen (players/roundCards/UI)
   const [isRestoring, setIsRestoring] = useState(true);
 
   const {
@@ -124,19 +124,7 @@ export default function DuoGameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrating, isRestoring]);
 
-  useEffect(() => {
-    let timerId: NodeJS.Timeout;
-    if (showBack && !wasCorrect) {
-      timerId = setTimeout(() => {
-        switchPlayerTurn();
-      }, 60000);
-    }
-    return () => {
-      clearTimeout(timerId);
-    };
-  }, [showBack, wasCorrect, switchPlayerTurn]);
-
-  // Ladda sparat spel + återskapa post-guess UI om roundCards innehåller kort
+  // 🧩 Ladda sparat spel + återskapa post-guess UI även vid FEL gissning
   useEffect(() => {
     if (!gameId || !user || isAnonymous) {
       setIsRestoring(false);
@@ -147,11 +135,25 @@ export default function DuoGameScreen({
       if (saved) {
         loadSavedGame({ players: saved.players as any, activePlayer: saved.activePlayer, roundCards: saved.roundCards });
 
+        // 1) Försök återskapa från explicit postGuess (sparas nedan)
+        const postGuess = (saved as any)?.postGuess as { card?: Card | null; wasCorrect?: boolean } | undefined;
+        if (postGuess?.card) {
+          setCard(postGuess.card);
+          setShowBack(true);
+          setGuessConfirmed(true);
+          setShowPlacementChoice(false);
+          setPlacement(null);
+          setIsSongInfoVisible(false);
+          setIsRestoring(false);
+          return;
+        }
+
+        // 2) Fallback: om rundan redan har preliminära kort => visa "rätt gissat"-vyn
         if (saved.roundCards && saved.roundCards.length > 0) {
           const last = saved.roundCards[saved.roundCards.length - 1];
-          setCard(last);             // undviker autogenerate
-          setShowBack(true);         // visa baksidan
-          setGuessConfirmed(true);   // döljer gissningsfältet
+          setCard(last);
+          setShowBack(true);
+          setGuessConfirmed(true);
           setShowPlacementChoice(false);
           setPlacement(null);
           setIsSongInfoVisible(false);
@@ -162,11 +164,11 @@ export default function DuoGameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, user?.uid, isAnonymous]);
 
-  // Spara spelets state löpande (debounce ~500ms) – endast inloggat läge
+  // 💾 Spara spelets state löpande (debounce ~500ms) + inkl. postGuess för att bevara felgissningsläge
   useEffect(() => {
     if (!user || isAnonymous || !gameId) return;
     const id = setTimeout(() => {
-      const payload: SavedDuoGameState = {
+      const payload: (SavedDuoGameState & { postGuess?: { card: Card | null; wasCorrect: boolean } }) = {
         id: gameId,
         player1Name: player1,
         player2Name: player2,
@@ -175,11 +177,14 @@ export default function DuoGameScreen({
         roundCards,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        // Spara endast om vi faktiskt är i post-guess-vy (back-sidan visas)
+        postGuess: showBack ? { card: card ?? null, wasCorrect: !!wasCorrect } : undefined,
       };
-      saveActiveGame(user.uid, payload).catch((e) => console.warn('Kunde inte spara aktivt spel', e));
+      // cast räcker – AsyncStorage sparar ändå extra fält
+      saveActiveGame(user.uid, payload as unknown as SavedDuoGameState).catch((e) => console.warn('Kunde inte spara aktivt spel', e));
     }, 500);
     return () => clearTimeout(id);
-  }, [players, activePlayer, roundCards, user, isAnonymous, gameId, player1, player2]);
+  }, [players, activePlayer, roundCards, showBack, wasCorrect, card, user, isAnonymous, gameId, player1, player2]);
 
   // 🧹 Ta bort sparat spel + städa ev. pending nextCard vid game over
   useEffect(() => {
@@ -351,7 +356,7 @@ export default function DuoGameScreen({
             ) : (
               <VStack alignItems="center" w="$full" mt="$2" space="sm">
                 <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
-                <Button action="negative" onPress={switchPlayerTurn}><ButtonText>Klar</ButtonText></Button>
+                <Button action="primary" onPress={switchPlayerTurn}><ButtonText>Fortsätt</ButtonText></Button>
               </VStack>
             )}
           </VStack>

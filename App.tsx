@@ -148,7 +148,7 @@ function AppContent() {
       Alert.alert('Inloggning krävs', 'Du måste vara inloggad för att spara pågående spel.');
     }
     if (user && activeGames.length >= 2) {
-      Alert.alert('Max 2 aktiva spel', 'Avsluta eller ta bort ett pågående spel innan du startar ett nytt.');
+      Alert.alert('Max 2 aktiva spel nått. Avsluta ett spel i menyn för att starta nytt.');
       return;
     }
     const newId = generateGameId();
@@ -165,35 +165,47 @@ function AppContent() {
   };
 
   // Ta bort från meny + 🧹 städning av ev. pending nextCard + lokala seenSongs
-  const deleteActiveGameFromMenu = async (id: string) => {
-    if (!user) return;
+const deleteActiveGameFromMenu = (id: string) => {
+  if (!user) return;
 
-    try {
-      const persistKey = `nextCard:${user.uid}:${id}`;
-      const rawNext = await AsyncStorage.getItem(persistKey);
+  Alert.alert(
+    'Avsluta spel',
+    'Vill du verkligen avsluta den här spelomgången?',
+    [
+      { text: 'Avbryt', style: 'cancel' },
+      {
+        text: 'Avsluta',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const persistKey = `nextCard:${user!.uid}:${id}`;
+            const rawNext = await AsyncStorage.getItem(persistKey);
 
-      if (rawNext) {
-        try {
-          const pending: CardData = JSON.parse(rawNext);
-          const songIdentifier = `${pending.artist} - ${pending.title}`.toLowerCase();
+            if (rawNext) {
+              try {
+                const pending: CardData = JSON.parse(rawNext);
+                const songIdentifier = `${pending.artist} - ${pending.title}`.toLowerCase();
+                const rawSeen = await AsyncStorage.getItem(SEEN_SONGS_KEY);
+                const arr = rawSeen ? (JSON.parse(rawSeen) as string[]) : [];
+                const filtered = arr.filter((s) => s !== songIdentifier);
+                await AsyncStorage.setItem(SEEN_SONGS_KEY, JSON.stringify(filtered));
+              } catch (e) {
+                console.warn('Kunde inte parsa pending nextCard', e);
+              }
+            }
 
-          const rawSeen = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-          const arr = rawSeen ? (JSON.parse(rawSeen) as string[]) : [];
-          const filtered = arr.filter((s) => s !== songIdentifier);
-
-          await AsyncStorage.setItem(SEEN_SONGS_KEY, JSON.stringify(filtered));
-        } catch {}
-        await AsyncStorage.removeItem(persistKey);
-      } else {
-        await AsyncStorage.removeItem(persistKey);
-      }
-    } catch (e) {
-      console.warn('Kunde inte städa pending nextCard/seenSongs', e);
-    }
-
-    await removeActiveGame(user.uid, id);
-    refreshActiveGames();
-  };
+            await AsyncStorage.removeItem(persistKey);
+            await removeActiveGame(user!.uid, id);
+            await refreshActiveGames(); // vänta in listuppdatering
+          } catch (e) {
+            console.warn('Kunde inte städa/avsluta spel', e);
+          }
+        },
+      },
+    ],
+    { cancelable: true }
+  );
+};
 
   const returnToMenu = () => {
     setPlayers(null);
@@ -283,7 +295,7 @@ function AppContent() {
                           <ButtonText>Återuppta</ButtonText>
                         </Button>
                         <Button size="sm" variant="outline" action="negative" onPress={() => deleteActiveGameFromMenu(g.id)}>
-                          <ButtonText>Ta bort</ButtonText>
+                          <ButtonText>Avsluta</ButtonText>
                         </Button>
                       </HStack>
                     </HStack>

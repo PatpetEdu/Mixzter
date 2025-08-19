@@ -62,7 +62,7 @@ export default function GameFooter({ onBackToMenu }: Props) {
             }}
           >
             <Icon as={LogOut} size="md" mr="$2" />
-            <ActionsheetItemText>Avsluta spelet</ActionsheetItemText>
+            <ActionsheetItemText>Tillbaka till menyn</ActionsheetItemText>
           </ActionsheetItem>
         </ActionsheetContent>
       </Actionsheet>
