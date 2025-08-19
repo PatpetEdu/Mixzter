@@ -290,12 +290,12 @@ export default function DuoGameScreen({
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>    
+      <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
         <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
         {renderTimeline(current, true)}
         {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
         {isLoadingCard ? (
-          <VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>
+          <VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar låt...</Text></VStack>
         ) : errorMessage ? (
           <Text color="$error600">{errorMessage}</Text>
         ) : !card ? (
@@ -304,19 +304,10 @@ export default function DuoGameScreen({
 
         {card && !guessConfirmed && !isLoadingCard && (
           <VStack space="md" w="$full">
+            {/* 1) Kortet */}
             <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
-            {isSongInfoVisible && (
-              <Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: '$info900', borderColor: '$info700'}}} borderWidth={1} borderRadius="$lg" p="$3">
-                <Text textAlign="center">Artist: {card.artist}</Text>
-                <Text textAlign="center">Låt: {card.title}</Text>
-                <Text textAlign="center">År: {card.year}</Text>
-              </Box>
-            )}
-            <HStack justifyContent="space-around" w="$full" my="$2">
-              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
-              <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
-            </HStack>
 
+            {/* 2) Bekräfta gissning / Placering – direkt under kortet */}
             {showPlacementChoice ? (
               <VStack space="md" alignItems="center">
                 <Text bold>Året finns redan. Placera kortet före eller efter?</Text>
@@ -334,6 +325,20 @@ export default function DuoGameScreen({
                 {!isGuessValid && (<Text color="$error600" textAlign="center">Ogiltigt årtal</Text>)}
                 <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
               </>
+            )}
+
+            {/* 3) Mindre viktiga: Hoppa över / Visa låtinfo */}
+            <HStack justifyContent="space-around" w="$full" my="$2">
+              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
+              <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
+            </HStack>
+
+            {isSongInfoVisible && (
+              <Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: '$info900', borderColor: '$info700'}}} borderWidth={1} borderRadius="$lg" p="$3">
+                <Text textAlign="center">Artist: {card.artist}</Text>
+                <Text textAlign="center">Låt: {card.title}</Text>
+                <Text textAlign="center">År: {card.year}</Text>
+              </Box>
             )}
           </VStack>
         )}

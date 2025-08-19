@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Linking, Platform } from 'react-native';
-import { Box, Button, ButtonText, VStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
+import React, { useState, useRef } from 'react';
+import { Linking, Platform, Animated, Easing } from 'react-native';
+import { Box, Button, ButtonText, VStack, Icon, Pressable, useColorMode, Image } from '@gluestack-ui/themed';
 import { Music, QrCodeIcon } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
-import AudioVisualizer from './AudioVisualizer';
 
+const MIXZTER_LOGO = require('../assets/mixzter-icon-1024.png');
 // Återställd och mer robust funktion för att öppna Spotify
 async function openSpotify(spotifyUrl: string) {
   try {
@@ -35,17 +35,38 @@ async function openSpotify(spotifyUrl: string) {
   }
 }
 
-type Props = {
+// Props (behåller signaturen för kompatibilitet även om onFlip/showFlipButton inte används här)
+export type CardFrontProps = {
   spotifyUrl: string;
   onFlip: () => void;
   showFlipButton: boolean;
 };
 
-export default function CardFront({ spotifyUrl }: Props) {
+export default function CardFront({ spotifyUrl }: CardFrontProps) {
   const [showQrCode, setShowQrCode] = useState(false);
-  // Använd useColorMode för att bestämma färgen baserat på temat
+  // Använd useColorMode för att bestämma QR-färg baserat på temat
   const colorMode = useColorMode();
-  const qrColor = colorMode === 'dark' ? 'white' : 'black';
+  const qrColor = (colorMode as any) === 'dark' ? 'white' : 'black';
+
+  // Storlekar: liten ruta för ikon, stor ruta när QR visas
+  const SMALL_SIZE = 56; // kompakt ikonruta
+  const LARGE_SIZE = 128; // som tidigare QR-storlek
+
+  // Animera storleken
+  const sizeAnim = useRef(new Animated.Value(SMALL_SIZE)).current;
+
+  const toggleQr = () => {
+    setShowQrCode((prev) => {
+      const next = !prev;
+      Animated.timing(sizeAnim, {
+        toValue: next ? LARGE_SIZE : SMALL_SIZE,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // width/height kan inte använda native driver
+      }).start();
+      return next;
+    });
+  };
 
   const handleOpenSpotify = () => {
     openSpotify(spotifyUrl);
@@ -66,7 +87,7 @@ export default function CardFront({ spotifyUrl }: Props) {
       }}
     >
       <Pressable
-        onPress={() => setShowQrCode(!showQrCode)}
+        onPress={toggleQr}
         position="absolute"
         top={10}
         right={10}
@@ -77,19 +98,22 @@ export default function CardFront({ spotifyUrl }: Props) {
       </Pressable>
 
       <VStack space="lg" alignItems="center">
-        <Box h={128} w={128} justifyContent="center" alignItems="center">
-          {showQrCode ? (
-            <QRCode
-              value={spotifyUrl}
-              size={128}
-              backgroundColor="transparent"
-              color={qrColor} // Använder nu en färg som garanterat fungerar
-            />
-          ) : (
-            <AudioVisualizer />
-          )}
-        </Box>
+        <Animated.View style={{ height: sizeAnim, width: sizeAnim }}>
+          <Box style={{ height: '100%', width: '100%' }} justifyContent="center" alignItems="center">
+            {showQrCode ? (
+              <QRCode
+                value={spotifyUrl}
+                size={LARGE_SIZE}
+                backgroundColor="transparent"
+                color={qrColor}
+              />
+            ) : (
+              <Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} />
+            )}
+          </Box>
+        </Animated.View>
 
+        {/* Viktigt: behåll knappen för att öppna Spotify */}
         <Button onPress={handleOpenSpotify} w="$full">
           <Icon as={Music} mr="$2" color="$white" />
           <ButtonText>Öppna i Spotify</ButtonText>
