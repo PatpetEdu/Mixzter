@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // UI & Theme
-import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center, HStack } from '@gluestack-ui/themed';
+import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center, HStack, Image } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
 
 // Egen kod
@@ -30,6 +30,7 @@ export type GameMode = 'menu' | 'duo-setup' | 'duo';
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
 
 const HEADER_HEIGHT = 100; // Ungefärlig höjd på din header, kan behöva justeras
+const MIXZTER_LOGO = require('./assets/mixzter-icon-1024.png');
 
 const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
   const user = auth.currentUser;
@@ -148,7 +149,7 @@ function AppContent() {
       Alert.alert('Inloggning krävs', 'Du måste vara inloggad för att spara pågående spel.');
     }
     if (user && activeGames.length >= 2) {
-      Alert.alert('Max 2 aktiva spel nått. Avsluta ett spel i menyn för att starta nytt.');
+      Alert.alert('Max 2 aktiva spel.Avsluta ett spel i menyn för att starta nytt.');
       return;
     }
     const newId = generateGameId();
@@ -251,7 +252,7 @@ const deleteActiveGameFromMenu = (id: string) => {
         <GameHeader />
         <Center flex={1}>
           <VStack space="lg" alignItems="center">
-            <Heading size="2xl">🎵 Musikquiz</Heading>
+             <Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 120, height: 120, resizeMode: 'contain' }} />
             <Text size="md" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
               {user ? `Inloggad som: ${user.email}` : 'Spelar som gäst'}
             </Text>

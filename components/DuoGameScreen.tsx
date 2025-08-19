@@ -10,7 +10,6 @@ import {
   HStack,
   Input,
   InputField,
-  Image,
   Center,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,9 +19,6 @@ import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
 import { useAuth } from '../hooks/useAuth';
 import { deleteActiveGame, loadActiveGame, saveActiveGame, SavedDuoGameState } from '../storage/gameStorage';
-
-
-const MIXZTER_LOGO = require('../assets/mixzter-icon-1024.png');
 
 // Typer
 export type Card = { title: string; artist: string; year: number; spotifyUrl: string };
@@ -294,8 +290,7 @@ export default function DuoGameScreen({
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
-        <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
+      <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>    
         <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
         {renderTimeline(current, true)}
         {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
