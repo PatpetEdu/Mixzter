@@ -43,7 +43,7 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
   const [gameOverMessage, setGameOverMessage] = useState<string | null>(null);
   const [starAwardedThisTurn, setStarAwardedThisTurn] = useState(false);
 
-    // useEffect för att kontrollera om spelet är över
+  // useEffect för att kontrollera om spelet är över
   useEffect(() => {
     const p1Score = players[player1Name].timeline.length;
     const p2Score = players[player2Name].timeline.length;
@@ -53,16 +53,26 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
       else setGameOverMessage(`${player2Name} vinner!`);
     }
   }, [players, activePlayer, player1Name, player2Name]);
-  
-    // Funktion för att återställa state som är specifik för en runda
 
+  // Funktion för att återställa state som är specifik för en runda
   const resetTurnState = () => {
-      setWasCorrect(false);
-      setStarAwardedThisTurn(false);
+    setWasCorrect(false);
+    setStarAwardedThisTurn(false);
   };
 
-    // Logik för att ge en stjärna
+  // NYTT: Möjliggör laddning av sparat spel (hydrering) utifrån DuoGameScreen
+  const loadSavedGame = (payload: {
+    players: { [key: string]: Player };
+    activePlayer: string;
+    roundCards?: Card[];
+  }) => {
+    setPlayers(payload.players);
+    setActivePlayer(payload.activePlayer);
+    setRoundCards(payload.roundCards ?? []);
+    resetTurnState();
+  };
 
+  // Logik för att ge en stjärna
   const awardStar = () => {
     setPlayers((prev) => {
       const current = prev[activePlayer];
@@ -74,7 +84,7 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
     setStarAwardedThisTurn(true);
   };
 
-    // Logik för att hoppa över en låt
+  // Logik för att hoppa över en låt
   const skipSong = () => {
     const current = players[activePlayer];
     if (current.stars > 0) {
@@ -83,7 +93,7 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
     }
   };
 
-    // Logik för att bekräfta en gissning
+  // Logik för att bekräfta en gissning
   const confirmGuess = (guess: string, card: Card, placement?: 'before' | 'after') => {
     const p = players[activePlayer];
     const fullTimeline = [p.startYear, ...p.timeline, ...roundCards.map((c) => c.year)].sort((a, b) => a - b);
@@ -91,9 +101,9 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
 
     // Om låtens år är en exakt matchning är det alltid rätt.
     if (card.year === guessedYear) {
-        setWasCorrect(true);
-        setRoundCards((prev) => [...prev, card]);
-        return;
+      setWasCorrect(true);
+      setRoundCards((prev) => [...prev, card]);
+      return;
     }
 
     let lowerBound = -Infinity;
@@ -102,57 +112,57 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
 
     // Fall 1: Spelaren gissade ett existerande år och valde en placering
     if (placement) {
-        const existingYearIndex = fullTimeline.indexOf(guessedYear);
+      const existingYearIndex = fullTimeline.indexOf(guessedYear);
 
-        if (placement === 'before') {
-            upperBound = guessedYear;
-            if (existingYearIndex > 0) {
-                lowerBound = fullTimeline[existingYearIndex - 1];
-            }
-            // Kortet måste passa i luckan FÖRE det gissade året
-            isCorrect = card.year > lowerBound && card.year < upperBound;
-
-        } else { // placement === 'after'
-            lowerBound = guessedYear;
-            if (existingYearIndex < fullTimeline.length - 1) {
-                upperBound = fullTimeline[existingYearIndex + 1];
-            }
-            // Kortet måste passa i luckan EFTER det gissade året
-            isCorrect = card.year > lowerBound && card.year < upperBound;
+      if (placement === 'before') {
+        upperBound = guessedYear;
+        if (existingYearIndex > 0) {
+          lowerBound = fullTimeline[existingYearIndex - 1];
         }
-    } else { // Fall 2: Normal gissning (året finns inte på tidslinjen)
-        const upperIndex = fullTimeline.findIndex((y) => y > guessedYear);
-        if (upperIndex === -1) { // Gissningen är högst
-            lowerBound = fullTimeline[fullTimeline.length - 1];
-        } else if (upperIndex === 0) { // Gissningen är lägst
-            upperBound = fullTimeline[0];
-        } else {
-            lowerBound = fullTimeline[upperIndex - 1];
-            upperBound = fullTimeline[upperIndex];
+        // Kortet måste passa i luckan FÖRE det gissade året
+        isCorrect = card.year > lowerBound && card.year < upperBound;
+      } else {
+        // placement === 'after'
+        lowerBound = guessedYear;
+        if (existingYearIndex < fullTimeline.length - 1) {
+          upperBound = fullTimeline[existingYearIndex + 1];
         }
-        // Kortet måste vara efter föregående år, upp till och med nästa år
-        isCorrect = card.year > lowerBound && card.year <= upperBound;
+        // Kortet måste passa i luckan EFTER det gissade året
+        isCorrect = card.year > lowerBound && card.year < upperBound;
+      }
+    } else {
+      // Fall 2: Normal gissning (året finns inte på tidslinjen)
+      const upperIndex = fullTimeline.findIndex((y) => y > guessedYear);
+      if (upperIndex === -1) {
+        // Gissningen är högst
+        lowerBound = fullTimeline[fullTimeline.length - 1];
+      } else if (upperIndex === 0) {
+        // Gissningen är lägst
+        upperBound = fullTimeline[0];
+      } else {
+        lowerBound = fullTimeline[upperIndex - 1];
+        upperBound = fullTimeline[upperIndex];
+      }
+      // Kortet måste vara efter föregående år, upp till och med nästa år
+      isCorrect = card.year > lowerBound && card.year <= upperBound;
     }
 
     setWasCorrect(isCorrect);
 
     if (isCorrect) {
-        setRoundCards((prev) => [...prev, card]);
+      setRoundCards((prev) => [...prev, card]);
     }
     // Ingen automatisk timer här längre. Komponenten styr när turen ska bytas.
-
   };
 
-    // Ny funktion för att byta spelare, som komponenten kan anropa
-
+  // Ny funktion för att byta spelare, som komponenten kan anropa
   const switchPlayerTurn = () => {
     setRoundCards([]);
     setActivePlayer((prevPlayer) => (prevPlayer === player1Name ? player2Name : player1Name));
     onNewCardNeeded();
   };
 
-    // Logik för att spara och byta tur
-
+  // Logik för att spara och byta tur
   const saveAndEndTurn = () => {
     const p = players[activePlayer];
     const updatedPlayer: Player = {
@@ -161,13 +171,11 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
       cards: [...p.cards, ...roundCards],
     };
     setPlayers((prev) => ({ ...prev, [activePlayer]: updatedPlayer }));
-        // Anropar den nya switch-funktionen för att hålla logiken samlad
-
+    // Anropar den nya switch-funktionen för att hålla logiken samlad
     switchPlayerTurn();
   };
 
-    // Exponerar state och funktioner som komponenten behöver
-
+  // Exponerar state och funktioner som komponenten behöver
   return {
     players,
     activePlayer,
@@ -181,5 +189,7 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
     saveAndEndTurn,
     resetTurnState,
     switchPlayerTurn,
+    // NYTT
+    loadSavedGame,
   };
 }
