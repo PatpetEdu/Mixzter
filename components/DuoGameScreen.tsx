@@ -59,7 +59,7 @@ export default function DuoGameScreen({
 }: Props) {
   const { user, isAnonymous } = useAuth();
 
-  // ✅ Persist per spel (och användare) för nextCard
+  // Persist per spel (och användare) för nextCard
   const persistKey = user && gameId ? `nextCard:${user.uid}:${gameId}` : undefined;
 
   const { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating } = useGenerateSongs(
@@ -77,6 +77,9 @@ export default function DuoGameScreen({
   // Ny state för "Före/Efter"-logiken
   const [showPlacementChoice, setShowPlacementChoice] = useState(false);
   const [placement, setPlacement] = useState<'before' | 'after' | null>(null);
+
+  // Separat flagga för återställning av spelsessionen (players/roundCards/UI)
+  const [isRestoring, setIsRestoring] = useState(true);
 
   const {
     players,
@@ -113,13 +116,13 @@ export default function DuoGameScreen({
     resetTurnState();
   }, [resetTurnState]);
 
-  // Vänta in hydrering innan första autogenerate
+  // Vänta in hydrering OCH återställning innan första autogenerate
   useEffect(() => {
-    if (!isHydrating && !card && !initialPreloadedCard && !gameOverMessage) {
+    if (!isHydrating && !isRestoring && !card && !initialPreloadedCard && !gameOverMessage) {
       generateCard(resetInputs);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHydrating]);
+  }, [isHydrating, isRestoring]);
 
   useEffect(() => {
     let timerId: NodeJS.Timeout;
@@ -133,14 +136,28 @@ export default function DuoGameScreen({
     };
   }, [showBack, wasCorrect, switchPlayerTurn]);
 
-  // Ladda sparat spel vid mount om gameId finns (och användaren är inloggad)
+  // Ladda sparat spel + återskapa post-guess UI om roundCards innehåller kort
   useEffect(() => {
-    if (!gameId || !user || isAnonymous) return;
+    if (!gameId || !user || isAnonymous) {
+      setIsRestoring(false);
+      return;
+    }
     (async () => {
       const saved = await loadActiveGame(user.uid, gameId);
       if (saved) {
         loadSavedGame({ players: saved.players as any, activePlayer: saved.activePlayer, roundCards: saved.roundCards });
+
+        if (saved.roundCards && saved.roundCards.length > 0) {
+          const last = saved.roundCards[saved.roundCards.length - 1];
+          setCard(last);             // undviker autogenerate
+          setShowBack(true);         // visa baksidan
+          setGuessConfirmed(true);   // döljer gissningsfältet
+          setShowPlacementChoice(false);
+          setPlacement(null);
+          setIsSongInfoVisible(false);
+        }
       }
+      setIsRestoring(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, user?.uid, isAnonymous]);
@@ -199,7 +216,7 @@ export default function DuoGameScreen({
 
   const handleConfirmGuess = () => {
     const year = parseInt(guess, 10);
-    const valid = /^\d{4}$/.test(guess) && year >= 1900 && year <= currentYear;
+    const valid = /^[0-9]{4}$/.test(guess) && year >= 1900 && year <= currentYear;
     setIsGuessValid(valid);
     if (!valid || !card) return;
 
@@ -233,38 +250,16 @@ export default function DuoGameScreen({
     const roundTimeline = isCurrentPlayer ? roundCards.map((c) => c.year) : [];
     const yearsToDisplay = [...finalTimeline, ...roundTimeline].sort((a, b) => a - b);
     return (
-      <Box
-        borderWidth={1}
-        borderRadius="$lg"
-        p="$3"
-        my="$2"
-        w="$full"
-        bg={isCurrentPlayer ? '$primary100' : '$backgroundLight100'}
-        borderColor={isCurrentPlayer ? '$primary300' : '$borderLight300'}
-        sx={{ _dark: { bg: isCurrentPlayer ? '$primary900' : '$backgroundDark800', borderColor: isCurrentPlayer ? '$primary700' : '$borderDark700' } }}
-      >
+      <Box borderWidth={1} borderRadius="$lg" p="$3" my="$2" w="$full" bg={isCurrentPlayer ? '$primary100' : '$backgroundLight100'} borderColor={isCurrentPlayer ? '$primary300' : '$borderLight300'} sx={{ _dark: { bg: isCurrentPlayer ? '$primary900' : '$backgroundDark800', borderColor: isCurrentPlayer ? '$primary700' : '$borderDark700' } }}>
         <HStack justifyContent="space-between" alignItems="center">
-          <Text bold fontSize="$lg" color="$textLight900" sx={{ _dark: { color: '$textDark100' } }}>
-            {player.name}s tidslinje ({finalTimeline.length - 1} kort)
-          </Text>
-          <Text bold fontSize="$lg" color="$textLight900" sx={{ _dark: { color: '$textDark100' } }}>
-            ⭐ {player.stars}
-          </Text>
+          <Text bold fontSize="$lg" color="$textLight900" sx={{ _dark: { color: '$textDark100' } }}>{player.name}s tidslinje ({finalTimeline.length - 1} kort)</Text>
+          <Text bold fontSize="$lg" color="$textLight900" sx={{ _dark: { color: '$textDark100' } }}>⭐ {player.stars}</Text>
         </HStack>
         <HStack flexWrap="wrap" mt="$2">
           {yearsToDisplay.map((year, idx) => {
             const isPrelim = isCurrentPlayer && roundCards.some((c) => c.year === year) && !finalTimeline.includes(year);
             return (
-              <Box
-                key={`${year}-${idx}`}
-                px="$2"
-                py="$1"
-                mr="$2"
-                mb="$2"
-                borderRadius="$md"
-                bg={isPrelim ? '$primary200' : '$backgroundLight200'}
-                sx={{ _dark: { bg: isPrelim ? '$primary800' : '$backgroundDark700' } }}
-              >
+              <Box key={`${year}-${idx}`} px="$2" py="$1" mr="$2" mb="$2" borderRadius="$md" bg={isPrelim ? '$primary200' : '$backgroundLight200'} sx={{ _dark: { bg: isPrelim ? '$primary800' : '$backgroundDark700' } }}>
                 <Text color="$textLight700" sx={{ _dark: { color: '$textDark300' } }}>{String(year)}</Text>
               </Box>
             );
@@ -279,16 +274,10 @@ export default function DuoGameScreen({
       <Center flex={1} px="$4">
         <VStack alignItems="center" space="md">
           <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
-          <Text fontSize="$lg" color="$primary600" sx={{ _dark: { color: '$primary400' } }}>
-            {gameOverMessage}
-          </Text>
+          <Text fontSize="$lg" color="$primary600" sx={{ _dark: { color: '$primary400' } }}>{gameOverMessage}</Text>
           <VStack space="xs" alignItems="center" my="$3">
-            <Text>
-              {player1}: {players[player1].timeline.length} kort
-            </Text>
-            <Text>
-              {player2}: {players[player2].timeline.length} kort
-            </Text>
+            <Text>{player1}: {players[player1].timeline.length} kort</Text>
+            <Text>{player2}: {players[player2].timeline.length} kort</Text>
           </VStack>
         </VStack>
       </Center>
@@ -301,68 +290,49 @@ export default function DuoGameScreen({
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
-        <Box alignItems="center" mb="$2">
-          <Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} />
-        </Box>
+        <Box alignItems="center" mb="$2"><Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 96, height: 96, resizeMode: 'contain' }} /></Box>
         <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
         {renderTimeline(current, true)}
         {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
         {isLoadingCard ? (
-          <VStack alignItems="center" mt="$4">
-            <ActivityIndicator size="large" />
-            <Text mt="$2">Genererar kort...</Text>
-          </VStack>
+          <VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar kort...</Text></VStack>
         ) : errorMessage ? (
           <Text color="$error600">{errorMessage}</Text>
         ) : !card ? (
-          <Button onPress={() => generateCard(resetInputs)}>
-            <ButtonText>Starta spelet</ButtonText>
-          </Button>
+          <Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>
         ) : null}
 
         {card && !guessConfirmed && !isLoadingCard && (
           <VStack space="md" w="$full">
             <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
             {isSongInfoVisible && (
-              <Box bg="$info100" borderColor="$info300" sx={{ _dark: { bg: '$info900', borderColor: '$info700' } }} borderWidth={1} borderRadius="$lg" p="$3">
+              <Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: '$info900', borderColor: '$info700'}}} borderWidth={1} borderRadius="$lg" p="$3">
                 <Text textAlign="center">Artist: {card.artist}</Text>
                 <Text textAlign="center">Låt: {card.title}</Text>
                 <Text textAlign="center">År: {card.year}</Text>
               </Box>
             )}
             <HStack justifyContent="space-around" w="$full" my="$2">
-              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}>
-                <ButtonText>Hoppa över (-1 ⭐)</ButtonText>
-              </Button>
-              <Button variant="outline" onPress={handleToggleSongInfo}>
-                <ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText>
-              </Button>
+              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
+              <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
             </HStack>
 
             {showPlacementChoice ? (
               <VStack space="md" alignItems="center">
                 <Text bold>Året finns redan. Placera kortet före eller efter?</Text>
                 <HStack space="md">
-                  <Button variant={placement === 'before' ? 'solid' : 'outline'} onPress={() => setPlacement('before')}>
-                    <ButtonText>Före {guess}</ButtonText>
-                  </Button>
-                  <Button variant={placement === 'after' ? 'solid' : 'outline'} onPress={() => setPlacement('after')}>
-                    <ButtonText>Efter {guess}</ButtonText>
-                  </Button>
+                  <Button variant={placement === 'before' ? 'solid' : 'outline'} onPress={() => setPlacement('before')}><ButtonText>Före {guess}</ButtonText></Button>
+                  <Button variant={placement === 'after' ? 'solid' : 'outline'} onPress={() => setPlacement('after')}><ButtonText>Efter {guess}</ButtonText></Button>
                 </HStack>
-                <Button onPress={handlePlacementConfirm} isDisabled={!placement}>
-                  <ButtonText>Bekräfta placering</ButtonText>
-                </Button>
+                <Button onPress={handlePlacementConfirm} isDisabled={!placement}><ButtonText>Bekräfta placering</ButtonText></Button>
               </VStack>
             ) : (
               <>
                 <Input w="$full" maxWidth={220} alignSelf="center" isInvalid={!isGuessValid}>
                   <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
                 </Input>
-                {!isGuessValid && <Text color="$error600" textAlign="center">Ogiltigt årtal</Text>}
-                <Button onPress={handleConfirmGuess}>
-                  <ButtonText>Bekräfta gissning</ButtonText>
-                </Button>
+                {!isGuessValid && (<Text color="$error600" textAlign="center">Ogiltigt årtal</Text>)}
+                <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
               </>
             )}
           </VStack>
@@ -374,22 +344,14 @@ export default function DuoGameScreen({
             {wasCorrect ? (
               <VStack alignItems="center" w="$full" mt="$2" space="sm">
                 <Text color="$success600" bold>✅ Rätt gissat!</Text>
-                <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}>
-                  <ButtonText>Ge stjärna (+1)</ButtonText>
-                </Button>
-                <Button onPress={handleContinue}>
-                  <ButtonText>Fortsätt</ButtonText>
-                </Button>
-                <Button variant="outline" onPress={handleSave}>
-                  <ButtonText>Spara & avsluta runda</ButtonText>
-                </Button>
+                <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
+                <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
+                <Button variant="outline" onPress={handleSave}><ButtonText>Spara & avsluta runda</ButtonText></Button>
               </VStack>
             ) : (
               <VStack alignItems="center" w="$full" mt="$2" space="sm">
                 <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
-                <Button action="negative" onPress={switchPlayerTurn}>
-                  <ButtonText>Klar</ButtonText>
-                </Button>
+                <Button action="negative" onPress={switchPlayerTurn}><ButtonText>Klar</ButtonText></Button>
               </VStack>
             )}
           </VStack>
@@ -402,5 +364,6 @@ export default function DuoGameScreen({
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, paddingBottom: 20, alignItems: 'center', flexGrow: 1 },
 });
+
 
 

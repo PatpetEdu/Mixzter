@@ -61,16 +61,24 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
   };
 
   // NYTT: Möjliggör laddning av sparat spel (hydrering) utifrån DuoGameScreen
-  const loadSavedGame = (payload: {
-    players: { [key: string]: Player };
-    activePlayer: string;
-    roundCards?: Card[];
-  }) => {
-    setPlayers(payload.players);
-    setActivePlayer(payload.activePlayer);
-    setRoundCards(payload.roundCards ?? []);
-    resetTurnState();
-  };
+ const loadSavedGame = (payload: {
+  players: { [key: string]: Player };
+  activePlayer: string;
+  roundCards?: Card[];
+}) => {
+  setPlayers(payload.players);
+  setActivePlayer(payload.activePlayer);
+
+  const rc = payload.roundCards ?? [];
+  setRoundCards(rc);
+
+  // Härled post-guess-läge: om rundan redan har preliminära kort
+  // ska "Rätt gissat!"-vyn och knapparna visas igen.
+  setWasCorrect(rc.length > 0);
+
+  // Vi nollar bara "stjärna delad denna tur"-flaggan.
+  setStarAwardedThisTurn(false);
+};
 
   // Logik för att ge en stjärna
   const awardStar = () => {
