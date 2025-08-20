@@ -44,3 +44,36 @@ ios/
 # Firebase Functions build-artifacts
 functions/lib/
 functions/node_modules/
+
+# VS Code / JetBrains
+.vscode/
+.idea/
+*.iml
+.eslintcache
+
+# Windows/macOS småskräp
+Thumbs.db
+
+# Generella env-filer (inte bara *.local)
+.env
+.env.*
+functions/.env
+functions/.env.*
+
+# Firebase (lokala loggar/cache)
+.firebase/
+firebase-debug.log
+# Functions lokal runtimeconfig (genereras lokalt av Firebase CLI)
+functions/.runtimeconfig.json
+
+# Yarn 2+/PNP (om du skulle använda det framöver)
+.pnp.*
+.yarn/*
+!.yarn/patches/
+!.yarn/releases/
+!.yarn/plugins/
+!.yarn/sdks/
+!.yarn/versions/
+
+# Test/coverage (om du börjar köra tester)
+coverage/
