@@ -1,128 +1,418 @@
-// components/SinglePlayerScreen.tsx
-import React, { useState } from 'react';
-import { View, Text, Button, StyleSheet, ActivityIndicator } from 'react-native';
-import CardFront from './CardFront';
-import CardBack from './CardBack';
+// SinglePlayerScreen.tsx
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Animated,
+  ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
+import {
+  VStack,
+  Heading,
+  Button,
+  ButtonText,
+  Input,
+  InputField,
+  Text,
+  Box,
+  HStack,
+} from '@gluestack-ui/themed';
+import * as firebaseAuth from 'firebase/auth';
 
-type CardData = {
-  artist: string;
-  title: string;
-  year: string;
-  spotifyUrl: string;
-};
+import PreviewCardFront, { PreviewCardFrontHandle } from './PreviewCardFront';
+import {
+  fetchPreviewCard,
+  markPreviewSeen,
+  PreviewCard as PreviewData,
+} from '../utils/previewProvider';
+import { useSinglePlayerLogic } from '../hooks/useSinglePlayerLogic';
 
 type Props = {
   onBackToMenu: () => void;
+  headerHeight: number;
+  onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
-export default function SinglePlayerScreen({ onBackToMenu }: Props) {
-  const [card, setCard] = useState<CardData | null>(null);
-  const [flipped, setFlipped] = useState(false);
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+// Session-minne för att undvika dubbletter i samma session
+const SEEN_SESSION = new Set<string>();
+
+export default function SinglePlayerScreen({ onBackToMenu, headerHeight, onScroll }: Props) {
+  const auth = firebaseAuth.getAuth();
+
+  // nuvarande & nästa kort (preload)
+  const [card, setCard] = useState<PreviewData | null>(null);
+  const [nextCard, setNextCard] = useState<PreviewData | null>(null);
+
   const [loading, setLoading] = useState(false);
-  const [noResult, setNoResult] = useState(false);
-  const [seenSongs, setSeenSongs] = useState<Set<string>>(new Set()); // Använder Set för effektiv sökning
+  const [preloading, setPreloading] = useState(false);
+  const [error, setError] = useState('');
 
-const generateCard = async () => {
+  // gissning + UI
+  const [guess, setGuess] = useState('');
+  const [revealed, setRevealed] = useState(false);
+  const [showPlacementChoice, setShowPlacementChoice] = useState(false);
+  const [placement, setPlacement] = useState<'before' | 'after' | null>(null);
+
+  // ljud
+  const previewRef = useRef<PreviewCardFrontHandle>(null);
+
+  const {
+    player,
+    wasCorrect,        // null | true | false
+    exactHit,          // exakt år => auto ⭐
+    highscore,
+    gameOverMessage,
+    skipSong,
+    confirmGuess,
+    resetGame,
+  } = useSinglePlayerLogic(() => {
+    advanceToNext();
+  });
+
+  const isGuessValid = useMemo(() => /^[0-9]{4}$/.test(guess), [guess]);
+
+  const stopAudio = useCallback(async () => {
+    try { await previewRef.current?.stop?.(); } catch {}
+  }, []);
+
+  useEffect(() => () => { stopAudio(); }, [stopAudio]);
+
+  // --- Datadel: hämta & preload ---
+  const actuallyFetchCard = useCallback(async (): Promise<PreviewData | null> => {
+    const idToken = await auth.currentUser?.getIdToken?.();
+    const c = await fetchPreviewCard(Array.from(SEEN_SESSION), idToken || undefined);
+    if (!c) return null;
+    const id = `${c.artist} - ${c.title}`.toLowerCase();
+    if (SEEN_SESSION.has(id)) return null;
+    SEEN_SESSION.add(id);
+    markPreviewSeen(c, idToken || undefined).catch(() => {});
+    return c;
+  }, [auth]);
+
+  const preloadNext = useCallback(async () => {
+    if (preloading || nextCard) return;
+    setPreloading(true);
+    const c = await actuallyFetchCard();
+    if (c) setNextCard(c);
+    setPreloading(false);
+  }, [preloading, nextCard, actuallyFetchCard]);
+
+  const startFirst = useCallback(async () => {
+    setError('');
     setLoading(true);
-    setFlipped(false);
-    setNoResult(false);
+    setRevealed(false);
+    setGuess('');
+    await stopAudio();
 
-    let newCard: CardData | null = null;
-    let attempts = 0;
-    const MAX_CLIENT_ATTEMPTS = 5; // Max antal försök att hitta en unik låt från servern
-
-    while (!newCard && attempts < MAX_CLIENT_ATTEMPTS) {
-      try {
-        const res = await fetch("https://us-central1-musikquiz-app.cloudfunctions.net/generateCard");
-        // Kontrollera om svaret inte är OK (t.ex. 404 från Spotify, eller 500 från OpenAI)
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Fel från servern vid generering av kort:", res.status, errorText);
-          // Vi sätter noResult till true och bryter för att visa felmeddelande till användaren
-          setNoResult(true);
-          break;
-        }
-
-        const data = await res.json();
-
-        // Skapa en unik identifierare för låten (artist + titel, gemener för jämförelse)
-        const songIdentifier = `${data.artist} - ${data.title}`.toLowerCase();
-
-        // Kontrollera om låten redan visats i denna session
-        if (!seenSongs.has(songIdentifier)) {
-          newCard = data;
-          // Lägg till låten i Set:et av visade låtar
-          setSeenSongs(prev => new Set(prev).add(songIdentifier));
-        } else {
-          console.log(`Låten "${songIdentifier}" har redan visats i denna session. Försöker generera en ny.`);
-        }
-      } catch (error) {
-        console.error("Kritiskt fel vid hämtning av kort:", error);
-        setNoResult(true); // Visa meddelande om fel
-        break; // Avbryt loopen vid ett kritiskt fel (t.ex. nätverksproblem)
-      }
-      attempts++;
+    if (nextCard) {
+      setCard(nextCard);
+      setNextCard(null);
+      setLoading(false);
+      preloadNext();
+      return;
     }
 
-    if (newCard) {
-      setCard(newCard);
-      setNoResult(false); // Om vi har ett kort, nollställ felmeddelandet
-    } else {
-      // Om vi inte hittade en unik låt efter X försök ELLER om det var ett fel
-      setCard(null);
-      setNoResult(true); // Visa meddelande om ingen träff eller fel
-      console.warn("Kunde inte generera en unik låt efter flera försök eller stötte på ett problem.");
-    }
+    const c = await actuallyFetchCard();
     setLoading(false);
+    if (!c) { setError('Kunde inte hämta preview just nu. Försök igen.'); return; }
+    setCard(c);
+    preloadNext();
+  }, [nextCard, preloadNext, actuallyFetchCard, stopAudio]);
+
+  const advanceToNext = useCallback(async () => {
+    setRevealed(false);
+    setShowPlacementChoice(false);
+    setPlacement(null);
+    setGuess('');
+    await stopAudio();
+
+    if (nextCard) {
+      setCard(nextCard);
+      setNextCard(null);
+      preloadNext();
+    } else {
+      setLoading(true);
+      const c = await actuallyFetchCard();
+      setLoading(false);
+      if (c) setCard(c);
+      preloadNext();
+    }
+  }, [nextCard, preloadNext, actuallyFetchCard, stopAudio]);
+
+  // Auto-preload av första kortet när skärmen öppnas
+  const started = useRef(false);
+  useEffect(() => {
+    if (!started.current) {
+      started.current = true;
+      startFirst();
+    }
+  }, [startFirst]);
+
+  // --- UI-handlers ---
+  const onConfirmPress = () => {
+    if (!card) return;
+    const y = parseInt(guess, 10);
+    if (!isGuessValid || Number.isNaN(y)) return;
+
+    const full = [player.startYear, ...player.timeline];
+    if (full.includes(y)) {
+      setShowPlacementChoice(true);
+      return;
+    }
+
+    confirmGuess(guess, {
+      title: card.title,
+      artist: card.artist,
+      year: card.year,
+      previewUrl: card.previewUrl,
+      externalUrl: card.externalUrl,
+      artworkUrl: card.artworkUrl,
+      source: card.source,
+    });
+    setRevealed(true);
   };
 
+  const onConfirmPlacement = () => {
+    if (!card || !placement) return;
+    confirmGuess(guess, {
+      title: card.title,
+      artist: card.artist,
+      year: card.year,
+      previewUrl: card.previewUrl,
+      externalUrl: card.externalUrl,
+      artworkUrl: card.artworkUrl,
+      source: card.source,
+    }, placement);
+    setRevealed(true);
+    setShowPlacementChoice(false);
+  };
+
+  const onSkip = () => {
+    if (!revealed) skipSong();
+  };
+
+  const onContinue = () => {
+    advanceToNext();
+  };
+
+  // --- render helpers ---
+  const renderTimeline = () => {
+    const years = [player.startYear, ...player.timeline].sort((a, b) => a - b);
+    return (
+      <Box
+        borderWidth={1}
+        borderRadius="$lg"
+        p="$3"
+        my="$2"
+        w="$full"
+        bg="$primary100"
+        borderColor="$primary300"
+        sx={{ _dark: { bg: '$primary900', borderColor: '$primary700' } }}
+      >
+        <HStack justifyContent="space-between" alignItems="center" mb="$1">
+          <Text bold fontSize="$lg">Din tidslinje ({player.timeline.length} kort)</Text>
+          <Text bold fontSize="$lg">⭐ {player.stars}</Text>
+        </HStack>
+        <HStack flexWrap="wrap" mt="$1">
+          {years.map((y, idx) => (
+            <Box
+              key={`${y}-${idx}`}
+              px="$2"
+              py="$1"
+              mr="$2"
+              mb="$2"
+              borderRadius="$md"
+              bg="$backgroundLight200"
+              sx={{ _dark: { bg: '$backgroundDark700' } }}
+            >
+              <Text>{String(y)}</Text>
+            </Box>
+          ))}
+        </HStack>
+      </Box>
+    );
+  };
+
+  // --- Game over ---
+  if (gameOverMessage) {
+    return (
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <AnimatedScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.container, { paddingTop: headerHeight }]}
+          scrollEventThrottle={16}
+          onScroll={onScroll}
+        >
+          <VStack space="md" alignItems="center" w="$full" maxWidth={520}>
+            <Heading size="xl">🎉 Spelet är över!</Heading>
+            <Text>{gameOverMessage}</Text>
+            <Text bold>Highscore: {highscore}</Text>
+            <HStack space="md" mt="$2">
+              <Button onPress={() => { resetGame(); startFirst(); }}>
+                <ButtonText>Börja om</ButtonText>
+              </Button>
+            </HStack>
+          </VStack>
+        </AnimatedScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🎵 Single Player</Text>
-      <Button
-        title={card ? "Generera nytt kort" : "Generera kort"}
-        onPress={generateCard}
-      />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <AnimatedScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.container, { paddingTop: headerHeight }]}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+      >
+        <VStack w="$full" maxWidth={520} alignSelf="center" space="lg">
+          <Heading size="xl" textAlign="center">🎵 Single Player</Heading>
 
-      {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
+          {/* Stats högst upp – syns alltid */}
+          <HStack space="md" alignItems="center" justifyContent="center">
+            <Text>Streak: {player.timeline.length}</Text>
+            <Text>• Highscore: {highscore}</Text>
+          </HStack>
 
-      {noResult && !loading && (
-        <Text style={{ marginTop: 20, color: 'red' }}>Ingen träff – försök igen!</Text>
-      )}
+          {renderTimeline()}
 
-      {!loading && card && (
-        <View style={{ marginTop: 20 }}>
-          {flipped ? (
-            <CardBack
-              artist={card.artist}
-              title={card.title}
-              year={card.year}
-              onFlip={() => setFlipped(false)}
-            />
-          ) : (
-         <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => setFlipped(true)} showFlipButton />
+          {loading && <ActivityIndicator />}
+          {error ? <Text color="$error600">{error}</Text> : null}
+
+          {/* FEEDBACK ovanför kortet */}
+          {revealed && (
+            <Box alignItems="center">
+              {wasCorrect ? (
+                <Text bold color="$success700" sx={{ _dark: { color: '$success300' } }}>
+                  ✅ Rätt gissat{exactHit ? ' (+1 ⭐ för exakt år)' : ''}!
+                </Text>
+              ) : (
+                <Text bold color="$error700" sx={{ _dark: { color: '$error300' } }}>
+                  ❌ Fel!
+                </Text>
+              )}
+            </Box>
           )}
-        </View>
-      )}
 
-      <View style={{ marginTop: 40 }}>
-        <Button title="Gå tillbaka till meny" onPress={onBackToMenu} />
-      </View>
-    </View>
+          {/* Kortet */}
+          {card && (
+            <VStack space="md" w="$full" alignItems="center">
+              <PreviewCardFront
+                ref={previewRef}
+                title={card.title}
+                artist={card.artist}
+                year={revealed ? card.year : undefined}
+                artworkUrl={card.artworkUrl}
+                previewUrl={card.previewUrl}
+                externalUrl={card.externalUrl}
+                hideMeta={!revealed}
+                blurArtwork={!revealed}
+                allowExternalWhenHidden
+              />
+
+              {/* Före reveal: gissning/placering */}
+              {!revealed && (
+                <>
+                  <Input w="$full" maxWidth={240} alignSelf="center" isInvalid={guess.length > 0 && !isGuessValid}>
+                    <InputField
+                      placeholder="Ex: 2012"
+                      keyboardType="numeric"
+                      value={guess}
+                      onChangeText={setGuess}
+                      returnKeyType="done"
+                      onSubmitEditing={onConfirmPress}
+                    />
+                  </Input>
+
+                  {showPlacementChoice ? (
+                    <VStack space="md" alignItems="center">
+                      <Text bold>Året finns redan. Placera före eller efter?</Text>
+                      <HStack space="md">
+                        <Button variant={placement === 'before' ? 'solid' : 'outline'} onPress={() => setPlacement('before')}>
+                          <ButtonText>Före {guess}</ButtonText>
+                        </Button>
+                        <Button variant={placement === 'after' ? 'solid' : 'outline'} onPress={() => setPlacement('after')}>
+                          <ButtonText>Efter {guess}</ButtonText>
+                        </Button>
+                      </HStack>
+                      <Button onPress={onConfirmPlacement} isDisabled={!placement}>
+                        <ButtonText>Bekräfta placering</ButtonText>
+                      </Button>
+                    </VStack>
+                  ) : (
+                    <>
+               {!isGuessValid && guess.length > 0 && (
+  <Text color="$error600" textAlign="center">Ogiltigt årtal</Text>
+)}
+          <HStack
+            w="$full"
+            space="md"
+            justifyContent="center"
+            flexWrap="wrap"
+            >
+           <Button
+            onPress={onConfirmPress}
+            isDisabled={!isGuessValid}
+            style={{ flex: 1, minWidth: '48%' }}   // ⬅ halva bredden, men får wrap:a
+            px="$4"
+            >
+            <ButtonText textAlign="center">Bekräfta gissning</ButtonText>
+          </Button>
+          <Button
+            variant="outline"
+            onPress={onSkip}
+            isDisabled={player.stars <= 0}
+            style={{ flex: 1, minWidth: '48%' }}
+            px="$4"
+            >
+             <ButtonText textAlign="center">Hoppa över (-1 ⭐)</ButtonText>
+            </Button>
+            </HStack>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* Efter reveal */}
+              {revealed && (
+                <VStack space="md" alignItems="center">
+                  <Button onPress={onContinue}>
+                    <ButtonText>Fortsätt</ButtonText>
+                  </Button>
+                </VStack>
+              )}
+
+              {preloading && (
+                <Text size="xs" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
+                  Förladdar nästa låt…
+                </Text>
+              )}
+            </VStack>
+          )}
+        </VStack>
+      </AnimatedScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 24,
+    flexGrow: 1,
   },
 });

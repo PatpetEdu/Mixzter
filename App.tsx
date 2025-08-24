@@ -15,6 +15,7 @@ import PlayerSetupScreen from './components/PlayerSetupScreen';
 import DuoGameScreen from './components/DuoGameScreen';
 import LoginScreen from './components/LoginScreen';
 import SignupScreen from './components/SignupScreen';
+import SinglePlayerScreen from './components/SinglePlayerScreen'; // ⬅️ NYTT: importera single player
 import GameHeader from './components/GameHeader';
 import GameFooter from './components/GameFooter';
 import { AuthProvider } from './context/AuthContext';
@@ -24,7 +25,8 @@ import { auth } from './firebase';
 import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame } from './storage/gameStorage';
 
 export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
-export type GameMode = 'menu' | 'duo-setup' | 'duo';
+// ⬇️ NYTT: lägg till 'single'
+export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single';
 
 // NYTT: delad nyckel för lokal historik
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
@@ -166,47 +168,47 @@ function AppContent() {
   };
 
   // Ta bort från meny + 🧹 städning av ev. pending nextCard + lokala seenSongs
-const deleteActiveGameFromMenu = (id: string) => {
-  if (!user) return;
+  const deleteActiveGameFromMenu = (id: string) => {
+    if (!user) return;
 
-  Alert.alert(
-    'Avsluta spel',
-    'Vill du verkligen avsluta den här spelomgången?',
-    [
-      { text: 'Avbryt', style: 'cancel' },
-      {
-        text: 'Avsluta',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const persistKey = `nextCard:${user!.uid}:${id}`;
-            const rawNext = await AsyncStorage.getItem(persistKey);
+    Alert.alert(
+      'Avsluta spel',
+      'Vill du verkligen avsluta den här spelomgången?',
+      [
+        { text: 'Avbryt', style: 'cancel' },
+        {
+          text: 'Avsluta',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const persistKey = `nextCard:${user!.uid}:${id}`;
+              const rawNext = await AsyncStorage.getItem(persistKey);
 
-            if (rawNext) {
-              try {
-                const pending: CardData = JSON.parse(rawNext);
-                const songIdentifier = `${pending.artist} - ${pending.title}`.toLowerCase();
-                const rawSeen = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-                const arr = rawSeen ? (JSON.parse(rawSeen) as string[]) : [];
-                const filtered = arr.filter((s) => s !== songIdentifier);
-                await AsyncStorage.setItem(SEEN_SONGS_KEY, JSON.stringify(filtered));
-              } catch (e) {
-                console.warn('Kunde inte parsa pending nextCard', e);
+              if (rawNext) {
+                try {
+                  const pending: CardData = JSON.parse(rawNext);
+                  const songIdentifier = `${pending.artist} - ${pending.title}`.toLowerCase();
+                  const rawSeen = await AsyncStorage.getItem(SEEN_SONGS_KEY);
+                  const arr = rawSeen ? (JSON.parse(rawSeen) as string[]) : [];
+                  const filtered = arr.filter((s) => s !== songIdentifier);
+                  await AsyncStorage.setItem(SEEN_SONGS_KEY, JSON.stringify(filtered));
+                } catch (e) {
+                  console.warn('Kunde inte parsa pending nextCard', e);
+                }
               }
-            }
 
-            await AsyncStorage.removeItem(persistKey);
-            await removeActiveGame(user!.uid, id);
-            await refreshActiveGames(); // vänta in listuppdatering
-          } catch (e) {
-            console.warn('Kunde inte städa/avsluta spel', e);
-          }
+              await AsyncStorage.removeItem(persistKey);
+              await removeActiveGame(user!.uid, id);
+              await refreshActiveGames(); // vänta in listuppdatering
+            } catch (e) {
+              console.warn('Kunde inte städa/avsluta spel', e);
+            }
+          },
         },
-      },
-    ],
-    { cancelable: true }
-  );
-};
+      ],
+      { cancelable: true }
+    );
+  };
 
   const returnToMenu = () => {
     setPlayers(null);
@@ -252,10 +254,15 @@ const deleteActiveGameFromMenu = (id: string) => {
         <GameHeader />
         <Center flex={1}>
           <VStack space="lg" alignItems="center">
-             <Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 120, height: 120, resizeMode: 'contain' }} />
+            <Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 120, height: 120, resizeMode: 'contain' }} />
             <Text size="md" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
               {user ? `Inloggad som: ${user.email}` : 'Spelar som gäst'}
             </Text>
+
+            {/* Start Single Player – påverkar inte Duo-logiken */}
+            <Button onPress={() => setMode('single')}>
+              <ButtonText>Start Single Player</ButtonText>
+            </Button>
 
             {/* Starta nytt Duo-spel – spärr om 2 aktiva redan finns */}
             <Button onPress={() => setMode('duo-setup')} isDisabled={!!user && activeGames.length >= 2}>
@@ -313,6 +320,36 @@ const deleteActiveGameFromMenu = (id: string) => {
       </Box>
     );
   }
+
+// Single Player – med samma “collapsible header”-setup som Duo
+if (mode === 'single') {
+  return (
+    <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1,
+          transform: [{ translateY: headerTranslateY }],
+        }}
+      >
+        <GameHeader />
+      </Animated.View>
+
+      <Box flex={1}>
+        <SinglePlayerScreen
+          onBackToMenu={returnToMenu}
+          headerHeight={HEADER_HEIGHT}
+          onScroll={handleScroll}   // ⬅️ viktigt
+        />
+      </Box>
+
+      <GameFooter onBackToMenu={returnToMenu} />
+    </Box>
+  );
+}
 
   // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
   if (mode === 'duo-setup' || (mode === 'duo' && players)) {
@@ -380,4 +417,3 @@ function ThemedApp() {
     </>
   );
 }
-
