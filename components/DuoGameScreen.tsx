@@ -1,16 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform  } from 'react-native';
 import {
-  Box,
-  Text,
-  Heading,
-  Button,
-  ButtonText,
-  VStack,
-  HStack,
-  Input,
-  InputField,
-  Center,
+  Box, Text, Heading, Button, ButtonText, VStack, HStack, Input, InputField, Center,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CardFront from './CardFront';
@@ -22,7 +13,6 @@ import { deleteActiveGame, loadActiveGame, saveActiveGame, SavedDuoGameState } f
 
 // Typer
 export type Card = { title: string; artist: string; year: number; spotifyUrl: string };
-
 type Player = { name: string; timeline: number[]; cards: Card[]; startYear: number; stars: number };
 
 type Props = {
@@ -33,7 +23,7 @@ type Props = {
   onPreloadComplete: () => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: number;
-  // ID för aktivt spel (för sparning/återupptag)
+    // ID för aktivt spel (för sparning/återupptag)
   gameId: string | null;
 };
 
@@ -55,7 +45,7 @@ export default function DuoGameScreen({
 }: Props) {
   const { user, isAnonymous } = useAuth();
 
-  // Persist per spel (och användare) för nextCard
+    // Persist per spel (och användare) för nextCard
   const persistKey = user && gameId ? `nextCard:${user.uid}:${gameId}` : undefined;
 
   const { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating } = useGenerateSongs(
@@ -70,12 +60,15 @@ export default function DuoGameScreen({
   const [showBack, setShowBack] = useState(false);
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
 
-  // Ny state för "Före/Efter"-logiken
+    // Ny state för "Före/Efter"-logiken
   const [showPlacementChoice, setShowPlacementChoice] = useState(false);
   const [placement, setPlacement] = useState<'before' | 'after' | null>(null);
 
-  // 🔄 separat flagga för återställning av spelsessionen (players/roundCards/UI)
+    // 🔄 separat flagga för återställning av spelsessionen (players/roundCards/UI)
   const [isRestoring, setIsRestoring] = useState(true);
+
+  // 🔸 Litet override så att vi kan rendera korrekt “Rätt gissat!” från storage direkt
+  const [wasCorrectOverride, setWasCorrectOverride] = useState<boolean | null>(null);
 
   const {
     players,
@@ -109,6 +102,7 @@ export default function DuoGameScreen({
     setIsSongInfoVisible(false);
     setShowPlacementChoice(false);
     setPlacement(null);
+    setWasCorrectOverride(null);
     resetTurnState();
   }, [resetTurnState]);
 
@@ -120,7 +114,7 @@ export default function DuoGameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrating, isRestoring]);
 
-  // 🧩 Ladda sparat spel + återskapa post-guess UI även vid FEL gissning
+  // 🧩 Återställning från storage – använd currentCard + uiSnapshot + postGuess om de finns
   useEffect(() => {
     if (!gameId || !user || isAnonymous) {
       setIsRestoring(false);
@@ -129,9 +123,26 @@ export default function DuoGameScreen({
     (async () => {
       const saved = await loadActiveGame(user.uid, gameId);
       if (saved) {
+        // Hydrera players mm i hooken först
         loadSavedGame({ players: saved.players as any, activePlayer: saved.activePlayer, roundCards: saved.roundCards });
 
-        // 1) Försök återskapa från explicit postGuess (sparas nedan)
+        // 1) Om det finns explicit UI-snapshot + currentCard (rekommenderad väg)
+        if (saved.currentCard && saved.uiSnapshot) {
+          setCard(saved.currentCard);
+          setShowBack(!!saved.uiSnapshot.showBack);
+          setGuess(saved.uiSnapshot.guess ?? '');
+          setShowPlacementChoice(!!saved.uiSnapshot.showPlacementChoice);
+          setPlacement(saved.uiSnapshot.placement ?? null);
+          setIsSongInfoVisible(!!saved.uiSnapshot.isSongInfoVisible);
+          setGuessConfirmed(!!saved.uiSnapshot.guessConfirmed);
+          if (saved.postGuess && typeof saved.postGuess.wasCorrect === 'boolean') {
+            setWasCorrectOverride(saved.postGuess.wasCorrect);
+          }
+          setIsRestoring(false);
+          return;
+        }
+
+        // 2) Bakåtkomp: om postGuess finns, använd det för att rendera back-sida korrekt
         const postGuess = (saved as any)?.postGuess as { card?: Card | null; wasCorrect?: boolean } | undefined;
         if (postGuess?.card) {
           setCard(postGuess.card);
@@ -140,11 +151,12 @@ export default function DuoGameScreen({
           setShowPlacementChoice(false);
           setPlacement(null);
           setIsSongInfoVisible(false);
+          if (typeof postGuess.wasCorrect === 'boolean') setWasCorrectOverride(postGuess.wasCorrect);
           setIsRestoring(false);
           return;
         }
 
-        // 2) Fallback: om rundan redan har preliminära kort => visa "rätt gissat"-vyn
+        // 3) Fallback: om rundan hade preliminära kort => visa back med sista kortet
         if (saved.roundCards && saved.roundCards.length > 0) {
           const last = saved.roundCards[saved.roundCards.length - 1];
           setCard(last);
@@ -160,11 +172,11 @@ export default function DuoGameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, user?.uid, isAnonymous]);
 
-  // 💾 Spara spelets state löpande (debounce ~500ms) + inkl. postGuess för att bevara felgissningsläge
+  // 💾 Spara spelet löpande (debounce ~500ms) – nu med currentCard + uiSnapshot + formell postGuess
   useEffect(() => {
     if (!user || isAnonymous || !gameId) return;
     const id = setTimeout(() => {
-      const payload: (SavedDuoGameState & { postGuess?: { card: Card | null; wasCorrect: boolean } }) = {
+      const payload: SavedDuoGameState = {
         id: gameId,
         player1Name: player1,
         player2Name: player2,
@@ -173,14 +185,34 @@ export default function DuoGameScreen({
         roundCards,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        // Spara endast om vi faktiskt är i post-guess-vy (back-sidan visas)
+
+        // 🔸 NYTT: spara “vilket kort visas just nu”
+        currentCard: card ?? null,
+
+        // 🔸 NYTT: spara exakt UI-läge (så vi kan återgå till front/back + inputs)
+        uiSnapshot: {
+          showBack,
+          guess,
+          showPlacementChoice,
+          placement,
+          isSongInfoVisible,
+          guessConfirmed,
+        },
+
+        // 🔸 NYTT (formellt): spara back-lägets facit
         postGuess: showBack ? { card: card ?? null, wasCorrect: !!wasCorrect } : undefined,
       };
       // cast räcker – AsyncStorage sparar ändå extra fält
-      saveActiveGame(user.uid, payload as unknown as SavedDuoGameState).catch((e) => console.warn('Kunde inte spara aktivt spel', e));
+
+      saveActiveGame(user.uid, payload).catch((e) => console.warn('Kunde inte spara aktivt spel', e));
     }, 500);
     return () => clearTimeout(id);
-  }, [players, activePlayer, roundCards, showBack, wasCorrect, card, user, isAnonymous, gameId, player1, player2]);
+  }, [
+    players, activePlayer, roundCards,
+    showBack, wasCorrect, card,
+    user, isAnonymous, gameId, player1, player2,
+    guess, showPlacementChoice, placement, isSongInfoVisible, guessConfirmed
+  ]);
 
   // 🧹 Ta bort sparat spel + städa ev. pending nextCard vid game over
   useEffect(() => {
@@ -288,6 +320,9 @@ export default function DuoGameScreen({
   const current = players[activePlayer];
   const canAffordSkip = current.stars > 0;
 
+  // 🔸 Rendera med override om den finns, annars hookens wasCorrect
+  const effectiveWasCorrect = (wasCorrectOverride !== null ? wasCorrectOverride : wasCorrect);
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
@@ -304,10 +339,10 @@ export default function DuoGameScreen({
 
         {card && !guessConfirmed && !isLoadingCard && (
           <VStack space="md" w="$full">
-            {/* 1) Kortet */}
+             {/* 1) Kortet */}
             <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
-
-            {/* 2) Bekräfta gissning / Placering – direkt under kortet */}
+           
+               {/* 2) Bekräfta gissning / Placering – direkt under kortet */}
             {showPlacementChoice ? (
               <VStack space="md" alignItems="center">
                 <Text bold>Året finns redan. Placera kortet före eller efter?</Text>
@@ -326,13 +361,12 @@ export default function DuoGameScreen({
                 <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
               </>
             )}
-
-            {/* 3) Mindre viktiga: Hoppa över / Visa låtinfo */}
+            
+             {/* 3) Mindre viktiga: Hoppa över / Visa låtinfo */}
             <HStack justifyContent="space-around" w="$full" my="$2">
               <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
               <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
             </HStack>
-
             {isSongInfoVisible && (
               <Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: '$info900', borderColor: '$info700'}}} borderWidth={1} borderRadius="$lg" p="$3">
                 <Text textAlign="center">Artist: {card.artist}</Text>
@@ -346,7 +380,7 @@ export default function DuoGameScreen({
         {showBack && card && (
           <VStack space="md" alignItems="center" w="$full">
             <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
-            {wasCorrect ? (
+            {effectiveWasCorrect ? (
               <VStack alignItems="center" w="$full" mt="$2" space="sm">
                 <Text color="$success600" bold>✅ Rätt gissat!</Text>
                 <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
@@ -369,6 +403,3 @@ export default function DuoGameScreen({
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, paddingBottom: 20, alignItems: 'center', flexGrow: 1 },
 });
-
-
-

@@ -1,11 +1,6 @@
 // =============================
-// File: storage/gameStorage.ts (NY FIL)
+// File: storage/gameStorage.ts (uppdaterad)
 // =============================
-
-// Ansvar: All hantering av "pågående spel" i AsyncStorage
-// - Max 2 aktiva spel per användare (hanteras i App.tsx vid start)
-// - Per-användare nycklar via Firebase UID
-// - Säkra JSON-parsers, defensiv felhantering
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -13,6 +8,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type Card = { title: string; artist: string; year: number; spotifyUrl: string };
 export type Player = { name: string; timeline: number[]; cards: Card[]; startYear: number; stars: number };
 
+// 🔸 NYTT: UI-snapshot-typ för att kunna återställa exakt läge (front/back, input m.m.)
+export type DuoUiSnapshot = {
+  showBack: boolean;
+  guess: string;
+  showPlacementChoice: boolean;
+  placement: 'before' | 'after' | null;
+  isSongInfoVisible: boolean;
+  guessConfirmed: boolean;
+};
+
+// 🔸 UPPDATERAD: SavedDuoGameState innehåller nu även aktuell låt + UI + postGuess
 export type SavedDuoGameState = {
   id: string;
   player1Name: string;
@@ -23,6 +29,15 @@ export type SavedDuoGameState = {
   createdAt: number;
   updatedAt: number;
   isCompleted?: boolean;
+
+  // NYTT: den låt som just nu visas i spelet (front eller back)
+  currentCard?: Card | null;
+
+  // NYTT: snapshot av UI-läget så vi kan återgå exakt (t.ex. “Rätt gissat!”-skärmen)
+  uiSnapshot?: DuoUiSnapshot;
+
+  // NYTT: om vi är i post-guess-läge, spara facitindikator
+  postGuess?: { card: Card | null; wasCorrect: boolean };
 };
 
 export type ActiveGameMeta = {
@@ -38,11 +53,7 @@ const ACTIVE_GAMES_INDEX = (uid: string) => `activeGames:${uid}`;
 const ACTIVE_GAME_KEY = (uid: string, id: string) => `activeGame:${uid}:${id}`;
 
 function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+  try { return raw ? (JSON.parse(raw) as T) : fallback; } catch { return fallback; }
 }
 
 function computeScores(players: { [key: string]: Player }, p1: string, p2: string) {
@@ -54,7 +65,7 @@ function computeScores(players: { [key: string]: Player }, p1: string, p2: strin
 export async function getActiveGames(uid: string): Promise<ActiveGameMeta[]> {
   const raw = await AsyncStorage.getItem(ACTIVE_GAMES_INDEX(uid));
   const list = safeParse<ActiveGameMeta[]>(raw, []);
-  // Sortera senaste överst
+    // Sortera senaste överst
   return list.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
@@ -64,10 +75,10 @@ export async function loadActiveGame(uid: string, gameId: string): Promise<Saved
 }
 
 export async function saveActiveGame(uid: string, state: SavedDuoGameState): Promise<void> {
-  // 1) Spara fullständigt state
+    // 1) Spara fullständigt state
   await AsyncStorage.setItem(ACTIVE_GAME_KEY(uid, state.id), JSON.stringify(state));
 
-  // 2) Uppdatera index-listan (metadata för meny)
+    // 2) Uppdatera index-listan (metadata för meny)
   const rawList = await AsyncStorage.getItem(ACTIVE_GAMES_INDEX(uid));
   const list = safeParse<ActiveGameMeta[]>(rawList, []);
 
@@ -96,6 +107,6 @@ export async function deleteActiveGame(uid: string, gameId: string): Promise<voi
 }
 
 export function generateGameId(): string {
-  // Enkel kollisionstolerant ID (räcker för lokal användning)
+   // Enkel kollisionstolerant ID (räcker för lokal användning)
   return `duo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }

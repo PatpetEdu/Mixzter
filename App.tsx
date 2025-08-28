@@ -1,5 +1,5 @@
 // =============================
-// File: App.tsx (Uppdaterad)
+// File: App.tsx (Uppdaterad med global preload vid appstart)
 // =============================
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent, AppState, Alert } from 'react-native';
@@ -30,10 +30,13 @@ export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single';
 
 // NYTT: delad nyckel för lokal historik
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
+// NYTT: global persist-nyckel för förladdat Duo-kort (per användare)
+const GLOBAL_DUO_PRELOAD_KEY = (uid: string) => `globalPreload:duo:${uid}`;
 
 const HEADER_HEIGHT = 100; // Ungefärlig höjd på din header, kan behöva justeras
 const MIXZTER_LOGO = require('./assets/mixzter-icon-1024.png');
 
+// Hämtar ett kort för global preload (konsumeras EJ här)
 const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
   const user = auth.currentUser;
   const token = user ? await user.getIdToken() : null;
@@ -94,39 +97,68 @@ function AppContent() {
     { useNativeDriver: false, listener: (_e: NativeSyntheticEvent<NativeScrollEvent>) => {} }
   );
 
-  const triggerDuoPreload = useCallback(async () => {
-    if (mode === 'duo-setup' && !preloadedDuoCard && !isPreloading) {
-      console.log('App.tsx: Startar pre-loading...');
-      setIsPreloading(true);
-      try {
-        const card = await fetchFirstCardForPreload();
-        setPreloadedDuoCard(card);
-      } finally {
-        setIsPreloading(false);
+  // ⬇️ NYTT: Global preload vid appstart/inloggning (även foreground)
+  const ensureGlobalDuoPreload = useCallback(async () => {
+    if (!user || isAnonymous) return; // Kräver inloggad användare
+    if (isPreloading || preloadedDuoCard) return; // Undvik dubbla anrop
+
+    try {
+      // 1) Försök hämta från lokal persist först
+      const key = GLOBAL_DUO_PRELOAD_KEY(user.uid);
+      const raw = await AsyncStorage.getItem(key);
+      if (raw) {
+        try {
+          const cached = JSON.parse(raw) as CardData;
+          setPreloadedDuoCard(cached);
+          return; // Inget behov av att hämta nytt
+        } catch {}
       }
-    }
-  }, [mode, preloadedDuoCard, isPreloading]);
 
+      // 2) Annars – hämta från servern
+      setIsPreloading(true);
+      const card = await fetchFirstCardForPreload();
+      if (card) {
+        setPreloadedDuoCard(card);
+        try { await AsyncStorage.setItem(key, JSON.stringify(card)); } catch {}
+      }
+    } finally {
+      setIsPreloading(false);
+    }
+  }, [user, isAnonymous, isPreloading, preloadedDuoCard]);
+
+  // ⬇️ NYTT: När preload-kortet förbrukas i DuoGame – nolla och värm upp nästa
+  const handlePreloadConsumed = useCallback(async () => {
+    const uid = user?.uid;
+    if (uid) {
+      try { await AsyncStorage.removeItem(GLOBAL_DUO_PRELOAD_KEY(uid)); } catch {}
+    }
+    setPreloadedDuoCard(null);
+    // Starta ny preload i bakgrunden för nästa nya spelomgång
+    ensureGlobalDuoPreload();
+  }, [user?.uid, ensureGlobalDuoPreload]);
+
+  // ⬇️ Uppstart/inloggning: säkra att preload finns
   useEffect(() => {
-    if (user || isAnonymous) {
-      triggerDuoPreload();
+    if (user && !isAnonymous) {
+      ensureGlobalDuoPreload();
+    } else {
+      // Utloggad eller anonym – rensa ev. preload i minnet (persist ligger kvar per användare)
+      setPreloadedDuoCard(null);
     }
-  }, [mode, user, isAnonymous, triggerDuoPreload]);
+  }, [user, isAnonymous, ensureGlobalDuoPreload]);
 
-  // Hämta/uppdatera listan när appen blir aktiv
+  // Hämta/uppdatera listan när appen blir aktiv + se till att preload finns
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('Appen blev aktiv, kollar om preload behövs...');
-        triggerDuoPreload();
+        console.log('Appen blev aktiv, kontrollerar global preload & aktiva spel...');
+        ensureGlobalDuoPreload();
         refreshActiveGames();
       }
       appState.current = nextAppState;
     });
-    return () => {
-      subscription.remove();
-    };
-  }, [triggerDuoPreload]);
+    return () => { subscription.remove(); };
+  }, [ensureGlobalDuoPreload]);
 
   // NYTT: Hämta aktiva spel för nuvarande användare
   const refreshActiveGames = useCallback(async () => {
@@ -142,9 +174,7 @@ function AppContent() {
     }
   }, [user, isAnonymous]);
 
-  useEffect(() => {
-    refreshActiveGames();
-  }, [refreshActiveGames]);
+  useEffect(() => { refreshActiveGames(); }, [refreshActiveGames]);
 
   const startDuoGame = (player1: string, player2: string) => {
     if (!user || isAnonymous) {
@@ -212,15 +242,13 @@ function AppContent() {
 
   const returnToMenu = () => {
     setPlayers(null);
-    setPreloadedDuoCard(null);
+    // ❗Behåll globalt preload-kort i minnet; det ska EJ nollas här
     setActiveGameId(null);
     setMode('menu');
     refreshActiveGames();
   };
 
-  useEffect(() => {
-    if (!user && !isAnonymous) setAuthScreen('login');
-  }, [user, isAnonymous]);
+  useEffect(() => { if (!user && !isAnonymous) setAuthScreen('login'); }, [user, isAnonymous]);
 
   if (loadingAuth) {
     return (
@@ -272,7 +300,7 @@ function AppContent() {
               <Text size="sm" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
                 Max 2 aktiva spel nått. Ta bort/avsluta ett spel för att starta nytt.
               </Text>
-            )}
+            )}   
 
             {/* Lista över pågående spel */}
             {user && (
@@ -321,35 +349,35 @@ function AppContent() {
     );
   }
 
-// Single Player – med samma “collapsible header”-setup som Duo
-if (mode === 'single') {
-  return (
-    <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1,
-          transform: [{ translateY: headerTranslateY }],
-        }}
-      >
-        <GameHeader />
-      </Animated.View>
+  // Single Player – med samma “collapsible header”-setup som Duo
+  if (mode === 'single') {
+    return (
+      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1,
+            transform: [{ translateY: headerTranslateY }],
+          }}
+        >
+          <GameHeader />
+        </Animated.View>
 
-      <Box flex={1}>
-        <SinglePlayerScreen
-          onBackToMenu={returnToMenu}
-          headerHeight={HEADER_HEIGHT}
-          onScroll={handleScroll}   // ⬅️ viktigt
-        />
+        <Box flex={1}>
+          <SinglePlayerScreen
+            onBackToMenu={returnToMenu}
+            headerHeight={HEADER_HEIGHT}
+            onScroll={handleScroll}   // ⬅️ viktigt
+          />
+        </Box>
+
+        <GameFooter onBackToMenu={returnToMenu} />
       </Box>
-
-      <GameFooter onBackToMenu={returnToMenu} />
-    </Box>
-  );
-}
+    );
+  }
 
   // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
   if (mode === 'duo-setup' || (mode === 'duo' && players)) {
@@ -377,8 +405,10 @@ if (mode === 'single') {
               player1={players.player1}
               player2={players.player2}
               onBackToMenu={returnToMenu}
+              // ⬇️ Viktigt: mata in globalt förladdat kort som första kort
               initialPreloadedCard={preloadedDuoCard}
-              onPreloadComplete={() => setPreloadedDuoCard(null)}
+              // ⬇️ När det kortet konsumeras i spelet – rensa persist & förladda nästa
+              onPreloadComplete={handlePreloadConsumed}
               onScroll={handleScroll}
               headerHeight={HEADER_HEIGHT}
               gameId={activeGameId}
