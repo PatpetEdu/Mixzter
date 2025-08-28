@@ -42,7 +42,7 @@ const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
   const token = user ? await user.getIdToken() : null;
   try {
     const storedSongs = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-    // Säker parse av lokal cache – behåller namnen storedSongs & clientSeenSongsArray
+       // Säker parse av lokal cache – behåller namnen storedSongs & clientSeenSongsArray
     const clientSeenSongsArray: string[] = (() => {
       try {
         return storedSongs ? JSON.parse(storedSongs) : [];
@@ -80,7 +80,7 @@ function AppContent() {
   const [isPreloading, setIsPreloading] = useState(false);
   const appState = useRef(AppState.currentState);
 
-  // NYTT: menylista över aktiva spel + nuvarande gameId för DuoGameScreen
+    // NYTT: menylista över aktiva spel + nuvarande gameId för DuoGameScreen
   const [activeGames, setActiveGames] = useState<ActiveGameMeta[]>([]);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
 
@@ -97,7 +97,7 @@ function AppContent() {
     { useNativeDriver: false, listener: (_e: NativeSyntheticEvent<NativeScrollEvent>) => {} }
   );
 
-  // ⬇️ NYTT: Global preload vid appstart/inloggning (även foreground)
+   // ⬇️ NYTT: Global preload vid appstart/inloggning (även foreground)
   const ensureGlobalDuoPreload = useCallback(async () => {
     if (!user || isAnonymous) return; // Kräver inloggad användare
     if (isPreloading || preloadedDuoCard) return; // Undvik dubbla anrop
@@ -113,8 +113,8 @@ function AppContent() {
           return; // Inget behov av att hämta nytt
         } catch {}
       }
-
-      // 2) Annars – hämta från servern
+      
+        // 2) Annars – hämta från servern
       setIsPreloading(true);
       const card = await fetchFirstCardForPreload();
       if (card) {
@@ -126,14 +126,14 @@ function AppContent() {
     }
   }, [user, isAnonymous, isPreloading, preloadedDuoCard]);
 
-  // ⬇️ NYTT: När preload-kortet förbrukas i DuoGame – nolla och värm upp nästa
+    // ⬇️ NYTT: När preload-kortet förbrukas i DuoGame – nolla och värm upp nästa
   const handlePreloadConsumed = useCallback(async () => {
     const uid = user?.uid;
     if (uid) {
       try { await AsyncStorage.removeItem(GLOBAL_DUO_PRELOAD_KEY(uid)); } catch {}
     }
     setPreloadedDuoCard(null);
-    // Starta ny preload i bakgrunden för nästa nya spelomgång
+      // Starta ny preload i bakgrunden för nästa nya spelomgång
     ensureGlobalDuoPreload();
   }, [user?.uid, ensureGlobalDuoPreload]);
 
@@ -190,14 +190,14 @@ function AppContent() {
     setMode('duo');
   };
 
-  // Återuppta ett sparat spel
+    // Återuppta ett sparat spel
   const resumeGame = (meta: ActiveGameMeta) => {
     setActiveGameId(meta.id);
     setPlayers({ player1: meta.player1, player2: meta.player2 });
     setMode('duo');
   };
 
-  // Ta bort från meny + 🧹 städning av ev. pending nextCard + lokala seenSongs
+   // Ta bort från meny + 🧹 städning av ev. pending nextCard + lokala seenSongs
   const deleteActiveGameFromMenu = (id: string) => {
     if (!user) return;
 
@@ -242,7 +242,7 @@ function AppContent() {
 
   const returnToMenu = () => {
     setPlayers(null);
-    // ❗Behåll globalt preload-kort i minnet; det ska EJ nollas här
+     // ❗Behåll globalt preload-kort i minnet; det ska EJ nollas här
     setActiveGameId(null);
     setMode('menu');
     refreshActiveGames();
@@ -275,7 +275,7 @@ function AppContent() {
     );
   }
 
-  // Huvudmenyn har nu en header men ingen footer
+    // Huvudmenyn har nu en header men ingen footer
   if (mode === 'menu') {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
@@ -287,20 +287,20 @@ function AppContent() {
               {user ? `Inloggad som: ${user.email}` : 'Spelar som gäst'}
             </Text>
 
-            {/* Start Single Player – påverkar inte Duo-logiken */}
-            <Button onPress={() => setMode('single')}>
-              <ButtonText>Start Single Player</ButtonText>
-            </Button>
-
-            {/* Starta nytt Duo-spel – spärr om 2 aktiva redan finns */}
+            {/* Starta nytt Duo-spel – huvudspelet, överst i menyn */}
             <Button onPress={() => setMode('duo-setup')} isDisabled={!!user && activeGames.length >= 2}>
-              <ButtonText>Start Duo</ButtonText>
+              <ButtonText>Start New Game</ButtonText>
             </Button>
             {user && activeGames.length >= 2 && (
               <Text size="sm" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
                 Max 2 aktiva spel nått. Ta bort/avsluta ett spel för att starta nytt.
               </Text>
-            )}   
+            )}
+
+            {/* Start Single Player – under utveckling: outline + grå */}
+            <Button variant="outline" action="secondary" onPress={() => setMode('single')}>
+              <ButtonText>Single Player Mode</ButtonText>
+            </Button>
 
             {/* Lista över pågående spel */}
             {user && (
@@ -379,7 +379,7 @@ function AppContent() {
     );
   }
 
-  // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
+    // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
   if (mode === 'duo-setup' || (mode === 'duo' && players)) {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
