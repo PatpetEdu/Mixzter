@@ -93,13 +93,15 @@ export const generateCard = onRequest(
       let openAITries = 0;
 
       while (!finalSong && openAITries < MAX_OPENAI_TRIES) {
-        const prompt = `Välj en **enbart en enda låt** som är slumpmässig, populär eller kulturellt betydelsefull från perioden **1970 till 2025**.
+        const prompt = `Välj en **enbart en enda låt** som är slumpmässig, populär eller kulturellt betydelsefull från perioden **1950 till 2026**.
 
 **Extremt viktigt:** Undvik **ALLA** låtar i följande lista: "${seenSongsPromptPart}".
 
 Säkerställ **maximal variation** från tidigare svar. Välj en låt från en annan genre, decennium, eller ursprung.
 
 Använd detta unika slumptal för att förstärka variationen: ${Math.random()}.
+
+Föredra låtar på engelska, men andra språk är också acceptabla om de är kända globalt.
 
 Svara **ENDAST** med ett JSON-objekt på följande exakta format:
 
@@ -110,7 +112,7 @@ Svara **ENDAST** med ett JSON-objekt på följande exakta format:
 }`;
 
         const completion = await openai.chat.completions.create({
-          model: "o4-mini-2025-04-16",
+          model: "gpt-5-mini",
           messages: [{ role: "user", content: prompt }],
           temperature: 1.0,
         });
