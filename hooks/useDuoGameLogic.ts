@@ -22,7 +22,7 @@ const MAX_STARS = 5;
 
 // Funktion för att skapa ett startår
 function getRandomYear() {
-  return Math.floor(Math.random() * (2025 - 1970 + 1)) + 1970;
+  return Math.floor(Math.random() * (2025 - 1950 + 1)) + 1950;
 }
 
 // Props för vår hook
