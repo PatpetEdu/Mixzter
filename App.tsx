@@ -72,7 +72,8 @@ const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
 function AppContent() {
   const { user, loadingAuth, isAnonymous, signOut } = useAuth();
   const [mode, setMode] = useState<GameMode>('menu');
-  const [players, setPlayers] = useState<{ player1: string; player2: string } | null>(null);
+  const [gameMode, setGameMode] = useState<string>('default');
+  const [players, setPlayers] = useState<{ player1Name: string; player2Name: string } | null>(null);
   const [preloadedDuoCard, setPreloadedDuoCard] = useState<CardData | null>(null);
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
   const { colorMode } = useTheme();
@@ -176,24 +177,28 @@ function AppContent() {
 
   useEffect(() => { refreshActiveGames(); }, [refreshActiveGames]);
 
-  const startDuoGame = (player1: string, player2: string) => {
+const startDuoGame = (player1Name: string, player2Name: string, selectedMode: string) => {
     if (!user || isAnonymous) {
       Alert.alert('Inloggning krävs', 'Du måste vara inloggad för att spara pågående spel.');
     }
     if (user && activeGames.length >= 2) {
-      Alert.alert('Max 2 aktiva spel.Avsluta ett spel i menyn för att starta nytt.');
+      Alert.alert('Max 2 aktiva spel. Avsluta ett spel i menyn för att starta nytt.');
       return;
     }
     const newId = generateGameId();
     setActiveGameId(newId);
-    setPlayers({ player1, player2 });
+    setPlayers({ player1Name, player2Name });
+    setGameMode(selectedMode); // ⬅️ Spara spelläget
     setMode('duo');
   };
 
     // Återuppta ett sparat spel
-  const resumeGame = (meta: ActiveGameMeta) => {
+const resumeGame = (meta: ActiveGameMeta) => {
     setActiveGameId(meta.id);
-    setPlayers({ player1: meta.player1, player2: meta.player2 });
+    setPlayers({ player1Name: meta.player1, player2Name: meta.player2 });
+    // Här skulle man kunna spara gameMode i activeGames-metadatan i framtiden
+    // För nu antar vi default eller hanterar det senare
+    setGameMode('default'); 
     setMode('duo');
   };
 
@@ -244,6 +249,7 @@ function AppContent() {
     setPlayers(null);
      // ❗Behåll globalt preload-kort i minnet; det ska EJ nollas här
     setActiveGameId(null);
+    setGameMode('default'); // ⬅️ Återställ till default
     setMode('menu');
     refreshActiveGames();
   };
@@ -398,16 +404,22 @@ function AppContent() {
 
         <Box flex={1}>
           {mode === 'duo-setup' && (
+            // 👇 PlayerSetupScreen skickar nu tillbaka 'selectedMode'
             <PlayerSetupScreen onStart={startDuoGame} onScroll={handleScroll} headerHeight={HEADER_HEIGHT} />
           )}
           {mode === 'duo' && players && (
             <DuoGameScreen
-              player1={players.player1}
-              player2={players.player2}
-              onBackToMenu={returnToMenu}
-              // ⬇️ Viktigt: mata in globalt förladdat kort som första kort
-              initialPreloadedCard={preloadedDuoCard}
-              // ⬇️ När det kortet konsumeras i spelet – rensa persist & förladda nästa
+              player1Name={players.player1Name} // OBS: Bytte namn på prop till player1Name för att matcha tidigare steg
+              player2Name={players.player2Name}
+              gameMode={gameMode} // ⬅️ NYTT: Skickar med spelläget
+              onBackToMenu={returnToMenu} // Ändrade onQuit till onBackToMenu om det var namnet i DuoGameScreen
+              
+              // 👇 LOGIK FÖR PRELOAD:
+              // Om vi kör "default" kan vi använda kortet vi laddade vid app-start.
+              // Om vi kör "Eurovision" (eller annat) sätter vi null här, så att hooken hämtar ett nytt kort direkt
+              // som matchar den valda genren.
+              initialPreloadedCard={gameMode === 'default' ? preloadedDuoCard : null}
+              
               onPreloadComplete={handlePreloadConsumed}
               onScroll={handleScroll}
               headerHeight={HEADER_HEIGHT}

@@ -57,6 +57,18 @@ const getUidFromRequest = async (req: Request): Promise<string | null> => {
     return null;
   }
 };
+const PROMPTS: Record<string, string> = {
+  default: `Välj en **enbart en enda låt** som är slumpmässig, populär eller kulturellt betydelsefull från perioden **1950 till 2026**.
+    Föredra låtar på engelska, men andra språk är också acceptabla om de är kända globalt.`,
+  
+  svenska: `Välj en **svensk låt** (sjungs på svenska eller av en mycket känd svensk artist) som är en klassiker, hit eller allsångsfavorit från **1960 till 2026**.`,
+  
+  eurovision: `Välj en låt som har tävlat i **Eurovision Song Contest** (oavsett land och placering) mellan **1956 och 2026**. Det ska vara en låt som många känner igen.`,
+  
+  rock: `Välj en låt inom genrerna **Rock, Hårdrock, Metal eller Punk** från perioden **1960 till 2026**. Det ska vara en känd låt inom genren.`,
+  
+  onehitwonder: `Välj en klassisk **One Hit Wonder** (artisten är främst känd för just denna låt) från **1970 till 2015**.`,
+};
 
 export const generateCard = onRequest(
   { timeoutSeconds: 120, secrets: [openaiApiKey, spotifyClientId, spotifyClientSecret] },
@@ -69,22 +81,22 @@ export const generateCard = onRequest(
     }
 
     const uid = await getUidFromRequest(req);
-    const { clientSeenSongs = [] } = req.body;
+    // 👇 Hämta gameMode från request body (defaultar till 'default' om det saknas)
+    const { clientSeenSongs = [], gameMode = 'default' } = req.body; 
     const clientSeenSongsSet = new Set<string>(clientSeenSongs);
 
+    // Välj rätt prompt-text. Fallback till default om gameMode är ogiltigt.
+    const selectedModeDescription = PROMPTS[gameMode] || PROMPTS['default'];
+
     try {
+      // ... (Koden för att hämta historik är oförändrad) ...
+      // (Bara för referens: const collectionPath = uid ? ... )
       const collectionPath = uid ? `users/${uid}/seenSongs` : "globalSeenSongs";
       const seenSongsRef = db.collection(collectionPath);
-
       const snapshot = await seenSongsRef.orderBy("timestamp", "desc").limit(MAX_USER_SEEN_SONGS_HISTORY).get();
-
       const firestoreHistory = new Set<string>();
-      snapshot.forEach((doc) => {
-        firestoreHistory.add(doc.data().songIdentifier);
-      });
-      logger.info(`generateCard: Hämtade ${firestoreHistory.size} låtar från historiken för ${uid || "global"}.`);
+      snapshot.forEach((doc) => { firestoreHistory.add(doc.data().songIdentifier); });
 
-        // *** FIX: Skapa en kombinerad lista med ALLA sedda låtar att skicka till OpenAI ***
       const allSeenSongs = new Set([...firestoreHistory, ...clientSeenSongsSet]);
       const seenSongsPromptPart = Array.from(allSeenSongs).join(", ");
 
@@ -93,18 +105,15 @@ export const generateCard = onRequest(
       let openAITries = 0;
 
       while (!finalSong && openAITries < MAX_OPENAI_TRIES) {
-        const prompt = `Välj en **enbart en enda låt** som är slumpmässig, populär eller kulturellt betydelsefull från perioden **1950 till 2026**.
+        // 👇 HÄR BYGGER VI DEN DYNAMISKA PROMPTEN
+        const prompt = `${selectedModeDescription}
 
 **Extremt viktigt:** Undvik **ALLA** låtar i följande lista: "${seenSongsPromptPart}".
 
-Säkerställ **maximal variation** från tidigare svar. Välj en låt från en annan genre, decennium, eller ursprung.
-
+Säkerställ **maximal variation** från tidigare svar.
 Använd detta unika slumptal för att förstärka variationen: ${Math.random()}.
 
-Föredra låtar på engelska, men andra språk är också acceptabla om de är kända globalt.
-
 Svara **ENDAST** med ett JSON-objekt på följande exakta format:
-
 {
   "artist": "Artistens namn",
   "title": "Låtens titel",

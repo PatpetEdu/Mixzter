@@ -16,10 +16,12 @@ const MAX_SEEN_SONGS_HISTORY = 200;
 const MAX_DIRECT_FETCH_ATTEMPTS = 5;
 
 // NYTT: persistKey (valfri) för att spara nästa kort per spel + expose isHydrating
+// Uppdaterad signatur: Lägg till gameMode
 export const useGenerateSongs = (
   initialPreloadedCard: Card | null,
   onPreloadComplete: () => void,
-  persistKey?: string
+  gameMode: string = 'default', // ⬅️ NYTT: Defaultar till standardläget
+  persistKeyBase: string = 'savedCard' // ⬅️ Vi använder denna som bas för nyckeln
 ) => {
   const auth = firebaseAuth.getAuth();
   const [seenSongs, setSeenSongs] = useState<Set<string>>(new Set());
@@ -30,6 +32,7 @@ export const useGenerateSongs = (
   const [isLoadingCard, setIsLoadingCard] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true); // ⬅️ NYTT
   const appState = useRef(AppState.currentState);
+  const activePersistKey = `${persistKeyBase}_${gameMode}`;
 
   useEffect(() => {
     seenSongsRef.current = seenSongs;
@@ -49,9 +52,11 @@ export const useGenerateSongs = (
       const res = await fetch('https://us-central1-musikquiz-app.cloudfunctions.net/generateCard', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ clientSeenSongs: clientSeenSongsArray }),
+  body: JSON.stringify({ 
+            clientSeenSongs: clientSeenSongsArray,
+            gameMode: gameMode 
+        }),
       });
-
       // *** FIX: Robust felhantering för att fånga upp "dolda" fel i APK ***
       if (!res.ok) {
         const errorText = await res.text();
@@ -116,10 +121,10 @@ export const useGenerateSongs = (
           preloadedCard = fetchedCard;
           setNextCard(preloadedCard);
 
-          // ✅ Persist nextCard per spel (om persistKey finns)
-          if (persistKey) {
+          // ✅ Persist nextCard per spel (om activePersistKey finns)
+          if (activePersistKey) {
             try {
-              await AsyncStorage.setItem(persistKey, JSON.stringify(preloadedCard));
+              await AsyncStorage.setItem(activePersistKey, JSON.stringify(preloadedCard));
             } catch {}
           }
 
@@ -136,7 +141,7 @@ export const useGenerateSongs = (
       attempts++;
     }
     if (!preloadedCard) console.error('Preload: Kunde inte för-ladda ett unikt kort.');
-  }, [fetchCardFromServer, nextCard, isLoadingCard, persistKey]);
+  }, [fetchCardFromServer, nextCard, isLoadingCard, activePersistKey]);
 
   const generateCard = useCallback(async (resetInputs?: () => void) => {
     setErrorMessage('');
@@ -147,9 +152,9 @@ export const useGenerateSongs = (
       setNextCard(null);
 
       // 🧹 Rensa persisterad nextCard när den förbrukas
-      if (persistKey) {
+      if (activePersistKey) {
         try {
-          await AsyncStorage.removeItem(persistKey);
+          await AsyncStorage.removeItem(activePersistKey);
         } catch {}
       }
 
@@ -188,7 +193,7 @@ export const useGenerateSongs = (
     } else {
       setErrorMessage('Kunde inte generera ett unikt kort efter flera försök. Försök igen.');
     }
-  }, [nextCard, markSongAsSeenOnServer, fetchCardFromServer, persistKey]);
+  }, [nextCard, markSongAsSeenOnServer, fetchCardFromServer, activePersistKey]);
 
   // Ny useEffect för att hantera appens tillstånd
   useEffect(() => {
@@ -228,9 +233,9 @@ export const useGenerateSongs = (
 
       // 1) Försök ladda persisterad nextCard först (per spel)
       let persistedNext: Card | null = null;
-      if (persistKey) {
+      if (activePersistKey) {
         try {
-          const raw = await AsyncStorage.getItem(persistKey);
+          const raw = await AsyncStorage.getItem(activePersistKey);
           persistedNext = raw ? (JSON.parse(raw) as Card) : null;
         } catch {}
       }
@@ -256,7 +261,7 @@ export const useGenerateSongs = (
       setIsHydrating(false);
     };
     loadInitialState();
-  }, [initialPreloadedCard, onPreloadComplete, markSongAsSeenOnServer, persistKey]);
+  }, [initialPreloadedCard, onPreloadComplete, markSongAsSeenOnServer, activePersistKey]);
 
   return { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating };
 };

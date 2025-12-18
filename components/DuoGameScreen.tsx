@@ -16,8 +16,9 @@ export type Card = { title: string; artist: string; year: number; spotifyUrl: st
 type Player = { name: string; timeline: number[]; cards: Card[]; startYear: number; stars: number };
 
 type Props = {
-  player1: string;
-  player2: string;
+  player1Name: string; // ⬅️ Ändrat från player1
+  player2Name: string; // ⬅️ Ändrat från player2
+  gameMode: string;    // ⬅️ NYTT: Tar emot spelläget
   onBackToMenu: () => void;
   initialPreloadedCard: Card | null;
   onPreloadComplete: () => void;
@@ -35,8 +36,9 @@ const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
 
 export default function DuoGameScreen({
-  player1,
-  player2,
+  player1Name, // ⬅️ Uppdaterat namn
+  player2Name, // ⬅️ Uppdaterat namn
+  gameMode,    // ⬅️ NYTT
   initialPreloadedCard,
   onPreloadComplete,
   onScroll,
@@ -48,9 +50,10 @@ export default function DuoGameScreen({
     // Persist per spel (och användare) för nextCard
   const persistKey = user && gameId ? `nextCard:${user.uid}:${gameId}` : undefined;
 
-  const { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating } = useGenerateSongs(
+ const { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating } = useGenerateSongs(
     initialPreloadedCard,
     onPreloadComplete,
+    gameMode, 
     persistKey
   );
 
@@ -85,8 +88,8 @@ export default function DuoGameScreen({
     switchPlayerTurn,
     loadSavedGame,
   } = useDuoGameLogic({
-    player1Name: player1,
-    player2Name: player2,
+    player1Name: player1Name,
+    player2Name: player2Name,
     onNewCardNeeded: () => {
       setCard(null);
       resetInputs();
@@ -178,8 +181,8 @@ export default function DuoGameScreen({
     const id = setTimeout(() => {
       const payload: SavedDuoGameState = {
         id: gameId,
-        player1Name: player1,
-        player2Name: player2,
+        player1Name: player1Name, // ⬅️ Uppdaterat
+        player2Name: player2Name, // ⬅️ Uppdaterat
         players: players as any,
         activePlayer,
         roundCards,
@@ -210,7 +213,7 @@ export default function DuoGameScreen({
   }, [
     players, activePlayer, roundCards,
     showBack, wasCorrect, card,
-    user, isAnonymous, gameId, player1, player2,
+    user, isAnonymous, gameId, player1Name, player2Name,
     guess, showPlacementChoice, placement, isSongInfoVisible, guessConfirmed
   ]);
 
@@ -219,7 +222,7 @@ export default function DuoGameScreen({
     if (gameOverMessage && user && !isAnonymous && gameId) {
       (async () => {
         try {
-          const persist = `nextCard:${user.uid}:${gameId}`;
+          const persist = `nextCard:${user.uid}:${gameId}_${gameMode}`;
           const rawNext = await AsyncStorage.getItem(persist);
           if (rawNext) {
             try {
@@ -240,7 +243,7 @@ export default function DuoGameScreen({
         await deleteActiveGame(user.uid, gameId).catch(() => {});
       })();
     }
-  }, [gameOverMessage, user, isAnonymous, gameId]);
+  }, [gameOverMessage, user, isAnonymous, gameId, gameMode]);
 
   const handleAwardStar = () => awardStar();
   const handleSkipSong = () => skipSong();
@@ -309,8 +312,8 @@ export default function DuoGameScreen({
           <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
           <Text fontSize="$lg" color="$primary600" sx={{ _dark: { color: '$primary400' } }}>{gameOverMessage}</Text>
           <VStack space="xs" alignItems="center" my="$3">
-            <Text>{player1}: {players[player1].timeline.length} kort</Text>
-            <Text>{player2}: {players[player2].timeline.length} kort</Text>
+            <Text>{player1Name}: {players[player1Name].timeline.length} kort</Text>
+            <Text>{player2Name}: {players[player2Name].timeline.length} kort</Text>
           </VStack>
         </VStack>
       </Center>
@@ -328,7 +331,7 @@ export default function DuoGameScreen({
       <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
         <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
         {renderTimeline(current, true)}
-        {renderTimeline(players[player1 === activePlayer ? player2 : player1], false)}
+       {renderTimeline(players[player1Name === activePlayer ? player2Name : player1Name], false)}
         {isLoadingCard ? (
           <VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar låt...</Text></VStack>
         ) : errorMessage ? (
