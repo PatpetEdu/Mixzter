@@ -382,7 +382,7 @@ export default function DuoGameScreen({
 
         {showBack && card && (
           <VStack space="md" alignItems="center" w="$full">
-            <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
+            <CardBack artist={card.artist} title={card.title} year={String(card.year)} spotifyUrl={card.spotifyUrl} onFlip={() => {}} />
             {effectiveWasCorrect ? (
               <VStack alignItems="center" w="$full" mt="$2" space="sm">
                 <Text color="$success600" bold>✅ Rätt gissat!</Text>
