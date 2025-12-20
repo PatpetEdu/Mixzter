@@ -3,6 +3,7 @@ import { Linking, Platform, Animated, View } from 'react-native';
 import { Box, Text, VStack, HStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
 import { Music, QrCode, Play, X } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export type CardFrontProps = {
   spotifyUrl: string;
@@ -145,11 +146,9 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
 
   return (
     <Box
-      bg="$secondary100"
-      sx={{ _dark: { bg: '$secondary100' } }}
       borderRadius="$3xl"
       borderWidth={1}
-      borderColor="$secondary400"
+      borderColor="rgba(100, 100, 110, 0.6)"
       p="$6"
       h={320}
       position="relative"
@@ -157,23 +156,24 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
       justifyContent="center"
       alignItems="center"
     >
-      {/* Background Ambient Effects */}
-      <Box
-        position="absolute"
-        inset={0}
-        opacity={0.2}
-        pointerEvents="none"
-      >
-        <Box
-          position="absolute"
-          w="120%"
-          h="120%"
-          top="-10%"
-          left="-10%"
-          borderRadius="$full"
-          bg="rgba(16, 185, 129, 0.2)"
-        />
-      </Box>
+      <LinearGradient
+        colors={
+          colorMode === 'dark'
+            ? ['rgba(20, 20, 22, 1)', 'rgba(30, 35, 35, 0.9)', 'rgba(20, 20, 22, 1)']
+            : ['rgba(20, 20, 22, 1)', 'rgba(25, 25, 28, 0.8)', 'rgba(20, 20, 22, 1)']
+        }
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          borderRadius: 24,
+        }}
+      />
+      {/* Background Ambient Effects - Removed for cleaner look */}
 
       {/* Central Pulsing Audio Visualizer */}
       <VStack space="lg" alignItems="center" zIndex={10} flex={1} justifyContent="center">
@@ -217,9 +217,9 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
           <Box
             w={96}
             h={96}
-            bg="$secondary200"
+            bg="rgba(35, 35, 40, 1)"
             borderWidth={1}
-            borderColor="$secondary400"
+            borderColor="rgba(80, 80, 90, 0.8)"
             borderRadius="$full"
             justifyContent="center"
             alignItems="center"
@@ -285,16 +285,16 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
 
         <Pressable
           w={64}
-          bg="$secondary200"
+          bg="rgba(35, 35, 40, 1)"
           borderWidth={1}
-          borderColor="$secondary400"
+          borderColor="rgba(80, 80, 90, 0.8)"
           borderRadius="$2xl"
           justifyContent="center"
           alignItems="center"
           onPress={toggleQR}
           sx={{
             _pressed: {
-              bg: '$secondary300',
+              bg: '$secondary200',
               transform: [{ scale: 0.95 }],
             },
           }}
@@ -308,10 +308,10 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
         <Box
           position="absolute"
           inset={16}
-          bg="rgba(9, 9, 11, 0.98)"
+          bg="rgba(40, 40, 45, 0.98)"
           borderRadius="$3xl"
           borderWidth={1}
-          borderColor="$secondary400"
+          borderColor="rgba(80, 80, 90, 0.8)"
           justifyContent="center"
           alignItems="center"
           p="$8"
@@ -331,7 +331,7 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
             <QRCode
               value={spotifyUrl}
               size={160}
-              backgroundColor="transparent"
+              backgroundColor="rgba(40, 40, 45, 1)"
               color="white"
             />
             <Text
