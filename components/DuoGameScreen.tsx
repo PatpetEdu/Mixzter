@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform  } from 'react-native';
 import {
-  Box, Text, Heading, Button, ButtonText, VStack, HStack, Input, InputField, Center,
+  Box, Text, Heading, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CardFront from './CardFront';
@@ -10,6 +10,7 @@ import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
 import { useAuth } from '../hooks/useAuth';
 import { deleteActiveGame, loadActiveGame, saveActiveGame, SavedDuoGameState } from '../storage/gameStorage';
+import { Music, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 // Typer
 export type Card = { title: string; artist: string; year: number; spotifyUrl: string };
@@ -62,6 +63,9 @@ export default function DuoGameScreen({
   const [isGuessValid, setIsGuessValid] = useState(true);
   const [showBack, setShowBack] = useState(false);
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
+  const [opponentExpanded, setOpponentExpanded] = useState(false);
+  const [activePlayerExpanded, setActivePlayerExpanded] = useState(true);
+  const [isSkipping, setIsSkipping] = useState(false);
 
     // Ny state för "Före/Efter"-logiken
   const [showPlacementChoice, setShowPlacementChoice] = useState(false);
@@ -246,7 +250,14 @@ export default function DuoGameScreen({
   }, [gameOverMessage, user, isAnonymous, gameId, gameMode]);
 
   const handleAwardStar = () => awardStar();
-  const handleSkipSong = () => skipSong();
+  const handleSkipSong = () => {
+    setIsSkipping(true);
+    setTimeout(() => {
+      skipSong();
+      resetInputs();
+      setIsSkipping(false);
+    }, 800);
+  };
   const handleToggleSongInfo = () => setIsSongInfoVisible((prev) => !prev);
   const handleSave = () => saveAndEndTurn();
 
@@ -284,24 +295,132 @@ export default function DuoGameScreen({
   const renderTimeline = (player: Player, isCurrentPlayer: boolean) => {
     const finalTimeline = [player.startYear, ...player.timeline];
     const roundTimeline = isCurrentPlayer ? roundCards.map((c) => c.year) : [];
-    const yearsToDisplay = [...finalTimeline, ...roundTimeline].sort((a, b) => a - b);
+    const allYears = Array.from(new Set([...finalTimeline, ...roundTimeline])).sort((a, b) => a - b);
+    
     return (
-      <Box borderWidth={1} borderRadius="$lg" p="$3" my="$2" w="$full" bg={isCurrentPlayer ? '$primary100' : '$backgroundLight100'} borderColor={isCurrentPlayer ? '$primary300' : '$borderLight300'} sx={{ _dark: { bg: isCurrentPlayer ? '$primary900' : '$backgroundDark800', borderColor: isCurrentPlayer ? '$primary700' : '$borderDark700' } }}>
-        <HStack justifyContent="space-between" alignItems="center">
-          <Text bold fontSize="$lg" color="$textLight900" sx={{ _dark: { color: '$textDark100' } }}>{player.name}s tidslinje ({finalTimeline.length - 1} kort)</Text>
-          <Text bold fontSize="$lg" color="$textLight900" sx={{ _dark: { color: '$textDark100' } }}>⭐ {player.stars}</Text>
-        </HStack>
-        <HStack flexWrap="wrap" mt="$2">
-          {yearsToDisplay.map((year, idx) => {
+      <>
+        <Box
+          w="$full"
+          mb="$4"
+          p="$5"
+          borderRadius="$3xl"
+          borderWidth={1}
+          borderColor={isCurrentPlayer ? 'rgba(16, 185, 129, 0.2)' : 'rgba(100, 100, 110, 0.3)'}
+          bg={isCurrentPlayer ? 'rgba(255, 255, 255, 0.95)' : 'rgba(100, 100, 110, 0.05)'}
+          sx={{ 
+            _dark: { 
+              bg: isCurrentPlayer ? 'rgba(20, 20, 22, 0.8)' : 'rgba(40, 40, 45, 0.6)',
+              borderColor: isCurrentPlayer ? 'rgba(16, 185, 129, 0.3)' : 'rgba(80, 80, 90, 0.4)'
+            } 
+          }}
+        >
+          <Pressable
+            onPress={() => !isCurrentPlayer ? setOpponentExpanded(!opponentExpanded) : setActivePlayerExpanded(!activePlayerExpanded)}
+          >
+            <HStack justifyContent="space-between" alignItems="center" mb={isCurrentPlayer || (isCurrentPlayer ? activePlayerExpanded : opponentExpanded) ? "$3" : 0}>
+              <HStack alignItems="center" space="md">
+                <Box 
+                  w={4.5} 
+                  h={4.5} 
+                  borderRadius="$full" 
+                  bg={isCurrentPlayer ? '$emerald500' : 'transparent'}
+                  sx={{
+                    _dark: {
+                      bg: isCurrentPlayer ? '$emerald500' : 'transparent'
+                    }
+                  }}
+                />
+                <HStack alignItems="center" space="xs">
+                  <Text fontSize="$sm" fontWeight="900" color={isCurrentPlayer ? '$secondary900' : '$secondary600'} sx={{ _dark: { color: isCurrentPlayer ? '$secondary100' : '$secondary400' } }} textTransform="uppercase" letterSpacing={0.5}>
+                    {player.name} ({player.timeline.length})
+                  </Text>
+                  {!isCurrentPlayer && !opponentExpanded && (
+                    <Text fontSize="$xs" fontWeight="700" color="$amber600" sx={{ _dark: { color: '$amber400' } }} opacity={0.6}>
+                      ({player.startYear})
+                    </Text>
+                  )}
+                </HStack>
+              </HStack>
+              <HStack alignItems="center" space="md">
+                <HStack alignItems="center" space="xs">
+                  {[...Array(5)].map((_, i) => (
+                    <Text key={i} fontSize="$lg" color={i < player.stars ? '$amber400' : '$secondary400'}>
+                      {i < player.stars ? '⭐' : '☆'}
+                    </Text>
+                  ))}
+                </HStack>
+                {!isCurrentPlayer && (
+                  <Icon 
+                    as={opponentExpanded ? ChevronUp : ChevronDown} 
+                    size="sm" 
+                    color="$secondary600" 
+                    sx={{ _dark: { color: '$secondary400' } }}
+                  />
+                )}
+                {isCurrentPlayer && (
+                  <Icon 
+                    as={activePlayerExpanded ? ChevronUp : ChevronDown} 
+                    size="sm" 
+                    color="$emerald500"
+                  />
+                )}
+              </HStack>
+            </HStack>
+          </Pressable>
+          
+          {(isCurrentPlayer ? activePlayerExpanded : opponentExpanded) && (
+            <HStack flexWrap="wrap" space="xs">
+              {allYears.map((year, idx) => {
             const isPrelim = isCurrentPlayer && roundCards.some((c) => c.year === year) && !finalTimeline.includes(year);
+            const isStartYear = year === player.startYear;
+            
             return (
-              <Box key={`${year}-${idx}`} px="$2" py="$1" mr="$2" mb="$2" borderRadius="$md" bg={isPrelim ? '$primary200' : '$backgroundLight200'} sx={{ _dark: { bg: isPrelim ? '$primary800' : '$backgroundDark700' } }}>
-                <Text color="$textLight700" sx={{ _dark: { color: '$textDark300' } }}>{String(year)}</Text>
+              <Box
+                key={`${year}-${idx}`}
+                px="$2"
+                py="$1"
+                borderRadius="$lg"
+                borderWidth={1}
+                borderColor={
+                  isStartYear ? 'rgba(251, 191, 36, 0.5)' :
+                  isPrelim ? 'rgba(16, 185, 129, 0.3)' :
+                  'rgba(100, 100, 110, 0.2)'
+                }
+                bg={
+                  isStartYear ? 'rgba(251, 191, 36, 0.1)' :
+                  isPrelim ? 'rgba(16, 185, 129, 0.1)' :
+                  'rgba(100, 100, 110, 0.05)'
+                }
+              >
+                <Text 
+                  fontSize="$xs" 
+                  fontWeight="900"
+                  color={
+                    isStartYear ? '$amber600' :
+                    isPrelim ? '$emerald600' :
+                    '$secondary600'
+                  }
+                  sx={{
+                    _dark: {
+                      color:
+                        isStartYear ? '$amber400' :
+                        isPrelim ? '$emerald400' :
+                        '$secondary400'
+                    }
+                  }}
+                  opacity={isStartYear && !isCurrentPlayer ? 0.5 : 1}
+                >
+                  {isStartYear && '📍 '}
+                  {String(year)}
+                </Text>
               </Box>
             );
           })}
-        </HStack>
-      </Box>
+            </HStack>
+          )}
+
+        </Box>
+      </>
     );
   };
 
@@ -329,9 +448,14 @@ export default function DuoGameScreen({
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
-        <Text fontSize="$lg" mb="$2">Nu spelar: {activePlayer}</Text>
+        {/* Opponent timeline - överst, kan kollapsa */}
+        <Box mt="$2">
+          {renderTimeline(players[player1Name === activePlayer ? player2Name : player1Name], false)}
+        </Box>
+        
+        {/* Aktiv spelare timeline - näst överst, kan kollapsa */}
         {renderTimeline(current, true)}
-       {renderTimeline(players[player1Name === activePlayer ? player2Name : player1Name], false)}
+        
         {isLoadingCard ? (
           <VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar låt...</Text></VStack>
         ) : errorMessage ? (
@@ -342,59 +466,485 @@ export default function DuoGameScreen({
 
         {card && !guessConfirmed && !isLoadingCard && (
           <VStack space="md" w="$full">
-             {/* 1) Kortet */}
+             {/* Kortet */}
             <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
            
-               {/* 2) Bekräfta gissning / Placering – direkt under kortet */}
+             {/* Guess section */}
             {showPlacementChoice ? (
-              <VStack space="md" alignItems="center">
-                <Text bold>Året finns redan. Placera kortet före eller efter?</Text>
-                <HStack space="md">
-                  <Button variant={placement === 'before' ? 'solid' : 'outline'} onPress={() => setPlacement('before')}><ButtonText>Före {guess}</ButtonText></Button>
-                  <Button variant={placement === 'after' ? 'solid' : 'outline'} onPress={() => setPlacement('after')}><ButtonText>Efter {guess}</ButtonText></Button>
+              <VStack space="lg" alignItems="center" w="$full">
+                <Box
+                  bg="rgba(255, 255, 255, 0.95)"
+                  sx={{ _dark: { bg: 'rgba(20, 20, 22, 0.8)' } }}
+                  borderRadius="$3xl"
+                  p="$6"
+                  borderWidth={1}
+                  borderColor="rgba(16, 185, 129, 0.2)"
+                  w="$full"
+                >
+                  <VStack space="md" alignItems="center">
+                    <Box w={12} h={12} bg="rgba(16, 185, 129, 0.1)" borderRadius="$2xl" justifyContent="center" alignItems="center">
+                      <Icon as={Music} size="lg" color="$emerald500" />
+                    </Box>
+                    <Text fontSize="$2xl" fontWeight="900" color="$secondary900" sx={{ _dark: { color: '$secondary100' } }} textTransform="uppercase" letterSpacing={1} textAlign="center">
+                      Timeline Duel
+                    </Text>
+                    <Text fontSize="$sm" color="$secondary600" sx={{ _dark: { color: '$secondary400' } }} textAlign="center">
+                      År {guess} finns redan. Vart hör denna låt hemma?
+                    </Text>
+                  </VStack>
+                </Box>
+                
+                <HStack space="md" w="$full">
+                  <Pressable
+                    flex={1}
+                    bg={placement === 'before' ? '$emerald500' : 'rgba(100, 100, 110, 0.1)'}
+                    onPress={() => setPlacement('before')}
+                    borderRadius="$2xl"
+                    py="$5"
+                    justifyContent="center"
+                    alignItems="center"
+                    sx={{
+                      _pressed: {
+                        bg: '$emerald600',
+                        transform: [{ scale: 0.95 }],
+                      },
+                    }}
+                  >
+                    <Text
+                      fontSize="$lg"
+                      fontWeight="900"
+                      color={placement === 'before' ? '$white' : '$secondary600'}
+                      sx={{ _dark: { color: placement === 'before' ? '$white' : '$secondary400' } }}
+                      textTransform="uppercase"
+                      letterSpacing={1}
+                    >
+                      ÄLDRE
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    flex={1}
+                    bg={placement === 'after' ? '$emerald500' : 'rgba(100, 100, 110, 0.1)'}
+                    onPress={() => setPlacement('after')}
+                    borderRadius="$2xl"
+                    py="$5"
+                    justifyContent="center"
+                    alignItems="center"
+                    sx={{
+                      _pressed: {
+                        bg: '$emerald600',
+                        transform: [{ scale: 0.95 }],
+                      },
+                    }}
+                  >
+                    <Text
+                      fontSize="$lg"
+                      fontWeight="900"
+                      color={placement === 'after' ? '$white' : '$secondary600'}
+                      sx={{ _dark: { color: placement === 'after' ? '$white' : '$secondary400' } }}
+                      textTransform="uppercase"
+                      letterSpacing={1}
+                    >
+                      NYARE
+                    </Text>
+                  </Pressable>
                 </HStack>
-                <Button onPress={handlePlacementConfirm} isDisabled={!placement}><ButtonText>Bekräfta placering</ButtonText></Button>
+
+                <Button
+                  action="primary"
+                  onPress={handlePlacementConfirm}
+                  isDisabled={!placement}
+                  w="$full"
+                  sx={{
+                    ":disabled": {
+                      opacity: 0.5,
+                    }
+                  }}
+                >
+                  <ButtonText fontSize="$lg" fontWeight="900" textTransform="uppercase" letterSpacing={1}>
+                    Bekräfta
+                  </ButtonText>
+                </Button>
               </VStack>
             ) : (
-              <>
-                <Input w="$full" maxWidth={220} alignSelf="center" isInvalid={!isGuessValid}>
-                  <InputField placeholder="Ex: 2012" keyboardType="numeric" value={guess} onChangeText={setGuess} returnKeyType="done" onSubmitEditing={handleConfirmGuess} />
-                </Input>
-                {!isGuessValid && (<Text color="$error600" textAlign="center">Ogiltigt årtal</Text>)}
-                <Button onPress={handleConfirmGuess}><ButtonText>Bekräfta gissning</ButtonText></Button>
-              </>
-            )}
-            
-             {/* 3) Mindre viktiga: Hoppa över / Visa låtinfo */}
-            <HStack justifyContent="space-around" w="$full" my="$2">
-              <Button onPress={handleSkipSong} isDisabled={!canAffordSkip}><ButtonText>Hoppa över (-1 ⭐)</ButtonText></Button>
-              <Button variant="outline" onPress={handleToggleSongInfo}><ButtonText>{isSongInfoVisible ? 'Dölj låtinfo' : 'Visa låtinfo'}</ButtonText></Button>
-            </HStack>
-            {isSongInfoVisible && (
-              <Box bg="$info100" borderColor="$info300" sx={{_dark: {bg: '$info900', borderColor: '$info700'}}} borderWidth={1} borderRadius="$lg" p="$3">
-                <Text textAlign="center">Artist: {card.artist}</Text>
-                <Text textAlign="center">Låt: {card.title}</Text>
-                <Text textAlign="center">År: {card.year}</Text>
-              </Box>
+              <VStack space="lg" alignItems="center" w="$full">
+                {/* Guess Year Section */}
+                <VStack space="md" w="$full" alignItems="center">
+                  {/* Title */}
+                  <Text 
+                    fontSize="$xs" 
+                    fontWeight="900" 
+                    color="$emerald600"
+                    sx={{ _dark: { color: '$emerald500' } }}
+                    textTransform="uppercase" 
+                    letterSpacing={1.5}
+                  >
+                    Guess Year
+                  </Text>
+
+                  {/* Input Container */}
+                  <Box 
+                    w="$full" 
+                    maxWidth={300}
+                    borderWidth={1}
+                    borderColor="rgba(80, 80, 90, 0.6)"
+                    borderRadius="$3xl"
+                    bg="rgba(20, 20, 22, 0.6)"
+                    sx={{
+                      _dark: {
+                        bg: 'rgba(15, 15, 18, 0.8)',
+                        borderColor: 'rgba(60, 60, 70, 0.6)',
+                      }
+                    }}
+                    px="$6"
+                    py="$6"
+                    justifyContent="center"
+                    alignItems="center"
+                  >
+                    <Input
+                      flex={1}
+                      w="$full"
+                      borderWidth={0}
+                      bg="transparent"
+                      sx={{
+                        _focus: {
+                          outline: 'none',
+                        },
+                      }}
+                    >
+                      <InputField
+                        placeholder="----"
+                        keyboardType="numeric"
+                        value={guess}
+                        onChangeText={(value) => {
+                          setGuess(value);
+                          setIsGuessValid(true); // Återställ validering när användaren redigerar
+                        }}
+                        returnKeyType="done"
+                        onSubmitEditing={handleConfirmGuess}
+                        maxLength={4}
+                        fontSize="$4xl"
+                        fontWeight="900"
+                        textAlign="center"
+                        color="$secondary300"
+                        placeholderTextColor="$secondary600"
+                        sx={{ _dark: { color: '$secondary300' } }}
+                      />
+                    </Input>
+                  </Box>
+
+                  {/* Error Message */}
+                  {!isGuessValid && guess.length > 0 && (
+                    <Text 
+                      color="$error600" 
+                      fontSize="$xs" 
+                      fontWeight="700" 
+                      textTransform="uppercase"
+                      letterSpacing={0.3}
+                    >
+                      Invalid year (1900-{currentYear})
+                    </Text>
+                  )}
+                </VStack>
+
+                {/* Lock In Answer knapp */}
+                <Button
+                  onPress={handleConfirmGuess}
+                  isDisabled={!isGuessValid || guess.length !== 4}
+                  w="$full"
+                  bg="$emerald500"
+                  borderRadius="$3xl"
+                  sx={{
+                    ":pressed": {
+                      bg: '$emerald600',
+                      transform: [{ scale: 0.95 }],
+                    },
+                    ":disabled": {
+                      opacity: 0.5,
+                    }
+                  }}
+                >
+                  <ButtonText
+                    fontSize="$lg"
+                    fontWeight="900"
+                    color="$white"
+                    textTransform="uppercase"
+                    letterSpacing={1.5}
+                  >
+                    Lock In Answer
+                  </ButtonText>
+                </Button>
+
+                {/* Hint & Skip */}
+                <HStack space="md" w="$full" justifyContent="space-between">
+                  <Pressable
+                    flex={1}
+                    borderWidth={1}
+                    borderColor="rgba(100, 100, 110, 0.3)"
+                    borderRadius="$xl"
+                    py="$3"
+                    px="$2"
+                    justifyContent="center"
+                    alignItems="center"
+                    sx={{
+                      _pressed: {
+                        bg: 'rgba(100, 100, 110, 0.1)',
+                        transform: [{ scale: 0.95 }],
+                      },
+                    }}
+                    onPress={handleToggleSongInfo}
+                  >
+                    <VStack alignItems="center" space="xs">
+                      <Icon as={Info} size="sm" color={isSongInfoVisible ? '$emerald500' : '$secondary600'} sx={{ _dark: { color: isSongInfoVisible ? '$emerald400' : '$secondary400' } }} />
+                      <Text fontSize="$xs" fontWeight="900" color={isSongInfoVisible ? '$emerald600' : '$secondary600'} sx={{ _dark: { color: isSongInfoVisible ? '$emerald400' : '$secondary400' } }} textTransform="uppercase" letterSpacing={0.5}>Get Hint</Text>
+                    </VStack>
+                  </Pressable>
+                  <Pressable
+                    flex={1}
+                    borderWidth={1}
+                    borderColor={canAffordSkip ? 'rgba(239, 68, 68, 0.3)' : 'rgba(100, 100, 110, 0.2)'}
+                    borderRadius="$xl"
+                    py="$3"
+                    px="$2"
+                    justifyContent="center"
+                    alignItems="center"
+                    disabled={!canAffordSkip || isSkipping}
+                    sx={{
+                      _pressed: {
+                        bg: 'rgba(239, 68, 68, 0.1)',
+                        transform: [{ scale: 0.95 }],
+                      },
+                      ":disabled": {
+                        opacity: 0.4,
+                      }
+                    }}
+                    onPress={handleSkipSong}
+                  >
+                    {isSkipping ? (
+                      <HStack space="xs" alignItems="center">
+                        <ActivityIndicator size="small" color={canAffordSkip ? '$error600' : '$secondary600'} />
+                      </HStack>
+                    ) : (
+                      <VStack alignItems="center" space="xs">
+                        <Icon as={Music} size="sm" color={canAffordSkip ? '$error600' : '$secondary600'} sx={{ _dark: { color: canAffordSkip ? '$error500' : '$secondary400' } }} />
+                        <Text fontSize="$xs" fontWeight="900" color={canAffordSkip ? '$error600' : '$secondary600'} sx={{ _dark: { color: canAffordSkip ? '$error500' : '$secondary400' } }} textTransform="uppercase" letterSpacing={0.5}>Skip</Text>
+                      </VStack>
+                    )}
+                  </Pressable>
+                </HStack>
+
+                {/* Song info box */}
+                {isSongInfoVisible && (
+                  <Box
+                    w="$full"
+                    bg="rgba(16, 185, 129, 0.05)"
+                    borderRadius="$2xl"
+                    borderWidth={1}
+                    borderColor="rgba(16, 185, 129, 0.2)"
+                    p="$3"
+                    sx={{
+                      _dark: {
+                        bg: 'rgba(16, 185, 129, 0.08)',
+                        borderColor: 'rgba(16, 185, 129, 0.3)',
+                      }
+                    }}
+                  >
+                    <VStack space="xs">
+                      <HStack space="sm">
+                        <Text fontSize="$xs" fontWeight="900" color="$emerald600" sx={{ _dark: { color: '$emerald400' } }}>Artist:</Text>
+                        <Text fontSize="$xs" color="$secondary700" sx={{ _dark: { color: '$secondary300' } }} flex={1}>{card.artist}</Text>
+                      </HStack>
+                      <HStack space="sm">
+                        <Text fontSize="$xs" fontWeight="900" color="$emerald600" sx={{ _dark: { color: '$emerald400' } }}>Låt:</Text>
+                        <Text fontSize="$xs" color="$secondary700" sx={{ _dark: { color: '$secondary300' } }} flex={1}>"{card.title}"</Text>
+                      </HStack>
+                      <HStack space="sm">
+                        <Text fontSize="$xs" fontWeight="900" color="$emerald600" sx={{ _dark: { color: '$emerald400' } }}>År:</Text>
+                        <Text fontSize="$xs" color="$secondary700" sx={{ _dark: { color: '$secondary300' } }}>{card.year}</Text>
+                      </HStack>
+                    </VStack>
+                  </Box>
+                )}
+              </VStack>
             )}
           </VStack>
         )}
 
+        {!showBack && card && !guessConfirmed && !isLoadingCard && (
+          <VStack space="md" w="$full" mt="$6">
+          </VStack>
+        )}
+
         {showBack && card && (
-          <VStack space="md" alignItems="center" w="$full">
-            <CardBack artist={card.artist} title={card.title} year={String(card.year)} spotifyUrl={card.spotifyUrl} onFlip={() => {}} />
+          <VStack space="lg" alignItems="center" w="$full">
+            <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
+            
             {effectiveWasCorrect ? (
-              <VStack alignItems="center" w="$full" mt="$2" space="sm">
-                <Text color="$success600" bold>✅ Rätt gissat!</Text>
-                <Button onPress={handleAwardStar} isDisabled={starAwardedThisTurn || current.stars >= MAX_STARS}><ButtonText>Ge stjärna (+1)</ButtonText></Button>
-                <Button onPress={handleContinue}><ButtonText>Fortsätt</ButtonText></Button>
-                <Button variant="outline" onPress={handleSave}><ButtonText>Spara & avsluta runda</ButtonText></Button>
-              </VStack>
+              <Box
+                w="$full"
+                bg="rgba(16, 185, 129, 0.1)"
+                borderRadius={40}
+                borderWidth={2.5}
+                borderColor="rgba(16, 185, 129, 0.5)"
+                p="$5"
+                sx={{
+                  _dark: {
+                    bg: 'rgba(16, 185, 129, 0.1)',
+                    borderColor: 'rgba(16, 185, 129, 0.5)',
+                  }
+                }}
+              >
+                <VStack space="md" alignItems="center" w="$full">
+                  {/* Checkmark Icon */}
+                  <Box
+                    w={24}
+                    h={24}
+                    bg="$emerald500"
+                    borderRadius="$lg"
+                    justifyContent="center"
+                    alignItems="center"
+                  >
+                    <Text fontSize="$lg" fontWeight="900" color="$white">✓</Text>
+                  </Box>
+
+                  {/* Title */}
+                  <Text 
+                    fontSize="$3xl" 
+                    fontWeight="900" 
+                    color="$emerald500"
+                    textTransform="uppercase" 
+                    letterSpacing={1}
+                    italic
+                    textAlign="center"
+                    w="$full"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    Genius!
+                  </Text>
+
+                  {/* Award Star Button */}
+                  <Pressable
+                    onPress={handleAwardStar}
+                    disabled={starAwardedThisTurn}
+                    sx={{
+                      _pressed: {
+                        transform: [{ scale: 0.9 }],
+                      },
+                      ":disabled": {
+                        opacity: 0.5,
+                      }
+                    }}
+                  >
+                    <HStack alignItems="center" space="sm">
+                      <Text fontSize="$xs" fontWeight="900" color={starAwardedThisTurn ? '$secondary500' : '$emerald600'} sx={{ _dark: { color: starAwardedThisTurn ? '$secondary600' : '$emerald400' } }} textTransform="uppercase" letterSpacing={0.5}>
+                        Award
+                      </Text>
+                      <Text fontSize="$2xl">{starAwardedThisTurn ? '⭐' : '⭐'}</Text>
+                    </HStack>
+                  </Pressable>
+
+                  {/* Action buttons */}
+                  <VStack space="sm" w="$full" mt="$3">
+                    <Button
+                      onPress={handleContinue}
+                      w="$full"
+                      bg="$white"
+                      borderRadius={24}
+                      sx={{
+                        ":pressed": {
+                          bg: 'rgba(255, 255, 255, 0.9)',
+                          transform: [{ scale: 0.95 }],
+                        }
+                      }}
+                    >
+                      <ButtonText fontSize="$lg" fontWeight="900" color="$secondary900" textTransform="uppercase" letterSpacing={1.5}>
+                        Continue 🔥
+                      </ButtonText>
+                    </Button>
+
+                    <Button
+                      onPress={handleSave}
+                      w="$full"
+                      bg="$emerald500"
+                      borderRadius={24}
+                      sx={{
+                        ":pressed": {
+                          bg: '$emerald600',
+                          transform: [{ scale: 0.95 }],
+                        }
+                      }}
+                    >
+                      <ButtonText fontSize="$lg" fontWeight="900" color="$white" textTransform="uppercase" letterSpacing={1.5}>
+                        Save & Pass Turn
+                      </ButtonText>
+                    </Button>
+                  </VStack>
+                </VStack>
+              </Box>
             ) : (
-              <VStack alignItems="center" w="$full" mt="$2" space="sm">
-                <Text color="$error600" bold>❌ Fel svar! Nästa spelares tur...</Text>
-                <Button action="primary" onPress={switchPlayerTurn}><ButtonText>Fortsätt</ButtonText></Button>
-              </VStack>
+              <Box
+                w="$full"
+                bg="rgba(239, 68, 68, 0.1)"
+                borderRadius={40}
+                borderWidth={2.5}
+                borderColor="rgba(239, 68, 68, 0.5)"
+                p="$5"
+                sx={{
+                  _dark: {
+                    bg: 'rgba(239, 68, 68, 0.1)',
+                    borderColor: 'rgba(239, 68, 68, 0.5)',
+                  }
+                }}
+              >
+                <VStack space="md" alignItems="center" w="$full">
+                  {/* X Icon */}
+                  <Box
+                    w={24}
+                    h={24}
+                    bg="rgba(239, 68, 68, 0.9)"
+                    borderRadius="$2xl"
+                    justifyContent="center"
+                    alignItems="center"
+                  >
+                    <Text fontSize="$lg" fontWeight="900" color="$white">✕</Text>
+                  </Box>
+
+                  {/* Title */}
+                  <Text 
+                    fontSize="$3xl" 
+                    fontWeight="900" 
+                    color="rgba(239, 68, 68, 0.9)"
+                    textTransform="uppercase" 
+                    letterSpacing={1}
+                    italic
+                    textAlign="center"
+                    w="$full"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    Not Quite
+                  </Text>
+
+                  {/* Action button */}
+                  <Button
+                    onPress={switchPlayerTurn}
+                    w="$full"
+                    bg="$secondary800"
+                    borderRadius={24}
+                    mt="$2"
+                    sx={{
+                      ":pressed": {
+                        bg: 'rgba(60, 60, 70, 1)',
+                        transform: [{ scale: 0.95 }],
+                      }
+                    }}
+                  >
+                    <ButtonText fontSize="$lg" fontWeight="900" color="$white" textTransform="uppercase" letterSpacing={1.5}>
+                      Next Player
+                    </ButtonText>
+                  </Button>
+                </VStack>
+              </Box>
             )}
           </VStack>
         )}

@@ -7,15 +7,14 @@ interface Props {
   artist: string;
   title: string;
   year: string;
-  spotifyUrl: string;
   onFlip: () => void;
 }
 
-export default function CardBack({ artist, title, year, spotifyUrl, onFlip }: Props) {
+export default function CardBack({ artist, title, year, onFlip }: Props) {
   return (
     <TouchableOpacity onPress={onFlip} activeOpacity={1} style={{ width: '100%' }}>
       <Box
-        bg="$white"
+        bg="rgba(255, 255, 255, 0.85)"
         borderRadius="$3xl"
         borderWidth={8}
         borderColor="rgba(16, 185, 129, 0.1)"
@@ -30,11 +29,12 @@ export default function CardBack({ artist, title, year, spotifyUrl, onFlip }: Pr
         {/* Centered Content */}
         <VStack
           alignItems="center"
-          justifyContent="center"
-          space="xs"
+          justifyContent="space-between"
+          space="md"
           w="$full"
+          flex={1}
         >
-          {/* Music Icon - Smaller */}
+          {/* Music Icon */}
           <Box
             w={56}
             h={56}
@@ -53,25 +53,17 @@ export default function CardBack({ artist, title, year, spotifyUrl, onFlip }: Pr
             <Music size={32} color="#10B981" strokeWidth={1.3} />
           </Box>
 
-          {/* Year - FILL THE SPACE */}
-          <VStack
-            alignItems="center"
-            space="xs"
+          {/* Year */}
+          <Text
+            fontSize="$6xl"
+            fontWeight="900"
+            italic
+            color="$secondary900"
+            textAlign="center"
             w="$full"
-            flex={1}
           >
-            <Text
-              fontSize="$6xl"
-              fontWeight="900"
-              italic
-              color="$secondary900"
-              textAlign="center"
-              w="$full"
-              flex={1}
-            >
-              {year}
-            </Text>
-          </VStack>
+            {year}
+          </Text>
           
           {/* Green Bar */}
           <Box
