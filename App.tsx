@@ -1,13 +1,15 @@
 // =============================
-// File: App.tsx (Uppdaterad med global preload vid appstart)
+// File: App.tsx (Redesignad med modern web-design)
 // =============================
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent, AppState, Alert } from 'react-native';
+import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent, AppState, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Sun, Moon, User, Users, Trophy, ChevronRight, X } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // UI & Theme
-import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center, HStack, Image } from '@gluestack-ui/themed';
+import { GluestackUIProvider, Text, Box, Button, ButtonText, Heading, VStack, Center, HStack, Image, Pressable } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
 
 // Egen kod
@@ -15,7 +17,7 @@ import PlayerSetupScreen from './components/PlayerSetupScreen';
 import DuoGameScreen from './components/DuoGameScreen';
 import LoginScreen from './components/LoginScreen';
 import SignupScreen from './components/SignupScreen';
-import SinglePlayerScreen from './components/SinglePlayerScreen'; // ⬅️ NYTT: importera single player
+import SinglePlayerScreen from './components/SinglePlayerScreen';
 import GameHeader from './components/GameHeader';
 import GameFooter from './components/GameFooter';
 import { AuthProvider } from './context/AuthContext';
@@ -25,16 +27,11 @@ import { auth } from './firebase';
 import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame } from './storage/gameStorage';
 
 export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
-// ⬇️ NYTT: lägg till 'single'
 export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single';
 
-// NYTT: delad nyckel för lokal historik
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
-// NYTT: global persist-nyckel för förladdat Duo-kort (per användare)
 const GLOBAL_DUO_PRELOAD_KEY = (uid: string) => `globalPreload:duo:${uid}`;
-
-const HEADER_HEIGHT = 100; // Ungefärlig höjd på din header, kan behöva justeras
-const MIXZTER_LOGO = require('./assets/mixzter-icon-1024.png');
+const HEADER_HEIGHT = 80;
 
 // Hämtar ett kort för global preload (konsumeras EJ här)
 const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
@@ -71,17 +68,16 @@ const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
 
 function AppContent() {
   const { user, loadingAuth, isAnonymous, signOut } = useAuth();
+  const { colorMode, toggleColorMode } = useTheme();
+  
   const [mode, setMode] = useState<GameMode>('menu');
   const [gameMode, setGameMode] = useState<string>('default');
   const [players, setPlayers] = useState<{ player1Name: string; player2Name: string } | null>(null);
   const [preloadedDuoCard, setPreloadedDuoCard] = useState<CardData | null>(null);
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
-  const { colorMode } = useTheme();
 
   const [isPreloading, setIsPreloading] = useState(false);
   const appState = useRef(AppState.currentState);
-
-    // NYTT: menylista över aktiva spel + nuvarande gameId för DuoGameScreen
   const [activeGames, setActiveGames] = useState<ActiveGameMeta[]>([]);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
 
@@ -93,12 +89,107 @@ function AppContent() {
     extrapolate: 'clamp',
   });
 
+  // Press feedback animations
+  const duoScaleAnim = useRef(new Animated.Value(1)).current;
+  const duoOpacityAnim = useRef(new Animated.Value(1)).current;
+  const soloScaleAnim = useRef(new Animated.Value(1)).current;
+  const soloOpacityAnim = useRef(new Animated.Value(1)).current;
+  const cardScaleAnims = useRef<Animated.Value[]>([]);
+  const cardOpacityAnims = useRef<Animated.Value[]>([]);
+
+  // Menu entrance animation
+  const menuAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (mode === 'menu') {
+      menuAnim.setValue(0);
+      Animated.timing(menuAnim, { toValue: 1, duration: 700, useNativeDriver: true }).start();
+    }
+  }, [mode, menuAnim]);
+
+  // Staggered animations for active games
+  const activeAnimValues = useRef<Animated.Value[]>([]);
+  useEffect(() => {
+    // ensure anim values match activeGames length
+    activeAnimValues.current = activeGames.map((_, i) => activeAnimValues.current[i] || new Animated.Value(0));
+    // run staggered entrance
+    const anims = activeAnimValues.current.map((v, i) => (
+      Animated.timing(v, { toValue: 1, duration: 360, delay: i * 90, useNativeDriver: true })
+    ));
+    Animated.stagger(90, anims).start();
+  }, [activeGames]);
+
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     { useNativeDriver: false, listener: (_e: NativeSyntheticEvent<NativeScrollEvent>) => {} }
   );
 
-   // ⬇️ NYTT: Global preload vid appstart/inloggning (även foreground)
+  // Press feedback for DUO BATTLE
+  const handleDuoPressIn = () => {
+    try {
+      // Try to use haptics if available, silent fail if not
+      const { VibrationPattern } = require('react-native').Vibration;
+      const Vibration = require('react-native').Vibration;
+      Vibration.vibrate(50);
+    } catch {}
+    Animated.parallel([
+      Animated.timing(duoScaleAnim, { toValue: 0.96, duration: 100, useNativeDriver: true }),
+      Animated.timing(duoOpacityAnim, { toValue: 0.8, duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleDuoPressOut = () => {
+    Animated.parallel([
+      Animated.timing(duoScaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+      Animated.timing(duoOpacityAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // Press feedback for SOLO JOURNEY
+  const handleSoloPressIn = () => {
+    try {
+      const Vibration = require('react-native').Vibration;
+      Vibration.vibrate(50);
+    } catch {}
+    Animated.parallel([
+      Animated.timing(soloScaleAnim, { toValue: 0.96, duration: 100, useNativeDriver: true }),
+      Animated.timing(soloOpacityAnim, { toValue: 0.8, duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleSoloPressOut = () => {
+    Animated.parallel([
+      Animated.timing(soloScaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+      Animated.timing(soloOpacityAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // Press feedback for ACTIVE CARDS
+  const handleCardPressIn = (index: number) => {
+    try {
+      const Vibration = require('react-native').Vibration;
+      Vibration.vibrate(30);
+    } catch {}
+    if (!cardScaleAnims.current[index]) {
+      cardScaleAnims.current[index] = new Animated.Value(1);
+      cardOpacityAnims.current[index] = new Animated.Value(1);
+    }
+    Animated.parallel([
+      Animated.timing(cardScaleAnims.current[index], { toValue: 0.97, duration: 80, useNativeDriver: true }),
+      Animated.timing(cardOpacityAnims.current[index], { toValue: 0.85, duration: 80, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleCardPressOut = (index: number) => {
+    if (!cardScaleAnims.current[index]) {
+      cardScaleAnims.current[index] = new Animated.Value(1);
+      cardOpacityAnims.current[index] = new Animated.Value(1);
+    }
+    Animated.parallel([
+      Animated.timing(cardScaleAnims.current[index], { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(cardOpacityAnims.current[index], { toValue: 1, duration: 80, useNativeDriver: true }),
+    ]).start();
+  };
+
   const ensureGlobalDuoPreload = useCallback(async () => {
     if (!user || isAnonymous) return; // Kräver inloggad användare
     if (isPreloading || preloadedDuoCard) return; // Undvik dubbla anrop
@@ -281,81 +372,409 @@ const resumeGame = (meta: ActiveGameMeta) => {
     );
   }
 
-    // Huvudmenyn har nu en header men ingen footer
+  // Huvudmenyn med ny design
   if (mode === 'menu') {
     return (
-      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+      <Box 
+        flex={1} 
+        bg="$backgroundLight0" 
+        sx={{ _dark: { bg: '$backgroundDark950' } }}
+      >
+        {/* Header */}
         <GameHeader />
-        <Center flex={1}>
-          <VStack space="lg" alignItems="center">
-            <Image source={MIXZTER_LOGO} alt="MIXZTER" style={{ width: 120, height: 120, resizeMode: 'contain' }} />
-            <Text size="md" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
-              {user ? `Inloggad som: ${user.email}` : 'Spelar som gäst'}
-            </Text>
 
-            {/* Starta nytt Duo-spel – huvudspelet, överst i menyn */}
-            <Button onPress={() => setMode('duo-setup')} isDisabled={!!user && activeGames.length >= 2}>
-              <ButtonText>Start New Game</ButtonText>
-            </Button>
-            {user && activeGames.length >= 2 && (
-              <Text size="sm" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
-                Max 2 aktiva spel nått. Ta bort/avsluta ett spel för att starta nytt.
-              </Text>
-            )}
+        {/* Main Content */}
+        <Box flex={1}>
+          <Animated.View
+            style={{
+              opacity: menuAnim,
+              transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
+              flex: 1,
+            }}
+          >
+            <ScrollView 
+              contentContainerStyle={{ paddingVertical: 24, paddingHorizontal: 24, flexGrow: 1 }}
+              scrollEventThrottle={16}
+            >
+              <VStack space="xl">
 
-            {/* Start Single Player – under utveckling: outline + grå */}
-            <Button variant="outline" action="secondary" onPress={() => setMode('single')}>
-              <ButtonText>Single Player Mode</ButtonText>
-            </Button>
-
-            {/* Lista över pågående spel */}
-            {user && (
-              <VStack w="$full" px="$6" space="sm" mt="$4">
-                <Heading size="lg">Pågående spel</Heading>
-                {activeGames.length === 0 ? (
-                  <Text color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>Inga pågående spel.</Text>
-                ) : (
-                  activeGames.map((g) => (
-                    <HStack
-                      key={g.id}
-                      alignItems="center"
-                      justifyContent="space-between"
-                      borderWidth={1}
-                      borderRadius="$lg"
-                      p="$3"
-                      bg="$backgroundLight100"
-                      sx={{ _dark: { bg: '$backgroundDark800' } }}
+              {/* Quick Start - Hero Buttons */}
+              <VStack space="md">
+                {/* DUO BATTLE Button - Emerald/Success gradient */}
+                {(!user || activeGames.length < 2) ? (
+                  <Animated.View 
+                    style={{ 
+                      transform: [{ scale: duoScaleAnim }],
+                      opacity: duoOpacityAnim,
+                    }}
+                  >
+                    <LinearGradient
+                      colors={["#059669", "#0f766e"]}
+                      start={[0, 0]}
+                      end={[1, 1]}
+                      style={{ borderRadius: 32, padding: 32 }}
                     >
-                      <VStack>
-                        <Text bold>
-                          {g.player1} vs {g.player2}
-                        </Text>
-                        <Text size="sm">Ställning: {g.p1Score}–{g.p2Score}</Text>
+                    <Pressable 
+                      onPress={() => setMode('duo-setup')} 
+                      onPressIn={handleDuoPressIn}
+                      onPressOut={handleDuoPressOut}
+                      style={{ backgroundColor: 'transparent' }}
+                      hitSlop={8}
+                    >
+                      <VStack space="md">
+                        <Box
+                          bg="rgba(255,255,255,0.15)"
+                          w={48}
+                          h={48}
+                          rounded="$2xl"
+                          justifyContent="center"
+                          alignItems="center"
+                        >
+                          <Users size={24} color="white" />
+                        </Box>
+                        <VStack space="xs">
+                          <Text 
+                            fontSize="$2xl" 
+                            fontWeight="black" 
+                            color="white"
+                          >
+                            DUO BATTLE
+                          </Text>
+                          <Text 
+                            fontSize="$sm" 
+                            color="rgba(255,255,255,0.8)"
+                            fontWeight="500"
+                          >
+                            Head-to-head on one device
+                          </Text>
+                        </VStack>
                       </VStack>
-                      <HStack space="sm">
-                        <Button size="sm" onPress={() => resumeGame(g)}>
-                          <ButtonText>Återuppta</ButtonText>
-                        </Button>
-                        <Button size="sm" variant="outline" action="negative" onPress={() => deleteActiveGameFromMenu(g.id)}>
-                          <ButtonText>Avsluta</ButtonText>
-                        </Button>
-                      </HStack>
-                    </HStack>
-                  ))
+                    </Pressable>
+                    </LinearGradient>
+                  </Animated.View>
+                ) : (
+                  <LinearGradient
+                    colors={["#059669", "#0f766e"]}
+                    start={[0, 0]}
+                    end={[1, 1]}
+                    style={{ borderRadius: 32, padding: 32, opacity: 0.5 }}
+                  >
+                    <VStack space="md">
+                      <Box
+                        bg="rgba(255,255,255,0.15)"
+                        w={48}
+                        h={48}
+                        rounded="$2xl"
+                        justifyContent="center"
+                        alignItems="center"
+                      >
+                        <Users size={24} color="white" />
+                      </Box>
+                      <VStack space="xs">
+                        <Text 
+                          fontSize="$2xl" 
+                          fontWeight="black" 
+                          color="white"
+                        >
+                          DUO BATTLE
+                        </Text>
+                        <Text 
+                          fontSize="$sm" 
+                          color="rgba(255,255,255,0.8)"
+                          fontWeight="500"
+                        >
+                          Head-to-head on one device
+                        </Text>
+                      </VStack>
+                    </VStack>
+                  </LinearGradient>
+                )}
+
+                {/* SOLO JOURNEY Button */}
+                <Animated.View
+                  style={{ 
+                    transform: [{ scale: soloScaleAnim }],
+                    opacity: soloOpacityAnim,
+                  }}
+                >
+                  <Pressable
+                    onPress={() => setMode('single')}
+                    onPressIn={handleSoloPressIn}
+                    onPressOut={handleSoloPressOut}
+                    hitSlop={8}
+                  bg="$backgroundLight50"
+                  rounded="$3xl"
+                  p="$8"
+                  borderWidth={1}
+                  borderColor="$backgroundLight200"
+                  sx={{
+                    _dark: { 
+                      bg: '$backgroundDark900',
+                      borderColor: '$backgroundDark800'
+                    }
+                  }}
+                >
+                  <VStack space="md">
+                    <Box
+                      bg="$backgroundLight200"
+                      w={48}
+                      h={48}
+                      rounded="$2xl"
+                      justifyContent="center"
+                      alignItems="center"
+                      sx={{
+                        _dark: { bg: '$backgroundDark800' }
+                      }}
+                    >
+                      <Trophy size={24} color="#f59e0b" />
+                    </Box>
+                    <VStack space="xs">
+                      <Text 
+                        fontSize="$2xl" 
+                        fontWeight="black" 
+                        sx={{
+                          _dark: { color: '$textDark100' }
+                        }}
+                      >
+                        SOLO JOURNEY
+                      </Text>
+                      <Text 
+                        fontSize="$sm" 
+                        sx={{
+                          _dark: { color: '$textDark400' }
+                        }}
+                        fontWeight="500"
+                      >
+                        Master the music history
+                      </Text>
+                    </VStack>
+                  </VStack>
+                </Pressable>
+                </Animated.View>
+
+                {user && activeGames.length >= 2 && (
+                  <Text 
+                    size="sm" 
+                    textAlign="center"
+                    sx={{ 
+                      _dark: { color: '$textDark400' } 
+                    }}
+                  >
+                    Max 2 aktiva spel nått. Avsluta ett spel för att starta nytt.
+                  </Text>
                 )}
               </VStack>
-            )}
 
-            <Button onPress={signOut} variant="link">
-              <ButtonText>{user ? 'Logga ut' : 'Logga in'}</ButtonText>
-            </Button>
-          </VStack>
-        </Center>
+              {/* Active Games Section */}
+              {user && (
+                <VStack space="md" mt="$8">
+                  <VStack space="md" pb="$4" borderBottomWidth={1} borderBottomColor="$backgroundLight200" sx={{ _dark: { borderBottomColor: '$backgroundDark800' } }}>
+                    <HStack justifyContent="space-between" alignItems="center" px="$1">
+                      <HStack alignItems="center" gap="$2.5">
+                        <Box
+                          w={3}
+                          h={28}
+                          rounded="$full"
+                          bg="#059669"
+                          sx={{
+                            _dark: { bg: '#10b981' }
+                          }}
+                        />
+                        <Text 
+                          fontSize="$xl" 
+                          fontWeight="black"
+                          sx={{
+                            _dark: { color: '$textDark100' }
+                          }}
+                        >
+                          RESUME BATTLE
+                        </Text>
+                      </HStack>
+                      <Box
+                        px="$3"
+                        py="$1.5"
+                        bg="rgba(16, 185, 129, 0.08)"
+                        rounded="$lg"
+                      >
+                        <Text 
+                          fontSize="$xs" 
+                          fontWeight="black"
+                          color="#059669"
+                          sx={{
+                            _dark: { color: '#10b981' }
+                          }}
+                        >
+                          {activeGames.length} Active
+                        </Text>
+                      </Box>
+                    </HStack>
+                  </VStack>
+
+                  {activeGames.length === 0 ? (
+                    <Box
+                      bg="$backgroundLight100"
+                      borderWidth={2}
+                      borderStyle="dashed"
+                      borderColor="$backgroundLight200"
+                      rounded="$2xl"
+                      p="$8"
+                      alignItems="center"
+                      justifyContent="center"
+                      sx={{
+                        _dark: {
+                          bg: '$backgroundDark900',
+                          borderColor: '$backgroundDark800'
+                        }
+                      }}
+                    >
+                      <Text 
+                        fontWeight="bold"
+                        fontSize="$sm"
+                        sx={{
+                          _dark: { color: '$textDark500' }
+                        }}
+                      >
+                        No active matches. Ready for a new duel?
+                      </Text>
+                    </Box>
+                  ) : (
+                    <VStack space="sm">
+                      {activeGames.map((game, index) => (
+                        <Animated.View
+                          key={game.id}
+                          style={{
+                            opacity: activeAnimValues.current[index] ? activeAnimValues.current[index] : 1,
+                            transform: [
+                              {
+                                translateY: activeAnimValues.current[index]
+                                  ? activeAnimValues.current[index].interpolate({ inputRange: [0, 1], outputRange: [12, 0] })
+                                  : 0,
+                              },
+                            ],
+                          }}
+                        >
+                          <Animated.View
+                            style={{
+                              transform: [{ scale: cardScaleAnims.current[index] || new Animated.Value(1) }],
+                              opacity: cardOpacityAnims.current[index] || new Animated.Value(1),
+                              width: '100%',
+                            }}
+                          >
+                          <HStack
+                            bg="$backgroundLight100"
+                            borderWidth={1}
+                            borderColor="$backgroundLight200"
+                            rounded="$2xl"
+                            p="$4"
+                            space="md"
+                            sx={{
+                              _dark: {
+                                bg: '$backgroundDark900',
+                                borderColor: '$backgroundDark800'
+                              }
+                            }}
+                          >
+                          <Pressable
+                            flex={1}
+                            flexDirection="row"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            onPressIn={() => handleCardPressIn(index)}
+                            onPressOut={() => handleCardPressOut(index)}
+                            onPress={() => resumeGame(game)}
+                            hitSlop={8}
+                          >
+                          <HStack space="md" alignItems="center" flex={1}>
+                            <Box
+                              w={48}
+                              h={48}
+                              bg="$backgroundLight200"
+                              rounded="$xl"
+                              justifyContent="center"
+                              alignItems="center"
+                              sx={{
+                                _dark: { bg: '$backgroundDark800' }
+                              }}
+                            >
+                              <Text 
+                                fontSize="$lg" 
+                                fontWeight="black"
+                                sx={{
+                                  _dark: { color: '$textDark700' }
+                                }}
+                              >
+                                {`${game.player1.charAt(0).toUpperCase()}·${game.player2.charAt(0).toUpperCase()}`}
+                              </Text>
+                            </Box>
+
+                            <VStack flex={1} space="xs">
+                              <Text 
+                                fontSize="$sm"
+                                fontWeight="bold"
+                                sx={{
+                                  _dark: { color: '$textDark100' }
+                                }}
+                              >
+                                {game.player1} vs {game.player2}
+                              </Text>
+                              <Box
+                                px="$3"
+                                py="$1"
+                                rounded="$md"
+                                bg="rgba(16, 185, 129, 0.1)"
+                                alignSelf="flex-start"
+                              >
+                                <Text 
+                                  fontSize="$xs" 
+                                  fontWeight="black"
+                                  color="#059669"
+                                  sx={{
+                                    _dark: { color: '#10b981' }
+                                  }}
+                                >
+                                  {game.p1Score} - {game.p2Score}
+                                </Text>
+                              </Box>
+                            </VStack>
+                          </HStack>
+
+                          <ChevronRight size={18} color="#d1d5db" />
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => deleteActiveGameFromMenu(game.id)}
+                            hitSlop={8}
+                            bg="rgba(239, 68, 68, 0.1)"
+                            p="$2"
+                            rounded="$xl"
+                            justifyContent="center"
+                            alignItems="center"
+                            w={32}
+                            h={32}
+                            sx={{ borderWidth: 1, borderColor: 'rgba(239,68,68,0.35)', _dark: { borderColor: 'rgba(239,68,68,0.45)' } }}
+                          >
+                            <X size={12} color="#dc2626" strokeWidth={3} />
+                          </Pressable>
+                          </HStack>
+                          </Animated.View>
+
+                          </Animated.View>
+                      ))}
+                    </VStack>
+                  )}
+                </VStack>
+              )}
+
+              {/* Sign Out Button - REMOVED: Now in UserProfile component */}
+            </VStack>
+          </ScrollView>
+            </Animated.View>
+        </Box>
       </Box>
     );
   }
 
-  // Single Player – med samma “collapsible header”-setup som Duo
+  // Single Player – med samma "collapsible header"-setup som Duo
   if (mode === 'single') {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
@@ -372,11 +791,11 @@ const resumeGame = (meta: ActiveGameMeta) => {
           <GameHeader />
         </Animated.View>
 
-        <Box flex={1}>
+        <Box flex={1} position="relative">
           <SinglePlayerScreen
             onBackToMenu={returnToMenu}
             headerHeight={HEADER_HEIGHT}
-            onScroll={handleScroll}   // ⬅️ viktigt
+            onScroll={handleScroll}
           />
         </Box>
 
@@ -385,7 +804,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
     );
   }
 
-    // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
+  // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
   if (mode === 'duo-setup' || (mode === 'duo' && players)) {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
@@ -402,24 +821,17 @@ const resumeGame = (meta: ActiveGameMeta) => {
           <GameHeader />
         </Animated.View>
 
-        <Box flex={1}>
+        <Box flex={1} position="relative">
           {mode === 'duo-setup' && (
-            // 👇 PlayerSetupScreen skickar nu tillbaka 'selectedMode'
             <PlayerSetupScreen onStart={startDuoGame} onScroll={handleScroll} headerHeight={HEADER_HEIGHT} />
           )}
           {mode === 'duo' && players && (
             <DuoGameScreen
-              player1Name={players.player1Name} // OBS: Bytte namn på prop till player1Name för att matcha tidigare steg
+              player1Name={players.player1Name}
               player2Name={players.player2Name}
-              gameMode={gameMode} // ⬅️ NYTT: Skickar med spelläget
-              onBackToMenu={returnToMenu} // Ändrade onQuit till onBackToMenu om det var namnet i DuoGameScreen
-              
-              // 👇 LOGIK FÖR PRELOAD:
-              // Om vi kör "default" kan vi använda kortet vi laddade vid app-start.
-              // Om vi kör "Eurovision" (eller annat) sätter vi null här, så att hooken hämtar ett nytt kort direkt
-              // som matchar den valda genren.
+              gameMode={gameMode}
+              onBackToMenu={returnToMenu}
               initialPreloadedCard={gameMode === 'default' ? preloadedDuoCard : null}
-              
               onPreloadComplete={handlePreloadConsumed}
               onScroll={handleScroll}
               headerHeight={HEADER_HEIGHT}
