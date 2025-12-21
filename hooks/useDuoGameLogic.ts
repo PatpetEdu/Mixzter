@@ -127,16 +127,16 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
         if (existingYearIndex > 0) {
           lowerBound = fullTimeline[existingYearIndex - 1];
         }
-        // Kortet måste passa i luckan FÖRE det gissade året
-        isCorrect = card.year > lowerBound && card.year < upperBound;
+        // Kortet måste passa i luckan FÖRE det gissade året (eller vara samma år)
+        isCorrect = card.year > lowerBound && card.year <= upperBound;
       } else {
         // placement === 'after'
         lowerBound = guessedYear;
         if (existingYearIndex < fullTimeline.length - 1) {
           upperBound = fullTimeline[existingYearIndex + 1];
         }
-        // Kortet måste passa i luckan EFTER det gissade året
-        isCorrect = card.year > lowerBound && card.year < upperBound;
+        // Kortet måste passa i luckan EFTER det gissade året (eller vara samma år)
+        isCorrect = card.year >= lowerBound && card.year < upperBound;
       }
     } else {
       // Fall 2: Normal gissning (året finns inte på tidslinjen)
