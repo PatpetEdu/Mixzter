@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Linking, Platform, Animated, View } from 'react-native';
+import { Linking, Platform, Animated, View, Vibration } from 'react-native';
 import { Box, Text, VStack, HStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
 import { Music, QrCode, Play, X } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -254,7 +254,10 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
         <Pressable
           flex={1}
           bg="$white"
-          onPress={() => openSpotify(spotifyUrl)}
+          onPress={() => {
+            Vibration.vibrate(30);
+            openSpotify(spotifyUrl);
+          }}
           borderRadius="$2xl"
           py="$4"
           justifyContent="center"

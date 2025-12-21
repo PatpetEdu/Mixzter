@@ -77,6 +77,7 @@ function AppContent() {
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
 
   const [isPreloading, setIsPreloading] = useState(false);
+  const [isSoloPressed, setIsSoloPressed] = useState(false);
   const appState = useRef(AppState.currentState);
   const [activeGames, setActiveGames] = useState<ActiveGameMeta[]>([]);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
@@ -146,6 +147,7 @@ function AppContent() {
 
   // Press feedback for SOLO JOURNEY
   const handleSoloPressIn = () => {
+    setIsSoloPressed(true);
     try {
       const Vibration = require('react-native').Vibration;
       Vibration.vibrate(50);
@@ -157,6 +159,7 @@ function AppContent() {
   };
 
   const handleSoloPressOut = () => {
+    setIsSoloPressed(false);
     Animated.parallel([
       Animated.timing(soloScaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
       Animated.timing(soloOpacityAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
@@ -501,55 +504,58 @@ const resumeGame = (meta: ActiveGameMeta) => {
                     onPress={() => setMode('single')}
                     onPressIn={handleSoloPressIn}
                     onPressOut={handleSoloPressOut}
-                    hitSlop={8}
-                  bg="$backgroundLight50"
-                  rounded="$3xl"
-                  p="$8"
-                  borderWidth={1}
-                  borderColor="$backgroundLight200"
-                  sx={{
-                    _dark: { 
-                      bg: '$backgroundDark900',
-                      borderColor: '$backgroundDark800'
-                    }
-                  }}
-                >
-                  <VStack space="md">
+                    hitSlop={16}
+                  >
                     <Box
-                      bg="$backgroundLight200"
-                      w={48}
-                      h={48}
-                      rounded="$2xl"
-                      justifyContent="center"
-                      alignItems="center"
+                      bg={isSoloPressed ? "$backgroundLight100" : "$backgroundLight50"}
+                      rounded="$3xl"
+                      p="$10"
+                      borderWidth={2}
+                      borderColor={isSoloPressed ? "$backgroundLight300" : "$backgroundLight200"}
                       sx={{
-                        _dark: { bg: '$backgroundDark800' }
+                        _dark: { 
+                          bg: isSoloPressed ? '$backgroundDark800' : '$backgroundDark900',
+                          borderColor: isSoloPressed ? '$backgroundDark700' : '$backgroundDark800'
+                        }
                       }}
                     >
-                      <Trophy size={24} color="#f59e0b" />
+                      <VStack space="md">
+                        <Box
+                          bg="$backgroundLight200"
+                          w={56}
+                          h={56}
+                          rounded="$2xl"
+                          justifyContent="center"
+                          alignItems="center"
+                          sx={{
+                            _dark: { bg: '$backgroundDark800' }
+                          }}
+                        >
+                          <Trophy size={28} color="#f59e0b" />
+                        </Box>
+                        <VStack space="xs">
+                          <Text 
+                            fontSize="$2xl" 
+                            fontWeight="black" 
+                            sx={{
+                              _dark: { color: '$textDark100' }
+                            }}
+                          >
+                            SOLO JOURNEY
+                          </Text>
+                          <Text 
+                            fontSize="$sm" 
+                            sx={{
+                              _dark: { color: '$textDark400' }
+                            }}
+                            fontWeight="500"
+                          >
+                            Master the music history
+                          </Text>
+                        </VStack>
+                      </VStack>
                     </Box>
-                    <VStack space="xs">
-                      <Text 
-                        fontSize="$2xl" 
-                        fontWeight="black" 
-                        sx={{
-                          _dark: { color: '$textDark100' }
-                        }}
-                      >
-                        SOLO JOURNEY
-                      </Text>
-                      <Text 
-                        fontSize="$sm" 
-                        sx={{
-                          _dark: { color: '$textDark400' }
-                        }}
-                        fontWeight="500"
-                      >
-                        Master the music history
-                      </Text>
-                    </VStack>
-                  </VStack>
-                </Pressable>
+                  </Pressable>
                 </Animated.View>
 
                 {user && activeGames.length >= 2 && (

@@ -45,8 +45,8 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
 
   // useEffect för att kontrollera om spelet är över
   useEffect(() => {
-    const p1Score = players[player1Name].timeline.length;
-    const p2Score = players[player2Name].timeline.length;
+    const p1Score = players[player1Name].timeline.length + 1; // +1 för startkortet
+    const p2Score = players[player2Name].timeline.length + 1; // +1 för startkortet
     if (activePlayer === player1Name && (p1Score >= WINNING_SCORE || p2Score >= WINNING_SCORE)) {
       if (p1Score === p2Score) setGameOverMessage('Oavgjort! Båda spelarna har 10 kort.');
       else if (p1Score > p2Score) setGameOverMessage(`${player1Name} vinner!`);

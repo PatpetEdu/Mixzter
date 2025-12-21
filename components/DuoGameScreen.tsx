@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform  } from 'react-native';
+import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform, Vibration } from 'react-native';
 import {
   Box, Text, Heading, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
 } from '@gluestack-ui/themed';
@@ -316,6 +316,12 @@ export default function DuoGameScreen({
         >
           <Pressable
             onPress={() => !isCurrentPlayer ? setOpponentExpanded(!opponentExpanded) : setActivePlayerExpanded(!activePlayerExpanded)}
+            sx={{
+              _pressed: {
+                opacity: 0.7,
+                transform: [{ scale: 0.98 }],
+              },
+            }}
           >
             <HStack justifyContent="space-between" alignItems="center" mb={isCurrentPlayer || (isCurrentPlayer ? activePlayerExpanded : opponentExpanded) ? "$3" : 0}>
               <HStack alignItems="center" space="md">
@@ -648,7 +654,10 @@ export default function DuoGameScreen({
 
                 {/* Lock In Answer knapp */}
                 <Button
-                  onPress={handleConfirmGuess}
+                  onPress={() => {
+                    Vibration.vibrate(50);
+                    handleConfirmGuess();
+                  }}
                   isDisabled={!isGuessValid || guess.length !== 4}
                   w="$full"
                   bg="$emerald500"
@@ -691,7 +700,10 @@ export default function DuoGameScreen({
                         transform: [{ scale: 0.95 }],
                       },
                     }}
-                    onPress={handleToggleSongInfo}
+                    onPress={() => {
+                      Vibration.vibrate(30);
+                      handleToggleSongInfo();
+                    }}
                   >
                     <VStack alignItems="center" space="xs">
                       <Icon as={Info} size="sm" color={isSongInfoVisible ? '$emerald500' : '$secondary600'} sx={{ _dark: { color: isSongInfoVisible ? '$emerald400' : '$secondary400' } }} />
@@ -717,7 +729,12 @@ export default function DuoGameScreen({
                         opacity: 0.4,
                       }
                     }}
-                    onPress={handleSkipSong}
+                    onPress={() => {
+                      if (canAffordSkip && !isSkipping) {
+                        Vibration.vibrate(30);
+                        handleSkipSong();
+                      }
+                    }}
                   >
                     {isSkipping ? (
                       <HStack space="xs" alignItems="center">
@@ -828,6 +845,7 @@ export default function DuoGameScreen({
                     disabled={starAwardedThisTurn}
                     sx={{
                       _pressed: {
+                        opacity: 0.7,
                         transform: [{ scale: 0.9 }],
                       },
                       ":disabled": {
@@ -846,13 +864,16 @@ export default function DuoGameScreen({
                   {/* Action buttons */}
                   <VStack space="sm" w="$full" mt="$3">
                     <Button
-                      onPress={handleContinue}
+                      onPress={() => {
+                        Vibration.vibrate(50);
+                        handleContinue();
+                      }}
                       w="$full"
                       bg="$white"
                       borderRadius={24}
                       sx={{
-                        ":pressed": {
-                          bg: 'rgba(255, 255, 255, 0.9)',
+                        _pressed: {
+                          bg: 'rgba(255, 255, 255, 0.8)',
                           transform: [{ scale: 0.95 }],
                         }
                       }}
@@ -863,7 +884,10 @@ export default function DuoGameScreen({
                     </Button>
 
                     <Button
-                      onPress={handleSave}
+                      onPress={() => {
+                        Vibration.vibrate(50);
+                        handleSave();
+                      }}
                       w="$full"
                       bg="$emerald500"
                       borderRadius={24}
@@ -927,7 +951,10 @@ export default function DuoGameScreen({
 
                   {/* Action button */}
                   <Button
-                    onPress={switchPlayerTurn}
+                    onPress={() => {
+                      Vibration.vibrate(50);
+                      switchPlayerTurn();
+                    }}
                     w="$full"
                     bg="$secondary800"
                     borderRadius={24}

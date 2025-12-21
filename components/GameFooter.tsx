@@ -29,6 +29,8 @@ export default function GameFooter({ onBackToMenu }: Props) {
       <Box
         pb={insets.bottom} // Safe area padding
         bg="$backgroundLight50"
+        w="$full"
+        justifyContent="center"
         sx={{
           borderTopWidth: 1,
           borderTopColor: '$borderLight300',
@@ -38,7 +40,7 @@ export default function GameFooter({ onBackToMenu }: Props) {
           },
         }}
       >
-        <HStack px="$4" py="$2" justifyContent="flex-end" alignItems="center">
+        <HStack py="$2" justifyContent="flex-end" alignItems="center" pr="$3">
           <Pressable
             onPress={() => setShowActionsheet(true)}
             borderRadius="$full"
