@@ -66,6 +66,7 @@ export default function DuoGameScreen({
   const [opponentExpanded, setOpponentExpanded] = useState(false);
   const [activePlayerExpanded, setActivePlayerExpanded] = useState(true);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [wasSkipped, setWasSkipped] = useState(false);
 
     // Ny state för "Före/Efter"-logiken
   const [showPlacementChoice, setShowPlacementChoice] = useState(false);
@@ -110,6 +111,7 @@ export default function DuoGameScreen({
     setShowPlacementChoice(false);
     setPlacement(null);
     setWasCorrectOverride(null);
+    setWasSkipped(false);
     resetTurnState();
   }, [resetTurnState]);
 
@@ -252,11 +254,18 @@ export default function DuoGameScreen({
   const handleAwardStar = () => awardStar();
   const handleSkipSong = () => {
     setIsSkipping(true);
-    setTimeout(() => {
-      skipSong();
-      resetInputs();
-      setIsSkipping(false);
-    }, 800);
+    setWasSkipped(true);
+    // Visa BackCard så spelaren kan se vilken låt det var
+    setShowBack(true);
+    setGuessConfirmed(true);
+    // VÄNTA MED skipSong tills användaren klickar "Next Song"
+    setIsSkipping(false);
+  };
+  
+  const handleNextSongAfterSkip = () => {
+    // skipSong() anropar onNewCardNeeded som anropar generateCard(resetInputs)
+    // Så vi behöver bara anropa skipSong()
+    skipSong();
   };
   const handleToggleSongInfo = () => setIsSongInfoVisible((prev) => !prev);
   const handleSave = () => saveAndEndTurn();
@@ -338,7 +347,7 @@ export default function DuoGameScreen({
                 />
                 <HStack alignItems="center" space="xs">
                   <Text fontSize="$sm" fontWeight="900" color={isCurrentPlayer ? '$secondary900' : '$secondary600'} sx={{ _dark: { color: isCurrentPlayer ? '$secondary100' : '$secondary400' } }} textTransform="uppercase" letterSpacing={0.5}>
-                    {player.name} ({player.timeline.length})
+                    {player.name} ({player.timeline.length + (isCurrentPlayer ? roundCards.length : 0)})
                   </Text>
                   {!isCurrentPlayer && !opponentExpanded && (
                     <Text fontSize="$xs" fontWeight="700" color="$amber600" sx={{ _dark: { color: '$amber400' } }} opacity={0.6}>
@@ -377,8 +386,33 @@ export default function DuoGameScreen({
           {(isCurrentPlayer ? activePlayerExpanded : opponentExpanded) && (
             <HStack flexWrap="wrap" space="xs">
               {allYears.map((year, idx) => {
-            const isPrelim = isCurrentPlayer && roundCards.some((c) => c.year === year) && !finalTimeline.includes(year);
+            const finalCount = [player.startYear, ...player.timeline].filter((y) => y === year).length;
+            const roundCount = isCurrentPlayer ? roundCards.filter((c) => c.year === year).length : 0;
+            const totalCount = finalCount + roundCount;
+            
             const isStartYear = year === player.startYear;
+            const isPrelim = isCurrentPlayer && roundCount > 0; // Preliminärt om det finns roundCards för detta år
+            const isEarned = finalCount > 0; // Intjänat om det finns i player.timeline
+            
+            // Bestäm färg baserat på status
+            let borderColor = 'rgba(100, 100, 110, 0.2)'; // Default grå
+            let bgColor = 'rgba(100, 100, 110, 0.05)';
+            let textColor = '$secondary600';
+            let textColorDark = '$secondary400';
+            
+            if (isPrelim && !isEarned) {
+              // Preliminärt kort (orange - visar "ej sparad än")
+              borderColor = 'rgba(251, 146, 60, 0.5)';
+              bgColor = 'rgba(251, 146, 60, 0.1)';
+              textColor = '$orange600';
+              textColorDark = '$orange400';
+            } else if (isEarned) {
+              // Intjänat kort (grönt - sparad och säker)
+              borderColor = 'rgba(16, 185, 129, 0.3)';
+              bgColor = 'rgba(16, 185, 129, 0.1)';
+              textColor = '$emerald600';
+              textColorDark = '$emerald400';
+            }
             
             return (
               <Box
@@ -387,37 +421,22 @@ export default function DuoGameScreen({
                 py="$1"
                 borderRadius="$lg"
                 borderWidth={1}
-                borderColor={
-                  isStartYear ? 'rgba(251, 191, 36, 0.5)' :
-                  isPrelim ? 'rgba(16, 185, 129, 0.3)' :
-                  'rgba(100, 100, 110, 0.2)'
-                }
-                bg={
-                  isStartYear ? 'rgba(251, 191, 36, 0.1)' :
-                  isPrelim ? 'rgba(16, 185, 129, 0.1)' :
-                  'rgba(100, 100, 110, 0.05)'
-                }
+                borderColor={borderColor}
+                bg={bgColor}
               >
                 <Text 
                   fontSize="$xs" 
                   fontWeight="900"
-                  color={
-                    isStartYear ? '$amber600' :
-                    isPrelim ? '$emerald600' :
-                    '$secondary600'
-                  }
+                  color={textColor}
                   sx={{
                     _dark: {
-                      color:
-                        isStartYear ? '$amber400' :
-                        isPrelim ? '$emerald400' :
-                        '$secondary400'
+                      color: textColorDark
                     }
                   }}
-                  opacity={isStartYear && !isCurrentPlayer ? 0.5 : 1}
                 >
                   {isStartYear && '📍 '}
                   {String(year)}
+                  {totalCount > 1 && ` (${totalCount}x)`}
                 </Text>
               </Box>
             );
@@ -437,8 +456,8 @@ export default function DuoGameScreen({
           <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
           <Text fontSize="$lg" color="$primary600" sx={{ _dark: { color: '$primary400' } }}>{gameOverMessage}</Text>
           <VStack space="xs" alignItems="center" my="$3">
-            <Text>{player1Name}: {players[player1Name].timeline.length} kort</Text>
-            <Text>{player2Name}: {players[player2Name].timeline.length} kort</Text>
+            <Text>{player1Name}: {players[player1Name].timeline.length + 1} kort (inkl. startår)</Text>
+            <Text>{player2Name}: {players[player2Name].timeline.length + 1} kort (inkl. startår)</Text>
           </VStack>
         </VStack>
       </Center>
@@ -795,7 +814,74 @@ export default function DuoGameScreen({
           <VStack space="lg" alignItems="center" w="$full">
             <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
             
-            {effectiveWasCorrect ? (
+            {wasSkipped ? (
+              <Box
+                w="$full"
+                bg="rgba(168, 85, 247, 0.1)"
+                borderRadius={40}
+                borderWidth={2.5}
+                borderColor="rgba(168, 85, 247, 0.5)"
+                p="$5"
+                sx={{
+                  _dark: {
+                    bg: 'rgba(168, 85, 247, 0.1)',
+                    borderColor: 'rgba(168, 85, 247, 0.5)',
+                  }
+                }}
+              >
+                <VStack space="md" alignItems="center" w="$full">
+                  {/* Icon */}
+                  <Box
+                    w={24}
+                    h={24}
+                    bg="rgba(168, 85, 247, 0.9)"
+                    borderRadius="$2xl"
+                    justifyContent="center"
+                    alignItems="center"
+                  >
+                    <Text fontSize="$lg" fontWeight="900" color="$white">⊘</Text>
+                  </Box>
+
+                  {/* Title */}
+                  <Text 
+                    fontSize="$3xl" 
+                    fontWeight="900" 
+                    color="rgba(168, 85, 247, 0.9)"
+                    textTransform="uppercase" 
+                    letterSpacing={1}
+                    italic
+                    textAlign="center"
+                    w="$full"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    Skipped
+                  </Text>
+
+                  {/* Next Song Button */}
+                  <Button
+                    onPress={() => {
+                      Vibration.vibrate(50);
+                      handleNextSongAfterSkip();
+                    }}
+                    w="$full"
+                    bg="rgba(168, 85, 247, 0.9)"
+                    borderRadius={24}
+                    mt="$3"
+                    sx={{
+                      _pressed: {
+                        bg: 'rgba(168, 85, 247, 0.7)',
+                        transform: [{ scale: 0.95 }],
+                      }
+                    }}
+                  >
+                    <ButtonText fontSize="$lg" fontWeight="900" color="$white" textTransform="uppercase" letterSpacing={1.5}>
+                      Next Song →
+                    </ButtonText>
+                  </Button>
+                </VStack>
+              </Box>
+            ) : effectiveWasCorrect ? (
               <Box
                 w="$full"
                 bg="rgba(16, 185, 129, 0.1)"
@@ -861,48 +947,71 @@ export default function DuoGameScreen({
                     </HStack>
                   </Pressable>
 
-                  {/* Action buttons */}
-                  <VStack space="sm" w="$full" mt="$3">
+                  {/* Action buttons - olika beroende på om låten skippades */}
+                  {!wasSkipped ? (
+                    <VStack space="sm" w="$full" mt="$3">
+                      <Button
+                        onPress={() => {
+                          Vibration.vibrate(50);
+                          handleContinue();
+                        }}
+                        w="$full"
+                        bg="$white"
+                        borderRadius={24}
+                        sx={{
+                          _pressed: {
+                            bg: 'rgba(255, 255, 255, 0.8)',
+                            transform: [{ scale: 0.95 }],
+                          }
+                        }}
+                      >
+                        <ButtonText fontSize="$lg" fontWeight="900" color="$secondary900" textTransform="uppercase" letterSpacing={1.5}>
+                          Continue 🔥
+                        </ButtonText>
+                      </Button>
+
+                      <Button
+                        onPress={() => {
+                          Vibration.vibrate(50);
+                          handleSave();
+                        }}
+                        w="$full"
+                        bg="$emerald500"
+                        borderRadius={24}
+                        sx={{
+                          ":pressed": {
+                            bg: '$emerald600',
+                            transform: [{ scale: 0.95 }],
+                          }
+                        }}
+                      >
+                        <ButtonText fontSize="$lg" fontWeight="900" color="$white" textTransform="uppercase" letterSpacing={1.5}>
+                          Save & Pass Turn
+                        </ButtonText>
+                      </Button>
+                    </VStack>
+                  ) : (
                     <Button
                       onPress={() => {
                         Vibration.vibrate(50);
-                        handleContinue();
+                        handleNextSongAfterSkip();
                       }}
                       w="$full"
-                      bg="$white"
+                      bg="rgba(168, 85, 247, 0.9)"
                       borderRadius={24}
+                      mt="$3"
                       sx={{
                         _pressed: {
-                          bg: 'rgba(255, 255, 255, 0.8)',
-                          transform: [{ scale: 0.95 }],
-                        }
-                      }}
-                    >
-                      <ButtonText fontSize="$lg" fontWeight="900" color="$secondary900" textTransform="uppercase" letterSpacing={1.5}>
-                        Continue 🔥
-                      </ButtonText>
-                    </Button>
-
-                    <Button
-                      onPress={() => {
-                        Vibration.vibrate(50);
-                        handleSave();
-                      }}
-                      w="$full"
-                      bg="$emerald500"
-                      borderRadius={24}
-                      sx={{
-                        ":pressed": {
-                          bg: '$emerald600',
+                          bg: 'rgba(168, 85, 247, 0.7)',
                           transform: [{ scale: 0.95 }],
                         }
                       }}
                     >
                       <ButtonText fontSize="$lg" fontWeight="900" color="$white" textTransform="uppercase" letterSpacing={1.5}>
-                        Save & Pass Turn
+                        Next Song →
                       </ButtonText>
                     </Button>
-                  </VStack>
+                  )}
                 </VStack>
               </Box>
             ) : (
@@ -921,7 +1030,7 @@ export default function DuoGameScreen({
                 }}
               >
                 <VStack space="md" alignItems="center" w="$full">
-                  {/* X Icon */}
+                  {/* Icon */}
                   <Box
                     w={24}
                     h={24}

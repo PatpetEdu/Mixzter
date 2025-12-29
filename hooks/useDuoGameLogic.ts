@@ -104,10 +104,15 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
   // Logik för att bekräfta en gissning
   const confirmGuess = (guess: string, card: Card, placement?: 'before' | 'after') => {
     const p = players[activePlayer];
-    const fullTimeline = [p.startYear, ...p.timeline, ...roundCards.map((c) => c.year)].sort((a, b) => a - b);
+    
+    // 1. Skapa en UNIK tidslinje för beräkningen (tar bort dubbletter)
+    // Detta löser problemet om indexering hoppar fel bland dubbletter
+    const uniqueTimeline = Array.from(new Set([p.startYear, ...p.timeline, ...roundCards.map((c) => c.year)]))
+      .sort((a, b) => a - b);
+      
     const guessedYear = parseInt(guess, 10);
 
-    // Om låtens år är en exakt matchning är det alltid rätt.
+    // Om låtens år är en exakt matchning med gissningen är det alltid rätt.
     if (card.year === guessedYear) {
       setWasCorrect(true);
       setRoundCards((prev) => [...prev, card]);
@@ -118,42 +123,52 @@ export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: U
     let upperBound = Infinity;
     let isCorrect = false;
 
-    // Fall 1: Spelaren gissade ett existerande år och valde en placering
+    // Fall 1: Spelaren gissade ett existerande år och valde en placering (Placement)
     if (placement) {
-      const existingYearIndex = fullTimeline.indexOf(guessedYear);
+      const existingYearIndex = uniqueTimeline.indexOf(guessedYear);
 
       if (placement === 'before') {
         upperBound = guessedYear;
+        // Om det finns ett år innan, sätt det som nedre gräns
         if (existingYearIndex > 0) {
-          lowerBound = fullTimeline[existingYearIndex - 1];
+          lowerBound = uniqueTimeline[existingYearIndex - 1];
         }
-        // Kortet måste passa i luckan FÖRE det gissade året (eller vara samma år)
-        isCorrect = card.year > lowerBound && card.year <= upperBound;
+        
       } else {
         // placement === 'after'
         lowerBound = guessedYear;
-        if (existingYearIndex < fullTimeline.length - 1) {
-          upperBound = fullTimeline[existingYearIndex + 1];
+        // Om det finns ett år efter, sätt det som övre gräns
+        if (existingYearIndex < uniqueTimeline.length - 1) {
+          upperBound = uniqueTimeline[existingYearIndex + 1];
         }
-        // Kortet måste passa i luckan EFTER det gissade året (eller vara samma år)
-        isCorrect = card.year >= lowerBound && card.year < upperBound;
       }
+
     } else {
       // Fall 2: Normal gissning (året finns inte på tidslinjen)
-      const upperIndex = fullTimeline.findIndex((y) => y > guessedYear);
+      // Vi letar upp vilken lucka gissningen pekar på.
+      
+      const upperIndex = uniqueTimeline.findIndex((y) => y > guessedYear);
+      
       if (upperIndex === -1) {
-        // Gissningen är högst
-        lowerBound = fullTimeline[fullTimeline.length - 1];
+        // Gissningen är högre än alla existerande år (Sista luckan)
+        lowerBound = uniqueTimeline[uniqueTimeline.length - 1];
+        // upperBound är redan Infinity
       } else if (upperIndex === 0) {
-        // Gissningen är lägst
-        upperBound = fullTimeline[0];
+        // Gissningen är lägre än alla existerande år (Första luckan)
+        // lowerBound är redan -Infinity
+        upperBound = uniqueTimeline[0];
       } else {
-        lowerBound = fullTimeline[upperIndex - 1];
-        upperBound = fullTimeline[upperIndex];
+        // Gissningen är mellan två år
+        lowerBound = uniqueTimeline[upperIndex - 1];
+        upperBound = uniqueTimeline[upperIndex];
       }
-      // Kortet måste vara efter föregående år, upp till och med nästa år
-      isCorrect = card.year > lowerBound && card.year <= upperBound;
     }
+
+    // --- DEN VIKTIGA FIXEN ---
+    // Vi använder >= och <= för att tillåta att kortet är samma år som gränserna.
+    // Exempel: Luckan är 1972-1978. Kortet är 1972.
+    // 1972 >= 1972 (Sant) OCH 1972 <= 1978 (Sant) -> RÄTT!
+    isCorrect = card.year >= lowerBound && card.year <= upperBound;
 
     setWasCorrect(isCorrect);
 
