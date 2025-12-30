@@ -4,8 +4,7 @@ import {
   Box, Text, Heading, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CardFront from './CardFront';
-import CardBack from './CardBack';
+import AnimatedCard from './AnimatedCard';
 import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
 import { useAuth } from '../hooks/useAuth';
@@ -492,7 +491,12 @@ export default function DuoGameScreen({
         {card && !guessConfirmed && !isLoadingCard && (
           <VStack space="md" w="$full">
              {/* Kortet */}
-            <CardFront spotifyUrl={card.spotifyUrl} onFlip={() => {}} showFlipButton={false} />
+            <AnimatedCard 
+              showBack={false}
+              card={card}
+              onFlip={() => {}}
+              showFlipButton={false}
+            />
            
              {/* Guess section */}
             {showPlacementChoice ? (
@@ -812,7 +816,12 @@ export default function DuoGameScreen({
 
         {showBack && card && (
           <VStack space="lg" alignItems="center" w="$full">
-            <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={() => {}} />
+            <AnimatedCard 
+              showBack={true}
+              card={card}
+              onFlip={() => {}}
+              showFlipButton={false}
+            />
             
             {wasSkipped ? (
               <Box
