@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { KeyboardAvoidingView, Platform, TextInput, NativeSyntheticEvent, NativeScrollEvent, Animated, ScrollView, Pressable } from 'react-native';
 import { VStack, Input, InputField, Button, ButtonText, Center, Text, HStack, Box } from '@gluestack-ui/themed';
-import { UserPlus, PlayCircle, Music2, Globe, Disc, Star } from 'lucide-react-native';
+import { UserPlus, PlayCircle, Music2, Globe, Disc, Star, Film, Sparkles } from 'lucide-react-native';
 
 type Props = {
  onStart: (player1: string, player2: string, gameMode: string) => void;
@@ -16,6 +16,8 @@ const GAME_MODES = [
   { id: 'eurovision', label: 'Eurovision 1956-2025', icon: Star },
   { id: 'rock', label: 'Rock/Metal 1960-2025', icon: Disc },
   { id: 'onehitwonder', label: 'One Hit Wonders 1970-2015', icon: PlayCircle },
+  { id: 'filmmusik', label: 'Film & TV Musik 1950-2025', icon: Film },
+  { id: 'disney', label: 'Disney Klassiker 1937-2025', icon: Sparkles },
 ];
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
