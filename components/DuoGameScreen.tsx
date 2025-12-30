@@ -5,6 +5,7 @@ import {
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnimatedCard from './AnimatedCard';
+import ScoreScreen from './ScoreScreen';
 import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
 import { useAuth } from '../hooks/useAuth';
@@ -450,16 +451,12 @@ export default function DuoGameScreen({
 
   if (gameOverMessage) {
     return (
-      <Center flex={1} px="$4">
-        <VStack alignItems="center" space="md">
-          <Heading size="xl">🎉 Spelet är över! 🎉</Heading>
-          <Text fontSize="$lg" color="$primary600" sx={{ _dark: { color: '$primary400' } }}>{gameOverMessage}</Text>
-          <VStack space="xs" alignItems="center" my="$3">
-            <Text>{player1Name}: {players[player1Name].timeline.length + 1} kort (inkl. startår)</Text>
-            <Text>{player2Name}: {players[player2Name].timeline.length + 1} kort (inkl. startår)</Text>
-          </VStack>
-        </VStack>
-      </Center>
+      <ScoreScreen 
+        gameOverMessage={gameOverMessage}
+        players={players}
+        player1Name={player1Name}
+        player2Name={player2Name}
+      />
     );
   }
 
