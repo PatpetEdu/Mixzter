@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform, Vibration } from 'react-native';
+import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform, Vibration, Pressable as RNPressable, View } from 'react-native';
 import {
-  Box, Text, Heading, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
+  Box, Text, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnimatedCard from './AnimatedCard';
@@ -77,6 +77,64 @@ export default function DuoGameScreen({
 
   // 🔸 Litet override så att vi kan rendera korrekt “Rätt gissat!” från storage direkt
   const [wasCorrectOverride, setWasCorrectOverride] = useState<boolean | null>(null);
+
+  // 🎵 State för modal över år i tidslinjen
+  const [selectedYearCard, setSelectedYearCard] = useState<Card | null>(null);
+  const [showYearModal, setShowYearModal] = useState(false);
+  const [yearPosition, setYearPosition] = useState({ x: 0, y: 0 });
+  const modalAnimScale = React.useRef(new Animated.Value(0.3)).current;
+  const modalAnimOpacity = React.useRef(new Animated.Value(0)).current;
+  const modalAnimTranslate = React.useRef(new Animated.Value(1)).current;
+
+  // Funktion för att hitta kort baserat på år från en spelare
+  const findCardByYear = (player: Player, year: number): Card | null => {
+    return player.cards.find(c => c.year === year) || null;
+  };
+
+  // Funktion för att öppna modal med kort
+  const handleYearPress = (player: Player, year: number, event?: any) => {
+    // Försök hitta kortet från roundCards först (preliminära kort)
+    let cardForYear: Card | undefined = roundCards.find(c => c.year === year);
+    
+    // Om inte hittat i roundCards, försök från player.cards
+    if (!cardForYear) {
+      cardForYear = findCardByYear(player, year) || undefined;
+    }
+    
+    // Visa modal endast om vi hittar kortet
+    if (cardForYear) {
+      // Spara position från event om tillgänglig
+      if (event?.nativeEvent?.pageX && event?.nativeEvent?.pageY) {
+        setYearPosition({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
+      }
+      
+      setSelectedYearCard(cardForYear);
+      setShowYearModal(true);
+      
+      // Starta animationen
+      modalAnimScale.setValue(0.3);
+      modalAnimOpacity.setValue(0);
+      modalAnimTranslate.setValue(0);
+      
+      Animated.parallel([
+        Animated.timing(modalAnimScale, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalAnimOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalAnimTranslate, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
 
   const {
     players,
@@ -394,6 +452,9 @@ export default function DuoGameScreen({
             const isPrelim = isCurrentPlayer && roundCount > 0; // Preliminärt om det finns roundCards för detta år
             const isEarned = finalCount > 0; // Intjänat om det finns i player.timeline
             
+            // Bestäm om kortet har data och kan vara klickbart
+            const hasCardData = roundCards.some(c => c.year === year) || findCardByYear(player, year);
+            
             // Bestäm färg baserat på status
             let borderColor = 'rgba(100, 100, 110, 0.2)'; // Default grå
             let bgColor = 'rgba(100, 100, 110, 0.05)';
@@ -415,30 +476,40 @@ export default function DuoGameScreen({
             }
             
             return (
-              <Box
+              <RNPressable
                 key={`${year}-${idx}`}
-                px="$2"
-                py="$1"
-                borderRadius="$lg"
-                borderWidth={1}
-                borderColor={borderColor}
-                bg={bgColor}
+                disabled={!hasCardData}
+                onPress={(event) => {
+                  handleYearPress(player, year, event);
+                }}
+                style={({ pressed }) => ({
+                  opacity: pressed && hasCardData ? 0.7 : 1,
+                })}
               >
-                <Text 
-                  fontSize="$xs" 
-                  fontWeight="900"
-                  color={textColor}
-                  sx={{
-                    _dark: {
-                      color: textColorDark
-                    }
-                  }}
+                <Box
+                  px="$2"
+                  py="$1"
+                  borderRadius="$lg"
+                  borderWidth={1}
+                  borderColor={borderColor}
+                  bg={bgColor}
                 >
-                  {isStartYear && '📍 '}
-                  {String(year)}
-                  {totalCount > 1 && ` (${totalCount}x)`}
-                </Text>
-              </Box>
+                  <Text 
+                    fontSize="$xs" 
+                    fontWeight="900"
+                    color={textColor}
+                    sx={{
+                      _dark: {
+                        color: textColorDark
+                      }
+                    }}
+                  >
+                    {isStartYear && '📍 '}
+                    {String(year)}
+                    {totalCount > 1 && ` (${totalCount}x)`}
+                  </Text>
+                </Box>
+              </RNPressable>
             );
           })}
             </HStack>
@@ -446,6 +517,155 @@ export default function DuoGameScreen({
 
         </Box>
       </>
+    );
+  };
+
+  // 🎵 Render Year Card Modal
+  const renderYearModal = () => {
+    if (!showYearModal || !selectedYearCard) return null;
+
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}
+      >
+        <RNPressable
+          onPress={() => {
+            setShowYearModal(false);
+          }}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}
+        >
+          <Animated.View
+            style={{
+              transform: [
+                { scale: modalAnimScale },
+                { translateY: modalAnimTranslate.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-50, 0],
+                }) }
+              ],
+              opacity: modalAnimOpacity,
+              width: 220,
+            } as any}
+          >
+            <RNPressable 
+              onPress={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <Box
+                bg="rgba(255, 255, 255, 0.95)"
+                borderRadius="$3xl"
+                borderWidth={6}
+                borderColor="rgba(16, 185, 129, 0.1)"
+                h={240}
+                px="$2"
+                py="$2"
+                w={220}
+                justifyContent="center"
+                alignItems="center"
+                sx={{
+                  _dark: {
+                  bg: 'rgba(20, 20, 22, 0.95)',
+                }
+              }}
+            >
+              <VStack
+                alignItems="center"
+                justifyContent="space-between"
+                space="xs"
+                w="$full"
+                flex={1}
+              >
+                {/* Music Icon */}
+                <Box
+                  w={40}
+                  h={40}
+                  bg="$secondary800"
+                  borderRadius="$xl"
+                  justifyContent="center"
+                  alignItems="center"
+                  sx={{
+                    transform: [{ rotate: '3deg' }],
+                    shadowColor: 'rgba(16, 185, 129, 0.3)',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 10,
+                  }}
+                >
+                  <Music size={22} color="#10B981" strokeWidth={1.3} />
+                </Box>
+
+                {/* Year */}
+                <Text
+                  fontSize="$4xl"
+                  fontWeight="900"
+                  italic
+                  color="$secondary900"
+                  textAlign="center"
+                  w="$full"
+                  sx={{
+                    _dark: {
+                      color: '$secondary100',
+                    }
+                  }}
+                >
+                  {selectedYearCard.year}
+                </Text>
+
+                {/* Artist & Title */}
+                <VStack
+                  alignItems="center"
+                  space="xs"
+                  w="$full"
+                >
+                  <Text
+                    fontSize="$xs"
+                    fontWeight="600"
+                    color="$secondary500"
+                    italic
+                    textAlign="center"
+                    numberOfLines={2}
+                    px="$1"
+                    sx={{
+                      _dark: {
+                        color: '$secondary400',
+                      }
+                    }}
+                  >
+                    {selectedYearCard.artist}
+                  </Text>
+                  <Text
+                    fontSize="$2xs"
+                    fontWeight="500"
+                    color="$secondary400"
+                    textAlign="center"
+                    numberOfLines={2}
+                    px="$1"
+                    sx={{
+                      _dark: {
+                        color: '$secondary500',
+                      }
+                    }}
+                  >
+                    "{selectedYearCard.title}"
+                  </Text>
+                </VStack>
+              </VStack>
+            </Box>
+            </RNPressable>
+          </Animated.View>
+        </RNPressable>
+      </View>
     );
   };
 
@@ -467,8 +687,9 @@ export default function DuoGameScreen({
   const effectiveWasCorrect = (wasCorrectOverride !== null ? wasCorrectOverride : wasCorrect);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
+    <View style={{ flex: 1, position: 'relative' }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
         {/* Opponent timeline - överst, kan kollapsa */}
         <Box mt="$2">
           {renderTimeline(players[player1Name === activePlayer ? player2Name : player1Name], false)}
@@ -1091,7 +1312,9 @@ export default function DuoGameScreen({
           </VStack>
         )}
       </AnimatedScrollView>
+      {renderYearModal()}
     </KeyboardAvoidingView>
+    </View>
   );
 }
 
