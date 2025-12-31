@@ -824,7 +824,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
             transform: [{ translateY: headerTranslateY }],
           }}
         >
-          <GameHeader />
+          <GameHeader gameMode={mode === 'duo' ? gameMode : undefined} />
         </Animated.View>
 
         <Box flex={1} position="relative">
