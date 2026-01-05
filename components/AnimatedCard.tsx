@@ -80,6 +80,7 @@ export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = 
           top: 0,
           left: 0,
         } as any}
+        pointerEvents={showBack ? 'auto' : 'none'}
       >
         <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={onFlip || (() => {})} />
       </Animated.View>

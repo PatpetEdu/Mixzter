@@ -821,8 +821,10 @@ const resumeGame = (meta: ActiveGameMeta) => {
             left: 0,
             right: 0,
             zIndex: 1,
+            height: HEADER_HEIGHT,
             transform: [{ translateY: headerTranslateY }],
           }}
+          pointerEvents="box-none"
         >
           <GameHeader gameMode={mode === 'duo' ? gameMode : undefined} />
         </Animated.View>
