@@ -21,6 +21,7 @@ import {
   Box,
   HStack,
 } from '@gluestack-ui/themed';
+import CardSkeleton from './CardSkeleton';
 import * as firebaseAuth from 'firebase/auth';
 
 import PreviewCardFront, { PreviewCardFrontHandle } from './PreviewCardFront';
@@ -289,7 +290,7 @@ export default function SinglePlayerScreen({ onBackToMenu, headerHeight, onScrol
 
           {renderTimeline()}
 
-          {loading && <ActivityIndicator />}
+          {loading && <CardSkeleton />}
           {error ? <Text color="$error600">{error}</Text> : null}
 
           {/* FEEDBACK ovanför kortet */}

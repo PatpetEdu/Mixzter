@@ -5,6 +5,7 @@ import {
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnimatedCard from './AnimatedCard';
+import CardSkeleton from './CardSkeleton';
 import ScoreScreen from './ScoreScreen';
 import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
@@ -699,7 +700,7 @@ export default function DuoGameScreen({
         {renderTimeline(current, true)}
         
         {isLoadingCard ? (
-          <VStack alignItems="center" mt="$4"><ActivityIndicator size="large" /><Text mt="$2">Genererar låt...</Text></VStack>
+          <CardSkeleton />
         ) : errorMessage ? (
           <Text color="$error600">{errorMessage}</Text>
         ) : !card ? (
