@@ -249,6 +249,7 @@ export default function DuoGameScreen({
         id: gameId,
         player1Name: player1Name, // ⬅️ Uppdaterat
         player2Name: player2Name, // ⬅️ Uppdaterat
+        gameMode: gameMode, // 🔸 NYTT: Spara game mode
         players: players as any,
         activePlayer,
         roundCards,

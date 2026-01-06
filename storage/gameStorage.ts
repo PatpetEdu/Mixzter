@@ -23,6 +23,7 @@ export type SavedDuoGameState = {
   id: string;
   player1Name: string;
   player2Name: string;
+  gameMode: string;  // 🔸 NYTT: Spara det aktuella game mode
   players: { [key: string]: Player };
   activePlayer: string;
   roundCards: Card[];
@@ -44,6 +45,7 @@ export type ActiveGameMeta = {
   id: string;
   player1: string;
   player2: string;
+  gameMode: string;  // 🔸 NYTT: Spara game mode i metadata
   p1Score: number;
   p2Score: number;
   updatedAt: number;
@@ -87,6 +89,7 @@ export async function saveActiveGame(uid: string, state: SavedDuoGameState): Pro
     id: state.id,
     player1: state.player1Name,
     player2: state.player2Name,
+    gameMode: state.gameMode, // 🔸 NYTT: Spara game mode
     p1Score,
     p2Score,
     updatedAt: state.updatedAt,

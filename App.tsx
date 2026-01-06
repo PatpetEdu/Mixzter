@@ -290,9 +290,7 @@ const startDuoGame = (player1Name: string, player2Name: string, selectedMode: st
 const resumeGame = (meta: ActiveGameMeta) => {
     setActiveGameId(meta.id);
     setPlayers({ player1Name: meta.player1, player2Name: meta.player2 });
-    // Här skulle man kunna spara gameMode i activeGames-metadatan i framtiden
-    // För nu antar vi default eller hanterar det senare
-    setGameMode('default'); 
+    setGameMode(meta.gameMode); // 🔸 NYTT: Använd sparad game mode
     setMode('duo');
   };
 
