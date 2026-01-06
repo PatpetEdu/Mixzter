@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { KeyboardAvoidingView, Platform, TextInput, NativeSyntheticEvent, NativeScrollEvent, Animated, ScrollView, Pressable } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { VStack, Input, InputField, Button, ButtonText, Center, Text, HStack, Box } from '@gluestack-ui/themed';
-import { UserPlus, PlayCircle, Music2, Globe, Disc, Star, Film, Sparkles } from 'lucide-react-native';
+import { UserPlus, PlayCircle, Music2, Globe, Disc, Star, Film, Sparkles, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 type Props = {
  onStart: (player1: string, player2: string, gameMode: string) => void;
@@ -9,15 +10,20 @@ type Props = {
   headerHeight: number;
 };
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 // Kategorier med ikoner
 const GAME_MODES = [
-  { id: 'default', label: 'Blandat 1950-2025', icon: Music2 },
-  { id: 'svenska', label: 'Svenska Hits 1960-2025', icon: Globe },
-  { id: 'eurovision', label: 'Eurovision 1956-2025', icon: Star },
-  { id: 'rock', label: 'Rock/Metal 1960-2025', icon: Disc },
+  { id: 'default', label: `Blandat 1950-${CURRENT_YEAR}`, icon: Music2 },
+  { id: 'svenska', label: `Svenska Hits 1960-${CURRENT_YEAR}`, icon: Globe },
+  { id: 'eurovision', label: `Eurovision 1956-${CURRENT_YEAR}`, icon: Star },
+  { id: 'rock', label: `Rock/Metal 1960-${CURRENT_YEAR}`, icon: Disc },
   { id: 'onehitwonder', label: 'One Hit Wonders 1970-2015', icon: PlayCircle },
-  { id: 'filmmusik', label: 'Film & TV Musik 1950-2025', icon: Film },
-  { id: 'disney', label: 'Disney Klassiker 1937-2025', icon: Sparkles },
+  { id: 'filmmusik', label: `Film & TV Musik 1950-${CURRENT_YEAR}`, icon: Film },
+  { id: 'disney', label: `Disney Klassiker 1937-${CURRENT_YEAR}`, icon: Sparkles },
+  { id: 'melodifestivalen', label: `Melodifestivalen 1958-${CURRENT_YEAR}`, icon: Star },
+  { id: 'kpop', label: `K-POP 2000-${CURRENT_YEAR}`, icon: Music2 },
+  { id: 'eightiesnineties', label: '80s & 90s Hits 1980-1999', icon: Disc },
 ];
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
@@ -27,6 +33,14 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
   const [player2, setPlayer2] = useState('');
   const [selectedMode, setSelectedMode] = useState('default');
   const [error, setError] = useState('');
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleScrollCategories = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const isBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 10;
+    setIsScrolledToBottom(isBottom);
+  };
 
   const handleStart = () => {
     if (!player1.trim() || !player2.trim()) {
@@ -177,7 +191,7 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
               </HStack>
             </VStack>
 
-            {/* Category Selection */}
+            {/* Category Selection - Scrollable */}
             <VStack space="md">
               <Text
                 fontSize="$xs"
@@ -189,72 +203,104 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
               >
                 SELECT CATEGORY
               </Text>
-              <VStack space="sm">
-                {GAME_MODES.map((mode) => {
-                  const IconComponent = mode.icon;
-                  const isSelected = selectedMode === mode.id;
-                  
-                  return (
-                    <Pressable
-                      key={mode.id}
-                      onPress={() => setSelectedMode(mode.id)}
-                    >
-                      <Box
-                        flexDirection="row"
-                        alignItems="center"
-                        p="$4"
-                        rounded="$2xl"
-                        borderWidth={2}
-                        borderColor={isSelected ? '$emerald500' : '$backgroundLight100'}
-                        bg="$backgroundLight50"
-                        sx={{
-                          _dark: {
-                            borderColor: isSelected ? '$emerald500' : '$backgroundDark800',
-                            bg: '$backgroundDark950',
-                          },
-                        }}
-                      >
-                        <Box
-                          w="$6"
-                          h="$6"
-                          rounded="$md"
-                          justifyContent="center"
-                          alignItems="center"
-                          bg="$backgroundLight200"
-                          sx={{
-                            _dark: {
-                              bg: '$backgroundDark800',
-                            },
-                          }}
+              <Box position="relative">
+                <ScrollView 
+                  ref={scrollViewRef}
+                  scrollEventThrottle={16}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled={true}
+                  onScroll={handleScrollCategories}
+                  style={{ maxHeight: 280 }}
+                >
+                  <VStack space="sm">
+                    {GAME_MODES.map((mode) => {
+                      const IconComponent = mode.icon;
+                      const isSelected = selectedMode === mode.id;
+                      
+                      return (
+                        <Pressable
+                          key={mode.id}
+                          onPress={() => setSelectedMode(mode.id)}
                         >
-                          <IconComponent size={20} color="#059669" />
-                        </Box>
-                        <VStack space="xs" ml="$4" flex={1}>
-                          <Text
-                            fontWeight="bold"
-                            fontSize="$sm"
+                          <Box
+                            flexDirection="row"
+                            alignItems="center"
+                            p="$4"
+                            rounded="$2xl"
+                            borderWidth={2}
+                            borderColor={isSelected ? '$emerald500' : '$backgroundLight100'}
+                            bg="$backgroundLight50"
                             sx={{
                               _dark: {
-                                color: '$textDark100',
-                              }
+                                borderColor: isSelected ? '$emerald500' : '$backgroundDark800',
+                                bg: '$backgroundDark950',
+                              },
                             }}
                           >
-                            {mode.label}
-                          </Text>
-                        </VStack>
-                        {isSelected && (
-                          <Box
-                            w="$2"
-                            h="$2"
-                            rounded="$full"
-                            bg="$emerald500"
-                          />
-                        )}
-                      </Box>
-                    </Pressable>
-                  );
-                })}
-              </VStack>
+                            <Box
+                              w="$6"
+                              h="$6"
+                              rounded="$md"
+                              justifyContent="center"
+                              alignItems="center"
+                              bg="$backgroundLight200"
+                              sx={{
+                                _dark: {
+                                  bg: '$backgroundDark800',
+                                },
+                              }}
+                            >
+                              <IconComponent size={20} color="#059669" />
+                            </Box>
+                            <VStack space="xs" ml="$4" flex={1}>
+                              <Text
+                                fontWeight="bold"
+                                fontSize="$sm"
+                                sx={{
+                                  _dark: {
+                                    color: '$textDark100',
+                                  }
+                                }}
+                              >
+                                {mode.label}
+                              </Text>
+                            </VStack>
+                            {isSelected && (
+                              <Box
+                                w="$2"
+                                h="$2"
+                                rounded="$full"
+                                bg="$emerald500"
+                              />
+                            )}
+                          </Box>
+                        </Pressable>
+                      );
+                    })}
+                  </VStack>
+                </ScrollView>
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.2)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 50,
+                    pointerEvents: 'none',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  {isScrolledToBottom ? (
+                    <ChevronUp size={20} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
+                  ) : (
+                    <ChevronDown size={20} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
+                  )}
+                </LinearGradient>
+              </Box>
             </VStack>
 
             {/* Error Message */}

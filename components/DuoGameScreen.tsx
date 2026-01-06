@@ -154,6 +154,7 @@ export default function DuoGameScreen({
   } = useDuoGameLogic({
     player1Name: player1Name,
     player2Name: player2Name,
+    gameMode: gameMode,
     onNewCardNeeded: () => {
       setCard(null);
       resetInputs();

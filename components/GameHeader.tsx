@@ -9,14 +9,19 @@ type Props = {
   gameMode?: string;
 };
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 const GAME_MODE_LABELS: Record<string, string> = {
-  default: 'Blandat 1950-2025',
-  svenska: 'Svenska Hits 1960-2025',
-  eurovision: 'Eurovision 1956-2025',
-  rock: 'Rock/Metal 1960-2025',
+  default: `Blandat 1950-${CURRENT_YEAR}`,
+  svenska: `Svenska Hits 1960-${CURRENT_YEAR}`,
+  eurovision: `Eurovision 1956-${CURRENT_YEAR}`,
+  rock: `Rock/Metal 1960-${CURRENT_YEAR}`,
   onehitwonder: 'One Hit Wonders 1970-2015',
-  filmmusik: 'Film & TV Musik 1950-2025',
-  disney: 'Disney Klassiker 1937-2025',
+  filmmusik: `Film & TV Musik 1950-${CURRENT_YEAR}`,
+  disney: `Disney Klassiker 1937-${CURRENT_YEAR}`,
+  melodifestivalen: `Melodifestivalen 1958-${CURRENT_YEAR}`,
+  kpop: `K-POP 2000-${CURRENT_YEAR}`,
+  eightiesnineties: '80s & 90s Hits 1980-1999',
 };
 
 export default function GameHeader({ gameMode }: Props) {

@@ -19,23 +19,40 @@ type Player = {
 // Konstanter för spelets regler
 const WINNING_SCORE = 10;
 const MAX_STARS = 5;
+const CURRENT_YEAR = new Date().getFullYear();
 
-// Funktion för att skapa ett startår
-function getRandomYear() {
-  return Math.floor(Math.random() * (2025 - 1950 + 1)) + 1950;
+// Mappning av game modes till deras årintervall
+const GAME_MODE_YEARS: Record<string, { start: number; end: number }> = {
+  default: { start: 1950, end: CURRENT_YEAR },
+  svenska: { start: 1960, end: CURRENT_YEAR },
+  eurovision: { start: 1956, end: CURRENT_YEAR },
+  rock: { start: 1960, end: CURRENT_YEAR },
+  onehitwonder: { start: 1970, end: 2015 },
+  filmmusik: { start: 1950, end: CURRENT_YEAR },
+  disney: { start: 1937, end: CURRENT_YEAR },
+  melodifestivalen: { start: 1958, end: CURRENT_YEAR },
+  kpop: { start: 2000, end: CURRENT_YEAR },
+  eightiesnineties: { start: 1980, end: 1999 },
+};
+
+// Funktion för att skapa ett startår baserat på game mode
+function getRandomYear(gameMode: string = 'default') {
+  const years = GAME_MODE_YEARS[gameMode] || GAME_MODE_YEARS['default'];
+  return Math.floor(Math.random() * (years.end - years.start + 1)) + years.start;
 }
 
 // Props för vår hook
 type UseDuoGameLogicProps = {
   player1Name: string;
   player2Name: string;
+  gameMode?: string;
   onNewCardNeeded: () => void; // Anropas när ett nytt kort behövs
 };
 
-export function useDuoGameLogic({ player1Name, player2Name, onNewCardNeeded }: UseDuoGameLogicProps) {
+export function useDuoGameLogic({ player1Name, player2Name, gameMode = 'default', onNewCardNeeded }: UseDuoGameLogicProps) {
   const [players, setPlayers] = useState<{ [key: string]: Player }>({
-    [player1Name]: { name: player1Name, startYear: getRandomYear(), timeline: [], cards: [], stars: 1 },
-    [player2Name]: { name: player2Name, startYear: getRandomYear(), timeline: [], cards: [], stars: 1 },
+    [player1Name]: { name: player1Name, startYear: getRandomYear(gameMode), timeline: [], cards: [], stars: 1 },
+    [player2Name]: { name: player2Name, startYear: getRandomYear(gameMode), timeline: [], cards: [], stars: 1 },
   });
   const [activePlayer, setActivePlayer] = useState(player1Name);
   const [roundCards, setRoundCards] = useState<Card[]>([]);

@@ -38,6 +38,7 @@ type Card = {
   spotifyUrl: string;
 };
 
+const CURRENT_YEAR = new Date().getFullYear();
 const MAX_USER_SEEN_SONGS_HISTORY = 500;
 // *** FIX: Sänkt till 5 eftersom prompten nu är mycket mer effektiv ***
 const MAX_OPENAI_TRIES = 5;
@@ -58,20 +59,26 @@ const getUidFromRequest = async (req: Request): Promise<string | null> => {
   }
 };
 const PROMPTS: Record<string, string> = {
-  default: `Välj en **enbart en enda låt** som är slumpmässig, populär eller kulturellt betydelsefull från perioden **1950 till 2025**.
+  default: `Välj en **enbart en enda låt** som är slumpmässig, populär eller kulturellt betydelsefull från perioden **1950 till ${CURRENT_YEAR}**.
     Föredra låtar på engelska, men andra språk är också acceptabla om de är kända globalt.`,
   
-  svenska: `Välj en **svensk låt** (sjungs på svenska eller av en mycket känd svensk artist) som är en klassiker, hit eller allsångsfavorit från **1960 till 2025**.`,
+  svenska: `Välj en **svensk låt** (sjungs på svenska eller av en mycket känd svensk artist) som är en klassiker, hit eller allsångsfavorit från **1960 till ${CURRENT_YEAR}**.`,
   
-  eurovision: `Välj en låt som har tävlat i **Eurovision Song Contest** (oavsett land och placering) mellan **1956 och 2025**. Det ska vara en låt som många känner igen.`,
+  eurovision: `Välj en låt som har tävlat i **Eurovision Song Contest** (oavsett land och placering) mellan **1956 och ${CURRENT_YEAR}**. Det ska vara en låt som många känner igen.`,
   
-  rock: `Välj en låt inom genrerna **Rock, Hårdrock, Metal eller Punk** från perioden **1960 till 2025**. Det ska vara en känd låt inom genren.`,
+  rock: `Välj en låt inom genrerna **Rock, Hårdrock, Metal eller Punk** från perioden **1960 till ${CURRENT_YEAR}**. Det ska vara en känd låt inom genren.`,
   
   onehitwonder: `Välj en klassisk **One Hit Wonder** (artisten är främst känd för just denna låt) från **1970 till 2015**.`,
   
-  filmmusik: `Välj en låt från en **film, TV-serie eller musikal** från **1950 till 2025**. Det kan vara en låt från soundtracken eller en känd tema-låt. Det ska vara en välkänd låt.`,
+  filmmusik: `Välj en låt från en **film, TV-serie eller musikal** från **1950 till ${CURRENT_YEAR}**. Det kan vara en låt från soundtracken eller en känd tema-låt. Det ska vara en välkänd låt.`,
   
-  disney: `Välj en **Disney-låt** från någon av Disneys animerade eller livefilmer från **1937 till 2025**. Det ska vara en populär låt från en Disney-klassiker eller nyare Disney-film.`,
+  disney: `Välj en **Disney-låt** från någon av Disneys animerade eller livefilmer från **1937 till ${CURRENT_YEAR}**. Det ska vara en populär låt från en Disney-klassiker eller nyare Disney-film.`,
+
+  melodifestivalen: `Välj en låt som har tävlat i **Melodifestivalen** (Sverige) mellan **1958 och ${CURRENT_YEAR}**. Det ska vara en känd låt från tävlingen, gärna en vinnare eller finalist.`,
+
+  kpop: `Välj en **K-POP låt** (skapad av en sydkoreansk artist) från **2000 till ${CURRENT_YEAR}**. Det ska vara en välkänd K-POP-låt som många känner till globalt.`,
+
+  eightiesnineties: `Välj en populär och välkänd låt från genrer som Pop, Rock, Hip-Hop eller Dance från **1980 till 1999**. Det ska vara en klassiker från åttionde eller nittioende årtiondet.`,
 };
 
 export const generateCard = onRequest(
