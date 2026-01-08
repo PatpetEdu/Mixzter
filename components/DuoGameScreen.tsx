@@ -692,9 +692,9 @@ export default function DuoGameScreen({
   return (
     <View style={{ flex: 1, position: 'relative' }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight }]} onScroll={onScroll} scrollEventThrottle={16}>
+        <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight + 5 }]} onScroll={onScroll} scrollEventThrottle={16}>
         {/* Opponent timeline - överst, kan kollapsa */}
-        <Box mt="$2">
+       <Box mt="$3">
           {renderTimeline(players[player1Name === activePlayer ? player2Name : player1Name], false)}
         </Box>
         
