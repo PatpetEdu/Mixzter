@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { KeyboardAvoidingView, Platform, TextInput, NativeSyntheticEvent, NativeScrollEvent, Animated, ScrollView, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VStack, Input, InputField, Button, ButtonText, Center, Text, HStack, Box } from '@gluestack-ui/themed';
@@ -37,6 +37,13 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Rensa felmeddelande när användaren ändrar något
+  useEffect(() => {
+    if (error) {
+      setError('');
+    }
+  }, [player1, player2]);
+
   const handleScrollCategories = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const isBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 10;
@@ -45,7 +52,11 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
 
   const handleStart = () => {
     if (!player1.trim() || !player2.trim()) {
-      setError('Ange namn för båda spelarna.');
+      setError('Please enter names for both players.');
+      return;
+    }
+    if (player1.trim().toLowerCase() === player2.trim().toLowerCase()) {
+      setError('Players cannot have the same name.');
       return;
     }
     setError('');
@@ -314,11 +325,11 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
                 borderLeftColor="$error500"
               >
                 <Text
-                  color="$error700"
+                  color="$white"
                   fontWeight="bold"
                   textAlign="center"
                   sx={{
-                    _dark: { color: '$error500' }
+                    _dark: { color: '$white' }
                   }}
                 >
                   {error}

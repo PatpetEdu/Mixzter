@@ -108,6 +108,8 @@ export default function DuoGameScreen({
   const [selectedYearCard, setSelectedYearCard] = useState<Card | null>(null);
   const [showYearModal, setShowYearModal] = useState(false);
   const [yearPosition, setYearPosition] = useState({ x: 0, y: 0 });
+  const [carouselCards, setCarouselCards] = useState<Card[]>([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const modalAnimScale = React.useRef(new Animated.Value(0.3)).current;
   const modalAnimOpacity = React.useRef(new Animated.Value(0)).current;
   const modalAnimTranslate = React.useRef(new Animated.Value(1)).current;
@@ -119,22 +121,22 @@ export default function DuoGameScreen({
 
   // Funktion för att öppna modal med kort
   const handleYearPress = (player: Player, year: number, event?: any) => {
-    // Försök hitta kortet från roundCards först (preliminära kort)
-    let cardForYear: Card | undefined = roundCards.find(c => c.year === year);
+    // Samla alla kort för detta år (både preliminära och sparade)
+    const cardsForYear = [
+      ...roundCards.filter(c => c.year === year),
+      ...player.cards.filter(c => c.year === year && !roundCards.some(rc => rc.year === year && rc.artist === c.artist && rc.title === c.title))
+    ];
     
-    // Om inte hittat i roundCards, försök från player.cards
-    if (!cardForYear) {
-      cardForYear = findCardByYear(player, year) || undefined;
-    }
-    
-    // Visa modal endast om vi hittar kortet
-    if (cardForYear) {
+    // Visa modal endast om vi hittar kortet(en)
+    if (cardsForYear.length > 0) {
       // Spara position från event om tillgänglig
       if (event?.nativeEvent?.pageX && event?.nativeEvent?.pageY) {
         setYearPosition({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
       }
       
-      setSelectedYearCard(cardForYear);
+      setCarouselCards(cardsForYear);
+      setCarouselIndex(0);
+      setSelectedYearCard(cardsForYear[0]);
       setShowYearModal(true);
       
       // Starta animationen
@@ -538,24 +540,24 @@ export default function DuoGameScreen({
             // Bestäm om kortet har data och kan vara klickbart
             const hasCardData = roundCards.some(c => c.year === year) || findCardByYear(player, year);
             
-            // Bestäm färg baserat på status
-            let borderColor = 'rgba(100, 100, 110, 0.2)'; // Default grå
-            let bgColor = 'rgba(100, 100, 110, 0.05)';
-            let textColor = '$secondary600';
-            let textColorDark = '$secondary400';
+            // Bestäm färg baserat på status - förbättrad kontrast
+            let borderColor = 'rgba(100, 100, 110, 0.3)';
+            let bgColor = 'rgba(100, 100, 110, 0.08)';
+            let textColor = '$secondary700';
+            let textColorDark = '$secondary300';
             
             if (isPrelim && !isEarned) {
               // Preliminärt kort (orange - visar "ej sparad än")
-              borderColor = 'rgba(251, 146, 60, 0.5)';
-              bgColor = 'rgba(251, 146, 60, 0.1)';
-              textColor = '$orange600';
-              textColorDark = '$orange400';
+              borderColor = 'rgba(251, 146, 60, 0.7)';
+              bgColor = 'rgba(251, 146, 60, 0.15)';
+              textColor = '$orange700';
+              textColorDark = '$orange300';
             } else if (isEarned) {
               // Intjänat kort (grönt - sparad och säker)
-              borderColor = 'rgba(16, 185, 129, 0.3)';
-              bgColor = 'rgba(16, 185, 129, 0.1)';
-              textColor = '$emerald600';
-              textColorDark = '$emerald400';
+              borderColor = 'rgba(16, 185, 129, 0.6)';
+              bgColor = 'rgba(16, 185, 129, 0.15)';
+              textColor = '$emerald700';
+              textColorDark = '$emerald300';
             }
             
             return (
@@ -606,6 +608,18 @@ export default function DuoGameScreen({
   // 🎵 Render Year Card Modal
   const renderYearModal = () => {
     if (!showYearModal || !selectedYearCard) return null;
+
+    const handlePrevCard = () => {
+      const newIndex = carouselIndex === 0 ? carouselCards.length - 1 : carouselIndex - 1;
+      setCarouselIndex(newIndex);
+      setSelectedYearCard(carouselCards[newIndex]);
+    };
+
+    const handleNextCard = () => {
+      const newIndex = carouselIndex === carouselCards.length - 1 ? 0 : carouselIndex + 1;
+      setCarouselIndex(newIndex);
+      setSelectedYearCard(carouselCards[newIndex]);
+    };
 
     return (
       <View
@@ -743,6 +757,49 @@ export default function DuoGameScreen({
                     "{selectedYearCard.title}"
                   </Text>
                 </VStack>
+
+                {/* Carousel Navigation */}
+                {carouselCards.length > 1 && (
+                  <VStack space="sm" w="$full" alignItems="center">
+                    {/* Indicator */}
+                    <Text fontSize="$2xs" color="$secondary500" sx={{ _dark: { color: '$secondary400' } }} fontWeight="600">
+                      {carouselIndex + 1} / {carouselCards.length}
+                    </Text>
+                    {/* Navigation Buttons */}
+                    <HStack space="md" w="$full" justifyContent="center">
+                      <Pressable
+                        onPress={handlePrevCard}
+                        bg="$secondary800"
+                        borderRadius="$lg"
+                        px="$3"
+                        py="$2"
+                        sx={{
+                          _pressed: {
+                            bg: 'rgba(60, 60, 70, 1)',
+                            transform: [{ scale: 0.9 }],
+                          }
+                        }}
+                      >
+                        <Text fontSize="$sm" fontWeight="900" color="$white">←</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleNextCard}
+                        bg="$secondary800"
+                        borderRadius="$lg"
+                        px="$3"
+                        py="$2"
+                        sx={{
+                          _pressed: {
+                            bg: 'rgba(60, 60, 70, 1)',
+                            transform: [{ scale: 0.9 }],
+                          }
+                        }}
+                      >
+                        <Text fontSize="$sm" fontWeight="900" color="$white">→</Text>
+                      </Pressable>
+                    </HStack>
+                  </VStack>
+                )}
               </VStack>
             </Box>
             </RNPressable>
