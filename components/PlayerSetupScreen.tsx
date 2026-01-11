@@ -20,7 +20,7 @@ const GAME_MODES = [
   { id: 'rock', label: `Rock/Metal 1960-${CURRENT_YEAR}`, icon: Disc },
   { id: 'onehitwonder', label: 'One Hit Wonders 1970-2015', icon: PlayCircle },
   { id: 'filmmusik', label: `Film & TV Musik 1950-${CURRENT_YEAR}`, icon: Film },
-  { id: 'disney', label: `Disney Klassiker 1937-${CURRENT_YEAR}`, icon: Sparkles },
+  { id: 'disney', label: `Disney & Animerat 1937-${CURRENT_YEAR}`, icon: Sparkles },
   { id: 'melodifestivalen', label: `Melodifestivalen 1958-${CURRENT_YEAR}`, icon: Star },
   { id: 'kpop', label: `K-POP 2000-${CURRENT_YEAR}`, icon: Music2 },
   { id: 'eightiesnineties', label: '80s & 90s Hits 1980-1999', icon: Disc },

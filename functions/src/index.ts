@@ -111,20 +111,6 @@ function titleMatches(found: string, want: string): boolean {
   return tokenOverlap(f, w) >= 0.6;
 }
 
-function scoreMatch(m: SearchMatch, wantArtist: string, wantTitle: string, wantYear?: number): number {
-  let score = 0;
-  if (artistMatches(m.matchedArtist, wantArtist)) score += 10;
-  if (titleMatches(m.matchedTitle, wantTitle)) score += 10;
-  if (!artistMatches(m.matchedArtist, wantArtist) && titleMatches(m.matchedTitle, wantTitle)) score -= 5;
-  if (wantYear && m.yearGuess) {
-    const diff = Math.abs(m.yearGuess - wantYear);
-    if (diff <= 1) score += 4;
-    else if (diff <= 3) score += 2;
-    else if (diff <= 6) score += 1;
-  }
-  return score;
-}
-
 async function searchApple(artist: string, title: string, wantYear?: number): Promise<SearchMatch | null> {
   try {
     const { data } = await axios.get('https://itunes.apple.com/search', {
@@ -132,8 +118,12 @@ async function searchApple(artist: string, title: string, wantYear?: number): Pr
       timeout: 10000,
     });
     const results: any[] = Array.isArray(data?.results) ? data.results : [];
+    
+    // Filter out remixes, covers, live versions, etc.
+    const excludePatterns = /remix|cover|live|acoustic|version|remaster|edit|alternate|karaoke/i;
+    
     const candidates: SearchMatch[] = results
-      .filter((r) => r?.previewUrl)
+      .filter((r) => r?.previewUrl && !excludePatterns.test(r.trackName || ''))
       .map((r) => ({
         previewUrl: String(r.previewUrl),
         externalUrl: String(r.trackViewUrl || r.collectionViewUrl || ''),
@@ -144,10 +134,14 @@ async function searchApple(artist: string, title: string, wantYear?: number): Pr
         yearGuess: r?.releaseDate ? Number(String(r.releaseDate).slice(0, 4)) : undefined,
       }));
     if (candidates.length === 0) return null;
-    const ranked = candidates.map((c) => ({ c, s: scoreMatch(c, artist, title, wantYear) })).sort((a, b) => b.s - a.s);
-    const best = ranked[0];
-    if (!artistMatches(best.c.matchedArtist, artist) || !titleMatches(best.c.matchedTitle, title)) return null;
-    return best.c;
+    
+    // Take first exact match instead of scoring all
+    for (const c of candidates) {
+      if (artistMatches(c.matchedArtist, artist) && titleMatches(c.matchedTitle, title)) {
+        return c;
+      }
+    }
+    return null;
   } catch (e) {
     logger.warn('searchApple error', e);
     return null;
@@ -161,8 +155,12 @@ async function searchDeezer(artist: string, title: string, wantYear?: number): P
       timeout: 10000,
     });
     const arr: any[] = Array.isArray(data?.data) ? data.data : [];
+    
+    // Filter out remixes, covers, live versions, etc.
+    const excludePatterns = /remix|cover|live|acoustic|version|remaster|edit|alternate|karaoke/i;
+    
     const candidates: SearchMatch[] = arr
-      .filter((d) => d?.preview)
+      .filter((d) => d?.preview && !excludePatterns.test(d.title || ''))
       .map((d) => ({
         previewUrl: String(d.preview),
         externalUrl: String(d.link || (d.id ? `https://www.deezer.com/track/${d.id}` : '')),
@@ -173,10 +171,14 @@ async function searchDeezer(artist: string, title: string, wantYear?: number): P
         yearGuess: d?.release_date ? Number(String(d.release_date).slice(0, 4)) : undefined,
       }));
     if (candidates.length === 0) return null;
-    const ranked = candidates.map((c) => ({ c, s: scoreMatch(c, artist, title, wantYear) })).sort((a, b) => b.s - a.s);
-    const best = ranked[0];
-    if (!artistMatches(best.c.matchedArtist, artist) || !titleMatches(best.c.matchedTitle, title)) return null;
-    return best.c;
+    
+    // Take first exact match instead of scoring all
+    for (const c of candidates) {
+      if (artistMatches(c.matchedArtist, artist) && titleMatches(c.matchedTitle, title)) {
+        return c;
+      }
+    }
+    return null;
   } catch (e) {
     logger.warn('searchDeezer error', e);
     return null;
