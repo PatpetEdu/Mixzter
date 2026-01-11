@@ -36,6 +36,13 @@ type Card = {
   artist: string;
   year: number;
   spotifyUrl: string;
+  source?: string;
+  previewData?: {
+    previewUrl: string;
+    artworkUrl?: string;
+    externalUrl: string;
+    previewProvider: 'itunes' | 'deezer';
+  };
 };
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -43,6 +50,138 @@ const MAX_USER_SEEN_SONGS_HISTORY = 500;
 // *** FIX: Sänkt till 5 eftersom prompten nu är mycket mer effektiv ***
 const MAX_OPENAI_TRIES = 5;
 const MAX_SPOTIFY_SEARCH_ATTEMPTS = 3;
+
+// ====================
+// Apple/Deezer Search Types & Helpers
+// ====================
+type SearchMatch = {
+  previewUrl: string;
+  externalUrl: string;
+  artworkUrl?: string;
+  matchedArtist: string;
+  matchedTitle: string;
+  source: 'itunes' | 'deezer';
+  yearGuess?: number;
+};
+
+function normalize(s: string): string {
+  return (s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/[-_:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeTitleForMatch(title: string): string {
+  const t = normalize(title)
+    .replace(/\b(remix|remastered|radio edit|karaoke|tribute|cover|version|edit|extended|club mix|live)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t;
+}
+
+function tokens(s: string): Set<string> {
+  return new Set(normalize(s).split(' ').filter((w) => w.length > 1));
+}
+
+function tokenOverlap(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  a.forEach((t) => { if (b.has(t)) inter++; });
+  return inter / Math.max(a.size, b.size);
+}
+
+function artistMatches(found: string, want: string): boolean {
+  const f = tokens(found);
+  const w = tokens(want);
+  const overlap = tokenOverlap(f, w);
+  if (overlap >= 0.5) return true;
+  const fn = normalize(found), wn = normalize(want);
+  return fn.includes(wn) || wn.includes(fn);
+}
+
+function titleMatches(found: string, want: string): boolean {
+  const fn = normalizeTitleForMatch(found);
+  const wn = normalizeTitleForMatch(want);
+  if (fn === wn) return true;
+  const f = tokens(fn), w = tokens(wn);
+  return tokenOverlap(f, w) >= 0.6;
+}
+
+function scoreMatch(m: SearchMatch, wantArtist: string, wantTitle: string, wantYear?: number): number {
+  let score = 0;
+  if (artistMatches(m.matchedArtist, wantArtist)) score += 10;
+  if (titleMatches(m.matchedTitle, wantTitle)) score += 10;
+  if (!artistMatches(m.matchedArtist, wantArtist) && titleMatches(m.matchedTitle, wantTitle)) score -= 5;
+  if (wantYear && m.yearGuess) {
+    const diff = Math.abs(m.yearGuess - wantYear);
+    if (diff <= 1) score += 4;
+    else if (diff <= 3) score += 2;
+    else if (diff <= 6) score += 1;
+  }
+  return score;
+}
+
+async function searchApple(artist: string, title: string, wantYear?: number): Promise<SearchMatch | null> {
+  try {
+    const { data } = await axios.get('https://itunes.apple.com/search', {
+      params: { term: `${artist} ${title}`.trim(), media: 'music', entity: 'song', limit: 10 },
+      timeout: 10000,
+    });
+    const results: any[] = Array.isArray(data?.results) ? data.results : [];
+    const candidates: SearchMatch[] = results
+      .filter((r) => r?.previewUrl)
+      .map((r) => ({
+        previewUrl: String(r.previewUrl),
+        externalUrl: String(r.trackViewUrl || r.collectionViewUrl || ''),
+        artworkUrl: String(r.artworkUrl600 || r.artworkUrl250 || r.artworkUrl170 || r.artworkUrl100 || r.artworkUrl60 || ''),
+        matchedArtist: String(r.artistName || ''),
+        matchedTitle: String(r.trackName || ''),
+        source: 'itunes' as const,
+        yearGuess: r?.releaseDate ? Number(String(r.releaseDate).slice(0, 4)) : undefined,
+      }));
+    if (candidates.length === 0) return null;
+    const ranked = candidates.map((c) => ({ c, s: scoreMatch(c, artist, title, wantYear) })).sort((a, b) => b.s - a.s);
+    const best = ranked[0];
+    if (!artistMatches(best.c.matchedArtist, artist) || !titleMatches(best.c.matchedTitle, title)) return null;
+    return best.c;
+  } catch (e) {
+    logger.warn('searchApple error', e);
+    return null;
+  }
+}
+
+async function searchDeezer(artist: string, title: string, wantYear?: number): Promise<SearchMatch | null> {
+  try {
+    const { data } = await axios.get('https://api.deezer.com/search', {
+      params: { q: `${artist} ${title}`.trim(), limit: 10 },
+      timeout: 10000,
+    });
+    const arr: any[] = Array.isArray(data?.data) ? data.data : [];
+    const candidates: SearchMatch[] = arr
+      .filter((d) => d?.preview)
+      .map((d) => ({
+        previewUrl: String(d.preview),
+        externalUrl: String(d.link || (d.id ? `https://www.deezer.com/track/${d.id}` : '')),
+        artworkUrl: String(d.album?.cover_medium || d.album?.cover || ''),
+        matchedArtist: String(d.artist?.name || ''),
+        matchedTitle: String(d.title || d.title_short || ''),
+        source: 'deezer' as const,
+        yearGuess: d?.release_date ? Number(String(d.release_date).slice(0, 4)) : undefined,
+      }));
+    if (candidates.length === 0) return null;
+    const ranked = candidates.map((c) => ({ c, s: scoreMatch(c, artist, title, wantYear) })).sort((a, b) => b.s - a.s);
+    const best = ranked[0];
+    if (!artistMatches(best.c.matchedArtist, artist) || !titleMatches(best.c.matchedTitle, title)) return null;
+    return best.c;
+  } catch (e) {
+    logger.warn('searchDeezer error', e);
+    return null;
+  }
+}
 
 const getUidFromRequest = async (req: Request): Promise<string | null> => {
   if (!req.headers.authorization || !req.headers.authorization.startsWith("Bearer ")) {
@@ -72,13 +211,15 @@ const PROMPTS: Record<string, string> = {
   
   filmmusik: `Välj en låt från en **film, TV-serie eller musikal** från **1950 till ${CURRENT_YEAR}**. Det kan vara en låt från soundtracken eller en känd tema-låt. Det ska vara en välkänd låt.`,
   
-  disney: `Välj en **Disney-låt** från någon av Disneys animerade eller livefilmer från **1937 till ${CURRENT_YEAR}**. Det ska vara en populär låt från en Disney-klassiker eller nyare Disney-film.`,
+  disney: `Välj en populär animerad filmmusik från **Disney, Pixar eller DreamWorks Animation** från **1937 till ${CURRENT_YEAR}**. Det ska vara en välkänd låt från en klassisk eller modern animerad film.`,
 
   melodifestivalen: `Välj en låt som har tävlat i **Melodifestivalen** (Sverige) mellan **1958 och ${CURRENT_YEAR}**. Det ska vara en känd låt från tävlingen, gärna en vinnare eller finalist.`,
 
   kpop: `Välj en **K-POP låt** (skapad av en sydkoreansk artist) från **2000 till ${CURRENT_YEAR}**. Det ska vara en välkänd K-POP-låt som många känner till globalt.`,
 
   eightiesnineties: `Välj en populär och välkänd låt från genrer som Pop, Rock, Hip-Hop eller Dance från **1980 till 1999**. Det ska vara en klassiker från åttionde eller nittioende årtiondet.`,
+
+  modernahits: `Välj en populär och välkänd låt från **2005 till ${CURRENT_YEAR}**. Det kan vara från genrer som Pop, Rock, Hip-Hop, R&B eller Dance. Det ska vara en hits som många känner igen från denna period.`,
 };
 
 export const generateCard = onRequest(
@@ -117,6 +258,20 @@ export const generateCard = onRequest(
 
       while (!finalSong && openAITries < MAX_OPENAI_TRIES) {
         // 👇 HÄR BYGGER VI DEN DYNAMISKA PROMPTEN
+        const isSourceMode = gameMode === 'filmmusik' || gameMode === 'disney';
+        const jsonFormatExample = isSourceMode 
+          ? `{
+  "artist": "Artistens namn",
+  "title": "Låtens titel",
+  "year": 2009,
+  "source": "Filmens eller seriens namn"
+}` 
+          : `{
+  "artist": "Artistens namn",
+  "title": "Låtens titel",
+  "year": 2009
+}`;
+        
         const prompt = `${selectedModeDescription}
 
 **Extremt viktigt:** Undvik **ALLA** låtar i följande lista: "${seenSongsPromptPart}".
@@ -125,11 +280,7 @@ Säkerställ **maximal variation** från tidigare svar.
 Använd detta unika slumptal för att förstärka variationen: ${Math.random()}.
 
 Svara **ENDAST** med ett JSON-objekt på följande exakta format:
-{
-  "artist": "Artistens namn",
-  "title": "Låtens titel",
-  "year": 2009
-}`;
+${jsonFormatExample}`;
 
         const completion = await openai.chat.completions.create({
           model: "gpt-5-mini",
@@ -187,6 +338,7 @@ Svara **ENDAST** med ett JSON-objekt på följande exakta format:
         }
 
         let spotifySearchAttempts = 0;
+        
         while (!spotifyItem && spotifySearchAttempts < MAX_SPOTIFY_SEARCH_ATTEMPTS) {
           try {
             const query = encodeURIComponent(`${parsedOpenAISong.artist} ${parsedOpenAISong.title}`);
@@ -196,11 +348,42 @@ Svara **ENDAST** med ett JSON-objekt på följande exakta format:
             );
             spotifyItem = searchRes.data.tracks.items[0];
             if (spotifyItem) {
+              // 🎵 Parallell Apple/Deezer-sökning medan vi har Spotify
+              // Denna är optional - om den misslyckas returnerar vi bara Spotify
+              let previewMatch: SearchMatch | null = null;
+              try {
+                const [appleResult, deezerResult] = await Promise.allSettled([
+                  searchApple(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
+                  searchDeezer(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
+                ]);
+                
+                // Föredra Apple, fallback till Deezer
+                if (appleResult.status === 'fulfilled' && appleResult.value) {
+                  previewMatch = appleResult.value;
+                } else if (deezerResult.status === 'fulfilled' && deezerResult.value) {
+                  previewMatch = deezerResult.value;
+                }
+              } catch (previewErr) {
+                // Preview search failed - log but continue with Spotify-only response
+                logger.warn("generateCard: Preview-sökning misslyckades:", previewErr);
+              }
+              
               finalSong = {
                 artist: parsedOpenAISong.artist,
                 title: parsedOpenAISong.title,
                 year: parsedOpenAISong.year,
                 spotifyUrl: spotifyItem.external_urls.spotify,
+                ...(parsedOpenAISong.source && {
+                  source: parsedOpenAISong.source,
+                }),
+                ...(previewMatch && {
+                  previewData: {
+                    previewUrl: previewMatch.previewUrl,
+                    artworkUrl: previewMatch.artworkUrl,
+                    externalUrl: previewMatch.externalUrl,
+                    source: previewMatch.source,
+                  },
+                }),
               };
             } else {
               spotifySearchAttempts++;
@@ -235,7 +418,7 @@ export const markSongAsSeen = onRequest(async (req, res) => {
   }
 
   const uid = await getUidFromRequest(req);
-  const { songIdentifier, artist, title, year } = req.body;
+  const { songIdentifier, artist, title, year, source } = req.body;
   if (!songIdentifier) {
     res.status(400).send("Song identifier is required.");
     return;
@@ -251,6 +434,7 @@ export const markSongAsSeen = onRequest(async (req, res) => {
       artist: artist || "unknown",
       title: title || "unknown",
       year: year || 0,
+      ...(source && { source }),
     });
     logger.info(`markSongAsSeen: Lade till "${songIdentifier}" i historiken för ${uid || "global"}.`);
 

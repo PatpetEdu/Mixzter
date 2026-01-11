@@ -6,6 +6,13 @@ export type Card = {
   artist: string;
   year: number;
   spotifyUrl: string;
+  source?: string;
+  previewData?: {
+    previewUrl: string;
+    artworkUrl?: string;
+    externalUrl: string;
+    previewProvider: 'itunes' | 'deezer';
+  };
 };
 
 type Player = {

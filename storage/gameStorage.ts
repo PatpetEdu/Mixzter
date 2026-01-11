@@ -5,7 +5,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Återanvänd befintliga typer från appen
-export type Card = { title: string; artist: string; year: number; spotifyUrl: string };
+export type Card = {
+  title: string;
+  artist: string;
+  year: number;
+  spotifyUrl: string;
+  source?: string;
+  previewData?: {
+    previewUrl: string;
+    artworkUrl?: string;
+    externalUrl: string;
+    previewProvider: 'itunes' | 'deezer';
+  };
+};
 export type Player = { name: string; timeline: number[]; cards: Card[]; startYear: number; stars: number };
 
 // 🔸 NYTT: UI-snapshot-typ för att kunna återställa exakt läge (front/back, input m.m.)

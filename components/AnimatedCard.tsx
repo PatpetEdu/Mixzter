@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Animated, View } from 'react-native';
-import CardFront from './CardFront';
+import CardFront, { PreviewData } from './CardFront';
 import CardBack from './CardBack';
 
 interface Props {
@@ -10,12 +10,16 @@ interface Props {
     title: string;
     year: number;
     spotifyUrl?: string;
+    source?: string;
+    previewData?: PreviewData;
   } | null;
   onFlip?: () => void;
   showFlipButton?: boolean;
+  onPlayPreview?: (previewUrl: string) => void;
+  isPlayingPreview?: boolean;
 }
 
-export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = true }: Props) {
+export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = true, onPlayPreview, isPlayingPreview }: Props) {
   const flipAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = 
           ],
         } as any}
       >
-        <CardFront spotifyUrl={card.spotifyUrl || ''} onFlip={onFlip || (() => {})} showFlipButton={showFlipButton} />
+        <CardFront spotifyUrl={card.spotifyUrl || ''} previewData={card.previewData} onFlip={onFlip || (() => {})} showFlipButton={showFlipButton} onPlayPreview={onPlayPreview} isPlayingPreview={isPlayingPreview} />
       </Animated.View>
 
       {/* Back Card */}
@@ -82,7 +86,7 @@ export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = 
         } as any}
         pointerEvents={showBack ? 'auto' : 'none'}
       >
-        <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={onFlip || (() => {})} />
+        <CardBack artist={card.artist} title={card.title} year={String(card.year)} onFlip={onFlip || (() => {})} artworkUrl={card.previewData?.artworkUrl} source={card.source} />
       </Animated.View>
     </View>
   );

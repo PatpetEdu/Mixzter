@@ -24,6 +24,7 @@ const GAME_MODES = [
   { id: 'melodifestivalen', label: `Melodifestivalen 1958-${CURRENT_YEAR}`, icon: Star },
   { id: 'kpop', label: `K-POP 2000-${CURRENT_YEAR}`, icon: Music2 },
   { id: 'eightiesnineties', label: '80s & 90s Hits 1980-1999', icon: Disc },
+  { id: 'modernahits', label: `Moderna Hits 2005-${CURRENT_YEAR}`, icon: Sparkles },
 ];
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);

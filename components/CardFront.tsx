@@ -1,14 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Linking, Platform, Animated, View, Vibration } from 'react-native';
 import { Box, Text, VStack, HStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
-import { Music, QrCode, Play, X } from 'lucide-react-native';
+import { QrCode, Play, X, Pause } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 
+export type PreviewData = {
+  previewUrl: string;
+  artworkUrl?: string;
+  externalUrl: string;
+  previewProvider: 'itunes' | 'deezer';
+};
+
 export type CardFrontProps = {
   spotifyUrl: string;
+  previewData?: PreviewData;
   onFlip: () => void;
   showFlipButton: boolean;
+  onPlayPreview?: (previewUrl: string) => void;
+  isPlayingPreview?: boolean;
 };
 
 async function openSpotify(spotifyUrl: string) {
@@ -40,7 +50,7 @@ async function openSpotify(spotifyUrl: string) {
   }
 }
 
-export default function CardFront({ spotifyUrl }: CardFrontProps) {
+export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false }: CardFrontProps) {
   const [showQR, setShowQR] = useState(false);
   const colorMode = useColorMode();
 
@@ -213,8 +223,8 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
             }}
           />
 
-          {/* Center Circle with Music Icon */}
-          <Box
+          {/* Center Circle with Music Icon - Clickable for preview */}
+          <Pressable
             w={96}
             h={96}
             bg="rgba(35, 35, 40, 1)"
@@ -229,10 +239,25 @@ export default function CardFront({ spotifyUrl }: CardFrontProps) {
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.3,
               shadowRadius: 8,
+              _pressed: {
+                opacity: 0.8,
+                transform: [{ scale: 0.95 }],
+              },
             }}
+            onPress={() => {
+              if (previewData) {
+                Vibration.vibrate(30);
+                if (onPlayPreview) onPlayPreview(previewData.previewUrl);
+              }
+            }}
+            disabled={!previewData}
           >
-            <Icon as={Music} size="xl" color="$emerald500" />
-          </Box>
+            <Icon
+              as={isPlayingPreview && previewData ? Pause : Play}
+              size="xl"
+              color={previewData ? "$emerald500" : "$secondary500"}
+            />
+          </Pressable>
         </Box>
 
         <VStack alignItems="center" space="xs">

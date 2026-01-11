@@ -9,6 +9,13 @@ type Card = {
   artist: string;
   year: number;
   spotifyUrl: string;
+  source?: string;
+  previewData?: {
+    previewUrl: string;
+    artworkUrl?: string;
+    externalUrl: string;
+    previewProvider: 'itunes' | 'deezer';
+  };
 };
 
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
@@ -99,6 +106,7 @@ export const useGenerateSongs = (
           artist: songData.artist,
           title: songData.title,
           year: songData.year,
+          ...(songData.source && { source: songData.source }),
         }),
       });
     } catch (err) {

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Animated, KeyboardAvoidingView, Platform, Vibration, Pressable as RNPressable, View } from 'react-native';
 import {
   Box, Text, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAudioPlayer } from 'expo-audio';
 import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
 import ScoreScreen from './ScoreScreen';
@@ -14,7 +15,19 @@ import { deleteActiveGame, loadActiveGame, saveActiveGame, SavedDuoGameState } f
 import { Music, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 // Typer
-export type Card = { title: string; artist: string; year: number; spotifyUrl: string };
+export type Card = {
+  title: string;
+  artist: string;
+  year: number;
+  spotifyUrl: string;
+  source?: string;
+  previewData?: {
+    previewUrl: string;
+    artworkUrl?: string;
+    externalUrl: string;
+    previewProvider: 'itunes' | 'deezer';
+  };
+};
 type Player = { name: string; timeline: number[]; cards: Card[]; startYear: number; stars: number };
 
 type Props = {
@@ -78,6 +91,18 @@ export default function DuoGameScreen({
 
   // 🔸 Litet override så att vi kan rendera korrekt “Rätt gissat!” från storage direkt
   const [wasCorrectOverride, setWasCorrectOverride] = useState<boolean | null>(null);
+
+  // 🎵 Audio preview playback
+  const [currentPreviewUrl, setCurrentPreviewUrl] = useState<string | null>(null);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const previewPlayerRef = useRef<ReturnType<typeof useAudioPlayer> | null>(null);
+
+  // Dynamic player based on current preview URL
+  const previewPlayer = useAudioPlayer(currentPreviewUrl || '');
+
+  useEffect(() => {
+    previewPlayerRef.current = previewPlayer;
+  }, [previewPlayer]);
 
   // 🎵 State för modal över år i tidslinjen
   const [selectedYearCard, setSelectedYearCard] = useState<Card | null>(null);
@@ -172,8 +197,63 @@ export default function DuoGameScreen({
     setPlacement(null);
     setWasCorrectOverride(null);
     setWasSkipped(false);
+    setIsPlayingPreview(false);
+    // Stop preview if playing
+    if (isPlayingPreview && previewPlayerRef.current) {
+      previewPlayerRef.current.pause();
+      setCurrentPreviewUrl(null);
+    }
     resetTurnState();
-  }, [resetTurnState]);
+  }, [resetTurnState, isPlayingPreview]);
+
+  // 🎵 Handle preview playback
+  const handlePlayPreview = useCallback((previewUrl: string) => {
+    try {
+      if (isPlayingPreview && currentPreviewUrl === previewUrl && previewPlayerRef.current) {
+        // Stop if same preview is playing
+        previewPlayerRef.current.pause();
+        setIsPlayingPreview(false);
+        setCurrentPreviewUrl(null);
+        return;
+      }
+
+      // Start new preview
+      setCurrentPreviewUrl(previewUrl);
+      setIsPlayingPreview(true);
+    } catch (error) {
+      console.error('Error playing preview:', error);
+      setIsPlayingPreview(false);
+    }
+  }, [isPlayingPreview, currentPreviewUrl]);
+
+  // Auto-reset play icon when preview finishes (previews are ~30 seconds)
+  useEffect(() => {
+    if (!isPlayingPreview) return;
+
+    // Set a timeout to reset play state after preview duration
+    // Most previews are 30 seconds, we use 35 to be safe
+    const previewTimeout = setTimeout(() => {
+      setIsPlayingPreview(false);
+    }, 35000);
+
+    return () => clearTimeout(previewTimeout);
+  }, [isPlayingPreview]);
+
+  // Auto-play when URL changes
+  useEffect(() => {
+    if (currentPreviewUrl && previewPlayerRef.current && isPlayingPreview) {
+      previewPlayerRef.current.play();
+    }
+  }, [currentPreviewUrl, isPlayingPreview]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (previewPlayerRef.current && isPlayingPreview) {
+        previewPlayerRef.current.pause();
+      }
+    };
+  }, []);
 
   // Vänta in hydrering OCH återställning innan första autogenerate
   useEffect(() => {
@@ -717,6 +797,8 @@ export default function DuoGameScreen({
               card={card}
               onFlip={() => {}}
               showFlipButton={false}
+              onPlayPreview={handlePlayPreview}
+              isPlayingPreview={isPlayingPreview}
             />
            
              {/* Guess section */}
@@ -1042,6 +1124,8 @@ export default function DuoGameScreen({
               card={card}
               onFlip={() => {}}
               showFlipButton={false}
+              onPlayPreview={handlePlayPreview}
+              isPlayingPreview={isPlayingPreview}
             />
             
             {wasSkipped ? (
