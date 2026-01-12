@@ -591,7 +591,20 @@ export default function DuoGameScreen({
                   >
                     {isStartYear && '📍 '}
                     {String(year)}
-                    {totalCount > 1 && ` (${totalCount}x)`}
+                    {totalCount > 1 && (
+                      <Text 
+                        color={isPrelim ? '$orange700' : textColor}
+                        sx={{
+                          _dark: {
+                            color: isPrelim ? '$orange300' : textColorDark
+                          }
+                        }}
+                        fontSize="$xs"
+                        fontWeight="900"
+                      >
+                        {` (${totalCount}x)`}
+                      </Text>
+                    )}
                   </Text>
                 </Box>
               </RNPressable>
