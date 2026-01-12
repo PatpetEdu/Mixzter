@@ -40,6 +40,7 @@ const GAME_MODE_YEARS: Record<string, { start: number; end: number }> = {
   melodifestivalen: { start: 1958, end: CURRENT_YEAR },
   kpop: { start: 2000, end: CURRENT_YEAR },
   eightiesnineties: { start: 1980, end: 1999 },
+  modernhits: { start: 2005, end: CURRENT_YEAR },
 };
 
 // Funktion för att skapa ett startår baserat på game mode

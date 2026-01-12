@@ -490,7 +490,7 @@ export default function DuoGameScreen({
                 />
                 <HStack alignItems="center" space="xs">
                   <Text fontSize="$sm" fontWeight="900" color={isCurrentPlayer ? '$secondary900' : '$secondary600'} sx={{ _dark: { color: isCurrentPlayer ? '$secondary100' : '$secondary400' } }} textTransform="uppercase" letterSpacing={0.5}>
-                    {player.name} ({player.timeline.length + (isCurrentPlayer ? roundCards.length : 0)})
+                    {player.name} ({1 + player.timeline.length + (isCurrentPlayer ? roundCards.length : 0)})
                   </Text>
                   {!isCurrentPlayer && !opponentExpanded && (
                     <Text fontSize="$xs" fontWeight="700" color="$amber600" sx={{ _dark: { color: '$amber400' } }} opacity={0.6}>
@@ -907,7 +907,7 @@ export default function DuoGameScreen({
                       textTransform="uppercase"
                       letterSpacing={1}
                     >
-                      ÄLDRE
+                      FÖRE
                     </Text>
                   </Pressable>
                   <Pressable
@@ -933,23 +933,28 @@ export default function DuoGameScreen({
                       textTransform="uppercase"
                       letterSpacing={1}
                     >
-                      NYARE
+                      EFTER
                     </Text>
                   </Pressable>
                 </HStack>
 
                 <Button
-                  action="primary"
                   onPress={handlePlacementConfirm}
                   isDisabled={!placement}
                   w="$full"
+                  bg="$emerald700"
+                  borderRadius="$3xl"
                   sx={{
+                    ":pressed": {
+                      bg: '$emerald800',
+                      transform: [{ scale: 0.95 }],
+                    },
                     ":disabled": {
                       opacity: 0.5,
                     }
                   }}
                 >
-                  <ButtonText fontSize="$lg" fontWeight="900" textTransform="uppercase" letterSpacing={1}>
+                  <ButtonText fontSize="$lg" fontWeight="900" color="$white" textTransform="uppercase" letterSpacing={1}>
                     Bekräfta
                   </ButtonText>
                 </Button>
