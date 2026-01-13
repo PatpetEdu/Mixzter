@@ -301,8 +301,8 @@ const startDuoGame = (playerNamesArray: string[], selectedMode: string) => {
     if (!user || isAnonymous) {
       Alert.alert('Inloggning krävs', 'Du måste vara inloggad för att spara pågående spel.');
     }
-    if (user && activeGames.length >= 2) {
-      Alert.alert('Max 2 aktiva spel. Avsluta ett spel i menyn för att starta nytt.');
+    if (user && activeGames.length >= 5) {
+      Alert.alert('Max 5 aktiva spel. Avsluta ett spel i menyn för att starta nytt.');
       return;
     }
     const newId = generateGameId();
@@ -428,7 +428,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
               {/* Quick Start - Hero Buttons */}
               <VStack space="md">
                 {/* DUO BATTLE Button - Emerald/Success gradient */}
-                {(!user || activeGames.length < 2) ? (
+                {(!user || activeGames.length < 5) ? (
                   <Animated.View 
                     style={{ 
                       transform: [{ scale: duoScaleAnim }],
@@ -465,7 +465,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                             fontWeight="black" 
                             color="white"
                           >
-                            DUO BATTLE
+                            MUSIC BATTLE
                           </Text>
                           <Text 
                             fontSize="$sm" 
@@ -503,7 +503,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                           fontWeight="black" 
                           color="white"
                         >
-                          DUO BATTLE
+                          MUSIC BATTLE
                         </Text>
                         <Text 
                           fontSize="$sm" 
@@ -582,7 +582,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                   </Pressable>
                 </Animated.View>
 
-                {user && activeGames.length >= 2 && (
+                {user && activeGames.length >= 5 && (
                   <Text 
                     size="sm" 
                     textAlign="center"
@@ -590,7 +590,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                       _dark: { color: '$textDark400' } 
                     }}
                   >
-                    Max 2 aktiva spel nått. Avsluta ett spel för att starta nytt.
+                    Max 5 aktiva spel nått. Avsluta ett spel för att starta nytt.
                   </Text>
                 )}
               </VStack>
