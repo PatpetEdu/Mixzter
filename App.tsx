@@ -81,6 +81,8 @@ function AppContent() {
   const appState = useRef(AppState.currentState);
   const [activeGames, setActiveGames] = useState<ActiveGameMeta[]>([]);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation logic
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -121,7 +123,14 @@ function AppContent() {
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false, listener: (_e: NativeSyntheticEvent<NativeScrollEvent>) => {} }
+    { 
+      useNativeDriver: false, 
+      listener: (_e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        setIsScrolling(true);
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => setIsScrolling(false), 300);
+      }
+    }
   );
 
   // Press feedback for DUO BATTLE
@@ -445,6 +454,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                       onPress={() => setMode('duo-setup')} 
                       onPressIn={handleDuoPressIn}
                       onPressOut={handleDuoPressOut}
+                      disabled={isScrolling}
                       style={{ backgroundColor: 'transparent' }}
                       hitSlop={8}
                     >
@@ -528,18 +538,16 @@ const resumeGame = (meta: ActiveGameMeta) => {
                     onPress={() => setMode('single')}
                     onPressIn={handleSoloPressIn}
                     onPressOut={handleSoloPressOut}
-                    hitSlop={16}
+                    disabled={isScrolling}
+                    hitSlop={8}
                   >
                     <Box
-                      bg={isSoloPressed ? "$backgroundLight100" : "$backgroundLight50"}
+                      bg={isSoloPressed ? "$backgroundLight100" : "$backgroundLight100"}
                       rounded="$3xl"
                       p="$10"
-                      borderWidth={2}
-                      borderColor={isSoloPressed ? "$backgroundLight300" : "$backgroundLight200"}
                       sx={{
                         _dark: { 
-                          bg: isSoloPressed ? '$backgroundDark800' : '$backgroundDark900',
-                          borderColor: isSoloPressed ? '$backgroundDark700' : '$backgroundDark800'
+                          bg: isSoloPressed ? '$backgroundDark800' : '$backgroundDark900'
                         }
                       }}
                     >
