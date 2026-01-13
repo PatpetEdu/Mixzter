@@ -33,8 +33,7 @@ export type DuoUiSnapshot = {
 // 🔸 UPPDATERAD: SavedDuoGameState innehåller nu även aktuell låt + UI + postGuess
 export type SavedDuoGameState = {
   id: string;
-  player1Name: string;
-  player2Name: string;
+  playerNames: string[];  // Array of player names (2-5 players)
   gameMode: string;  // 🔸 NYTT: Spara det aktuella game mode
   players: { [key: string]: Player };
   activePlayer: string;
@@ -55,11 +54,9 @@ export type SavedDuoGameState = {
 
 export type ActiveGameMeta = {
   id: string;
-  player1: string;
-  player2: string;
+  playerNames: string[];  // Array of player names
+  scores: { [playerName: string]: number };  // Score for each player
   gameMode: string;  // 🔸 NYTT: Spara game mode i metadata
-  p1Score: number;
-  p2Score: number;
   updatedAt: number;
 };
 
@@ -70,10 +67,12 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   try { return raw ? (JSON.parse(raw) as T) : fallback; } catch { return fallback; }
 }
 
-function computeScores(players: { [key: string]: Player }, p1: string, p2: string) {
-  const p1Score = players[p1]?.timeline?.length ?? 0;
-  const p2Score = players[p2]?.timeline?.length ?? 0;
-  return { p1Score, p2Score };
+function computeScores(players: { [key: string]: Player }, playerNames: string[]) {
+  const scores: { [playerName: string]: number } = {};
+  for (const playerName of playerNames) {
+    scores[playerName] = players[playerName]?.timeline?.length ?? 0;
+  }
+  return scores;
 }
 
 export async function getActiveGames(uid: string): Promise<ActiveGameMeta[]> {
@@ -96,14 +95,12 @@ export async function saveActiveGame(uid: string, state: SavedDuoGameState): Pro
   const rawList = await AsyncStorage.getItem(ACTIVE_GAMES_INDEX(uid));
   const list = safeParse<ActiveGameMeta[]>(rawList, []);
 
-  const { p1Score, p2Score } = computeScores(state.players, state.player1Name, state.player2Name);
+  const scores = computeScores(state.players, state.playerNames);
   const meta: ActiveGameMeta = {
     id: state.id,
-    player1: state.player1Name,
-    player2: state.player2Name,
+    playerNames: state.playerNames,
+    scores,
     gameMode: state.gameMode, // 🔸 NYTT: Spara game mode
-    p1Score,
-    p2Score,
     updatedAt: state.updatedAt,
   };
 

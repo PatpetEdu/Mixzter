@@ -14,34 +14,34 @@ interface Player {
 interface Props {
   gameOverMessage: string;
   players: { [key: string]: Player };
-  player1Name: string;
-  player2Name: string;
+  playerNames: string[]; // Array of player names
   onPlayAgain?: () => void;
 }
 
-export default function ScoreScreen({ gameOverMessage, players, player1Name, player2Name }: Props) {
-  const p1 = players[player1Name];
-  const p2 = players[player2Name];
-
-  const p1Score = p1.timeline.length + 1; // +1 för startår
-  const p2Score = p2.timeline.length + 1; // +1 för startår
+export default function ScoreScreen({ gameOverMessage, players, playerNames }: Props) {
+  // Calculate scores for all players
+  const scores = playerNames.map(name => ({
+    name,
+    score: (players[name]?.timeline.length ?? 0) + 1 // +1 för startår
+  }));
   
-  const winner = p1Score > p2Score ? player1Name : p2Score > p1Score ? player2Name : null;
-  const margin = Math.abs(p1Score - p2Score);
-
-  const isP1Winner = winner === player1Name;
-  const isP2Winner = winner === player2Name;
-  const isDraw = winner === null;
+  // Find winner(s)
+  const maxScore = Math.max(...scores.map(s => s.score));
+  const winners = scores.filter(s => s.score === maxScore);
+  const isDraw = winners.length > 1;
+  // Vinstmarginal = skillnad mellan vinnare och näst bäst
+  const sortedScores = [...scores].sort((a, b) => b.score - a.score);
+  const margin = sortedScores[0].score - (sortedScores[1]?.score ?? 0);
 
   return (
     <ScrollView 
-      contentContainerStyle={{ flexGrow: 1 }}
+      contentContainerStyle={{ paddingVertical: 20 }}
       style={{ backgroundColor: 'black' }}
     >
-      <Center flex={1} px="$4" bg="$black">
+      <Center px="$4" bg="$black">
         <VStack space="xl" alignItems="center" w="$full" maxWidth={400} py="$6">
         {/* Header */}
-        <VStack space="sm" alignItems="center" w="$full" mt="$8">
+        <VStack space="sm" alignItems="center" w="$full" mt="$12">
           <Box
             w={64}
             h={64}
@@ -61,139 +61,81 @@ export default function ScoreScreen({ gameOverMessage, players, player1Name, pla
 
         {/* Score Cards */}
         <VStack space="md" w="$full">
-          {/* Player 1 */}
-          <Box
-            bg={isP1Winner ? 'rgba(16, 185, 129, 0.15)' : isDraw ? 'rgba(100, 100, 110, 0.1)' : 'rgba(100, 100, 110, 0.05)'}
-            borderRadius="$2xl"
-            borderWidth={2}
-            borderColor={isP1Winner ? 'rgba(16, 185, 129, 0.5)' : isDraw ? 'rgba(100, 100, 110, 0.3)' : 'rgba(100, 100, 110, 0.2)'}
-            p="$6"
-            w="$full"
-          >
-            <VStack space="md">
-              <HStack justifyContent="space-between" alignItems="center">
-                <VStack space="xs" flex={1}>
-                  <Text fontSize="$xl" fontWeight="900" color="$secondary100">
-                    {player1Name}
-                  </Text>
-                  <Text fontSize="$sm" color="$secondary500">
-                    {p1.cards.length} gissade låtar
-                  </Text>
-                </VStack>
-                <Box 
-                  bg={isP1Winner ? '$emerald600' : 'rgba(100, 100, 110, 0.3)'}
-                  borderRadius="$xl"
-                  px="$4"
-                  py="$2"
-                  minWidth={60}
-                  justifyContent="center"
-                  alignItems="center"
-                >
-                  <Text fontSize="$3xl" fontWeight="900" color={isP1Winner ? '$white' : '$secondary300'}>
-                    {p1Score}
-                  </Text>
-                </Box>
-              </HStack>
+          {scores.map((playerScore) => {
+            const player = players[playerScore.name];
+            const isWinner = winners.some(w => w.name === playerScore.name);
+            const isHighlighted = isWinner || isDraw;
+            const isFirstPlayer = playerScore.name === playerNames[0]; // Check if starting player
+            
+            return (
+              <Box
+                key={playerScore.name}
+                bg={isHighlighted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 100, 110, 0.05)'}
+                borderRadius="$2xl"
+                borderWidth={2}
+                borderColor={isHighlighted ? 'rgba(16, 185, 129, 0.5)' : 'rgba(100, 100, 110, 0.2)'}
+                p="$6"
+                w="$full"
+              >
+                <VStack space="md">
+                  <HStack justifyContent="space-between" alignItems="center">
+                    <VStack space="xs" flex={1}>
+                      <Text fontSize="$xl" fontWeight="900" color="$secondary100">
+                        {isFirstPlayer && '♔ '}{playerScore.name}
+                      </Text>
+                      <Text fontSize="$sm" color="$secondary500">
+                        {player.cards.length} gissade låtar
+                      </Text>
+                    </VStack>
+                    <Box 
+                      bg={isHighlighted ? '$emerald600' : 'rgba(100, 100, 110, 0.3)'}
+                      borderRadius="$xl"
+                      px="$4"
+                      py="$2"
+                      minWidth={60}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text fontSize="$3xl" fontWeight="900" color={isHighlighted ? '$white' : '$secondary300'}>
+                        {playerScore.score}
+                      </Text>
+                    </Box>
+                  </HStack>
 
-              {/* Breakdown */}
-              <VStack space="md" w="$full">
-                <HStack space="lg" justifyContent="space-around">
-                  <Box flex={1}>
-                    <Text fontSize="$xs" color="$secondary600" mb="$1">Startår</Text>
-                    <Text fontSize="$lg" fontWeight="900" color="$secondary300">{p1.startYear}</Text>
-                  </Box>
-                  <Box flex={1}>
-                    <Text fontSize="$xs" color="$secondary600" mb="$1">Stjärnor</Text>
-                    <HStack space="xs">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          size={18}
-                          color={i < p1.stars ? '#EAB308' : 'rgba(100, 100, 110, 0.3)'}
-                          fill={i < p1.stars ? '#EAB308' : 'none'}
-                          strokeWidth={1.5}
-                        />
-                      ))}
+                  {/* Breakdown */}
+                  <VStack space="md" w="$full">
+                    <HStack space="lg" justifyContent="space-around">
+                      <Box flex={1}>
+                        <Text fontSize="$xs" color="$secondary600" mb="$1">Startår</Text>
+                        <Text fontSize="$lg" fontWeight="900" color="$secondary300">{player.startYear}</Text>
+                      </Box>
+                      <Box flex={1}>
+                        <Text fontSize="$xs" color="$secondary600" mb="$1">Stjärnor</Text>
+                        <HStack space="xs">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              size={18}
+                              color={i < player.stars ? '#EAB308' : 'rgba(100, 100, 110, 0.3)'}
+                              fill={i < player.stars ? '#EAB308' : 'none'}
+                              strokeWidth={1.5}
+                            />
+                          ))}
+                        </HStack>
+                      </Box>
                     </HStack>
-                  </Box>
-                </HStack>
-                {/* Timeline */}
-                <Box bg="rgba(100, 100, 110, 0.1)" borderRadius="$lg" p="$3" w="$full">
-                  <Text fontSize="$xs" color="$secondary600" mb="$2">Tidslinjen</Text>
-                  <Text fontSize="$sm" color="$secondary300" lineHeight={20}>
-                    {[p1.startYear, ...p1.timeline].sort((a, b) => a - b).join(', ')}
-                  </Text>
-                </Box>
-              </VStack>
-            </VStack>
-          </Box>
-
-          {/* Player 2 */}
-          <Box
-            bg={isP2Winner ? 'rgba(16, 185, 129, 0.15)' : isDraw ? 'rgba(100, 100, 110, 0.1)' : 'rgba(100, 100, 110, 0.05)'}
-            borderRadius="$2xl"
-            borderWidth={2}
-            borderColor={isP2Winner ? 'rgba(16, 185, 129, 0.5)' : isDraw ? 'rgba(100, 100, 110, 0.3)' : 'rgba(100, 100, 110, 0.2)'}
-            p="$6"
-            w="$full"
-          >
-            <VStack space="md">
-              <HStack justifyContent="space-between" alignItems="center">
-                <VStack space="xs" flex={1}>
-                  <Text fontSize="$xl" fontWeight="900" color="$secondary100">
-                    {player2Name}
-                  </Text>
-                  <Text fontSize="$sm" color="$secondary500">
-                    {p2.cards.length} gissade låtar
-                  </Text>
+                    {/* Timeline */}
+                    <Box bg="rgba(100, 100, 110, 0.1)" borderRadius="$lg" p="$3" w="$full">
+                      <Text fontSize="$xs" color="$secondary600" mb="$2">Tidslinjen</Text>
+                      <Text fontSize="$sm" color="$secondary300" lineHeight={20}>
+                        {[player.startYear, ...player.timeline].sort((a, b) => a - b).join(', ')}
+                      </Text>
+                    </Box>
+                  </VStack>
                 </VStack>
-                <Box 
-                  bg={isP2Winner ? '$emerald600' : 'rgba(100, 100, 110, 0.3)'}
-                  borderRadius="$xl"
-                  px="$4"
-                  py="$2"
-                  minWidth={60}
-                  justifyContent="center"
-                  alignItems="center"
-                >
-                  <Text fontSize="$3xl" fontWeight="900" color={isP2Winner ? '$white' : '$secondary300'}>
-                    {p2Score}
-                  </Text>
-                </Box>
-              </HStack>
-
-              {/* Breakdown */}
-              <VStack space="md" w="$full">
-                <HStack space="lg" justifyContent="space-around">
-                  <Box flex={1}>
-                    <Text fontSize="$xs" color="$secondary600" mb="$1">Startår</Text>
-                    <Text fontSize="$lg" fontWeight="900" color="$secondary300">{p2.startYear}</Text>
-                  </Box>
-                  <Box flex={1}>
-                    <Text fontSize="$xs" color="$secondary600" mb="$1">Stjärnor</Text>
-                    <HStack space="xs">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          size={18}
-                          color={i < p2.stars ? '#EAB308' : 'rgba(100, 100, 110, 0.3)'}
-                          fill={i < p2.stars ? '#EAB308' : 'none'}
-                          strokeWidth={1.5}
-                        />
-                      ))}
-                    </HStack>
-                  </Box>
-                </HStack>
-                {/* Timeline */}
-                <Box bg="rgba(100, 100, 110, 0.1)" borderRadius="$lg" p="$3" w="$full">
-                  <Text fontSize="$xs" color="$secondary600" mb="$2">Tidslinjen</Text>
-                  <Text fontSize="$sm" color="$secondary300" lineHeight={20}>
-                    {[p2.startYear, ...p2.timeline].sort((a, b) => a - b).join(', ')}
-                  </Text>
-                </Box>
-              </VStack>
-            </VStack>
-          </Box>
+              </Box>
+            );
+          })}
         </VStack>
 
         {/* Match Stats */}
@@ -243,5 +185,6 @@ export default function ScoreScreen({ gameOverMessage, players, player1Name, pla
         )}
       </VStack>
       </Center>
-    </ScrollView>  );
+    </ScrollView>
+  );
 }

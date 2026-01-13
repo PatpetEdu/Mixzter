@@ -25,7 +25,7 @@ type Player = {
 
 // Konstanter för spelets regler
 const WINNING_SCORE = 10;
-const MAX_STARS = 5;
+export const MAX_STARS = 5;
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Mappning av game modes till deras årintervall
@@ -51,18 +51,20 @@ function getRandomYear(gameMode: string = 'default') {
 
 // Props för vår hook
 type UseDuoGameLogicProps = {
-  player1Name: string;
-  player2Name: string;
+  playerNames: string[]; // Array of 2-5 player names
   gameMode?: string;
   onNewCardNeeded: () => void; // Anropas när ett nytt kort behövs
 };
 
-export function useDuoGameLogic({ player1Name, player2Name, gameMode = 'default', onNewCardNeeded }: UseDuoGameLogicProps) {
-  const [players, setPlayers] = useState<{ [key: string]: Player }>({
-    [player1Name]: { name: player1Name, startYear: getRandomYear(gameMode), timeline: [], cards: [], stars: 1 },
-    [player2Name]: { name: player2Name, startYear: getRandomYear(gameMode), timeline: [], cards: [], stars: 1 },
+export function useDuoGameLogic({ playerNames, gameMode = 'default', onNewCardNeeded }: UseDuoGameLogicProps) {
+  const [players, setPlayers] = useState<{ [key: string]: Player }>(() => {
+    const initialPlayers: { [key: string]: Player } = {};
+    for (const playerName of playerNames) {
+      initialPlayers[playerName] = { name: playerName, startYear: getRandomYear(gameMode), timeline: [], cards: [], stars: 1 };
+    }
+    return initialPlayers;
   });
-  const [activePlayer, setActivePlayer] = useState(player1Name);
+  const [activePlayer, setActivePlayer] = useState(playerNames[0]);
   const [roundCards, setRoundCards] = useState<Card[]>([]);
   const [wasCorrect, setWasCorrect] = useState(false);
   const [gameOverMessage, setGameOverMessage] = useState<string | null>(null);
@@ -70,14 +72,21 @@ export function useDuoGameLogic({ player1Name, player2Name, gameMode = 'default'
 
   // useEffect för att kontrollera om spelet är över
   useEffect(() => {
-    const p1Score = players[player1Name].timeline.length + 1; // +1 för startkortet
-    const p2Score = players[player2Name].timeline.length + 1; // +1 för startkortet
-    if (activePlayer === player1Name && (p1Score >= WINNING_SCORE || p2Score >= WINNING_SCORE)) {
-      if (p1Score === p2Score) setGameOverMessage('Oavgjort! Båda spelarna har 10 kort.');
-      else if (p1Score > p2Score) setGameOverMessage(`${player1Name} vinner!`);
-      else setGameOverMessage(`${player2Name} vinner!`);
+    const scores = playerNames.map(name => (players[name]?.timeline.length ?? 0) + 1);
+    const maxScore = Math.max(...scores);
+    const minScore = Math.min(...scores);
+    
+    if (activePlayer === playerNames[0]) {
+      if (maxScore >= WINNING_SCORE) {
+        const winners = playerNames.filter((name, idx) => scores[idx] === maxScore);
+        if (winners.length > 1) {
+          setGameOverMessage(`Oavgjort! ${winners.join(', ')} har alla ${maxScore} kort.`);
+        } else {
+          setGameOverMessage(`${winners[0]} vinner!`);
+        }
+      }
     }
-  }, [players, activePlayer, player1Name, player2Name]);
+  }, [players, activePlayer, playerNames]);
 
   // Funktion för att återställa state som är specifik för en runda
   const resetTurnState = () => {
@@ -206,7 +215,11 @@ export function useDuoGameLogic({ player1Name, player2Name, gameMode = 'default'
   // Ny funktion för att byta spelare, som komponenten kan anropa
   const switchPlayerTurn = () => {
     setRoundCards([]);
-    setActivePlayer((prevPlayer) => (prevPlayer === player1Name ? player2Name : player1Name));
+    setActivePlayer((prevPlayer) => {
+      const currentIndex = playerNames.indexOf(prevPlayer);
+      const nextIndex = (currentIndex + 1) % playerNames.length;
+      return playerNames[nextIndex];
+    });
     onNewCardNeeded();
   };
 

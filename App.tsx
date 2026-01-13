@@ -72,7 +72,7 @@ function AppContent() {
   
   const [mode, setMode] = useState<GameMode>('menu');
   const [gameMode, setGameMode] = useState<string>('default');
-  const [players, setPlayers] = useState<{ player1Name: string; player2Name: string } | null>(null);
+  const [playerNames, setPlayerNames] = useState<string[] | null>(null);
   const [preloadedDuoCard, setPreloadedDuoCard] = useState<CardData | null>(null);
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
 
@@ -271,7 +271,33 @@ function AppContent() {
 
   useEffect(() => { refreshActiveGames(); }, [refreshActiveGames]);
 
-const startDuoGame = (player1Name: string, player2Name: string, selectedMode: string) => {
+// Helper function to normalize game data (handles both old and new formats)
+const getGameDisplayData = (game: any) => {
+  // New format: playerNames and scores
+  if (game.playerNames && Array.isArray(game.playerNames)) {
+    return {
+      initials: game.playerNames.map((name: string) => name.charAt(0).toUpperCase()).join('·'),
+      names: game.playerNames.join(' vs '),
+      scoreDisplay: game.playerNames.map((name: string) => game.scores?.[name] ?? 0).join(' - '),
+    };
+  }
+  // Old format: player1, player2, p1Score, p2Score
+  if (game.player1 && game.player2) {
+    return {
+      initials: `${game.player1.charAt(0).toUpperCase()}·${game.player2.charAt(0).toUpperCase()}`,
+      names: `${game.player1} vs ${game.player2}`,
+      scoreDisplay: `${game.p1Score ?? 0} - ${game.p2Score ?? 0}`,
+    };
+  }
+  // Fallback
+  return {
+    initials: '?',
+    names: 'Unknown',
+    scoreDisplay: '0 - 0',
+  };
+};
+
+const startDuoGame = (playerNamesArray: string[], selectedMode: string) => {
     if (!user || isAnonymous) {
       Alert.alert('Inloggning krävs', 'Du måste vara inloggad för att spara pågående spel.');
     }
@@ -281,16 +307,16 @@ const startDuoGame = (player1Name: string, player2Name: string, selectedMode: st
     }
     const newId = generateGameId();
     setActiveGameId(newId);
-    setPlayers({ player1Name, player2Name });
-    setGameMode(selectedMode); // ⬅️ Spara spelläget
+    setPlayerNames(playerNamesArray);
+    setGameMode(selectedMode);
     setMode('duo');
   };
 
     // Återuppta ett sparat spel
 const resumeGame = (meta: ActiveGameMeta) => {
     setActiveGameId(meta.id);
-    setPlayers({ player1Name: meta.player1, player2Name: meta.player2 });
-    setGameMode(meta.gameMode); // 🔸 NYTT: Använd sparad game mode
+    setPlayerNames(meta.playerNames);
+    setGameMode(meta.gameMode);
     setMode('duo');
   };
 
@@ -338,10 +364,10 @@ const resumeGame = (meta: ActiveGameMeta) => {
   };
 
   const returnToMenu = () => {
-    setPlayers(null);
+    setPlayerNames(null);
      // ❗Behåll globalt preload-kort i minnet; det ska EJ nollas här
     setActiveGameId(null);
-    setGameMode('default'); // ⬅️ Återställ till default
+    setGameMode('default');
     setMode('menu');
     refreshActiveGames();
   };
@@ -707,7 +733,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                                   _dark: { color: '$textDark700' }
                                 }}
                               >
-                                {`${game.player1.charAt(0).toUpperCase()}·${game.player2.charAt(0).toUpperCase()}`}
+                                {getGameDisplayData(game).initials}
                               </Text>
                             </Box>
 
@@ -719,7 +745,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                                   _dark: { color: '$textDark100' }
                                 }}
                               >
-                                {game.player1} vs {game.player2}
+                                {getGameDisplayData(game).names}
                               </Text>
                               <Box
                                 px="$3"
@@ -736,7 +762,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                                     _dark: { color: '#10b981' }
                                   }}
                                 >
-                                  {game.p1Score} - {game.p2Score}
+                                  {getGameDisplayData(game).scoreDisplay}
                                 </Text>
                               </Box>
                             </VStack>
@@ -809,7 +835,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
   }
 
   // Både PlayerSetup och DuoGame använder nu samma layoutstruktur
-  if (mode === 'duo-setup' || (mode === 'duo' && players)) {
+  if (mode === 'duo-setup' || (mode === 'duo' && playerNames)) {
     return (
       <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
         <Animated.View
@@ -831,10 +857,9 @@ const resumeGame = (meta: ActiveGameMeta) => {
           {mode === 'duo-setup' && (
             <PlayerSetupScreen onStart={startDuoGame} onScroll={handleScroll} headerHeight={HEADER_HEIGHT} />
           )}
-          {mode === 'duo' && players && (
+          {mode === 'duo' && playerNames && (
             <DuoGameScreen
-              player1Name={players.player1Name}
-              player2Name={players.player2Name}
+              playerNames={playerNames}
               gameMode={gameMode}
               onBackToMenu={returnToMenu}
               initialPreloadedCard={gameMode === 'default' ? preloadedDuoCard : null}

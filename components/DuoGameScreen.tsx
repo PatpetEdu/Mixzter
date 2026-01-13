@@ -9,7 +9,7 @@ import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
 import ScoreScreen from './ScoreScreen';
 import { useGenerateSongs } from './useGenerateSongs';
-import { useDuoGameLogic } from '../hooks/useDuoGameLogic';
+import { useDuoGameLogic, MAX_STARS } from '../hooks/useDuoGameLogic';
 import { useAuth } from '../hooks/useAuth';
 import { deleteActiveGame, loadActiveGame, saveActiveGame, SavedDuoGameState } from '../storage/gameStorage';
 import { Music, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
@@ -31,8 +31,7 @@ export type Card = {
 type Player = { name: string; timeline: number[]; cards: Card[]; startYear: number; stars: number };
 
 type Props = {
-  player1Name: string; // ⬅️ Ändrat från player1
-  player2Name: string; // ⬅️ Ändrat från player2
+  playerNames: string[]; // ⬅️ Changed to array supporting 2-5 players
   gameMode: string;    // ⬅️ NYTT: Tar emot spelläget
   onBackToMenu: () => void;
   initialPreloadedCard: Card | null;
@@ -44,15 +43,13 @@ type Props = {
 };
 
 const currentYear = new Date().getFullYear();
-const MAX_STARS = 5;
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 // Lokal konstant för delad historiknyckel
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
 
 export default function DuoGameScreen({
-  player1Name, // ⬅️ Uppdaterat namn
-  player2Name, // ⬅️ Uppdaterat namn
+  playerNames, // ⬅️ Changed to array supporting 2-5 players
   gameMode,    // ⬅️ NYTT
   initialPreloadedCard,
   onPreloadComplete,
@@ -179,8 +176,7 @@ export default function DuoGameScreen({
     switchPlayerTurn,
     loadSavedGame,
   } = useDuoGameLogic({
-    player1Name: player1Name,
-    player2Name: player2Name,
+    playerNames: playerNames,
     gameMode: gameMode,
     onNewCardNeeded: () => {
       setCard(null);
@@ -329,8 +325,7 @@ export default function DuoGameScreen({
     const id = setTimeout(() => {
       const payload: SavedDuoGameState = {
         id: gameId,
-        player1Name: player1Name, // ⬅️ Uppdaterat
-        player2Name: player2Name, // ⬅️ Uppdaterat
+        playerNames: playerNames, // ⬅️ Updated to array
         gameMode: gameMode, // 🔸 NYTT: Spara game mode
         players: players as any,
         activePlayer,
@@ -362,7 +357,7 @@ export default function DuoGameScreen({
   }, [
     players, activePlayer, roundCards,
     showBack, wasCorrect, card,
-    user, isAnonymous, gameId, player1Name, player2Name,
+    user, isAnonymous, gameId, playerNames,
     guess, showPlacementChoice, placement, isSongInfoVisible, guessConfirmed
   ]);
 
@@ -448,6 +443,7 @@ export default function DuoGameScreen({
     const finalTimeline = [player.startYear, ...player.timeline];
     const roundTimeline = isCurrentPlayer ? roundCards.map((c) => c.year) : [];
     const allYears = Array.from(new Set([...finalTimeline, ...roundTimeline])).sort((a, b) => a - b);
+    const isFirstPlayer = player.name === playerNames[0]; // Check if this is the starting player
     
     return (
       <>
@@ -490,7 +486,7 @@ export default function DuoGameScreen({
                 />
                 <HStack alignItems="center" space="xs">
                   <Text fontSize="$sm" fontWeight="900" color={isCurrentPlayer ? '$secondary900' : '$secondary600'} sx={{ _dark: { color: isCurrentPlayer ? '$secondary100' : '$secondary400' } }} textTransform="uppercase" letterSpacing={0.5}>
-                    {player.name} ({1 + player.timeline.length + (isCurrentPlayer ? roundCards.length : 0)})
+                    {isFirstPlayer && '♔ '}{player.name} ({1 + player.timeline.length + (isCurrentPlayer ? roundCards.length : 0)})
                   </Text>
                   {!isCurrentPlayer && !opponentExpanded && (
                     <Text fontSize="$xs" fontWeight="700" color="$amber600" sx={{ _dark: { color: '$amber400' } }} opacity={0.6}>
@@ -827,8 +823,7 @@ export default function DuoGameScreen({
       <ScoreScreen 
         gameOverMessage={gameOverMessage}
         players={players}
-        player1Name={player1Name}
-        player2Name={player2Name}
+        playerNames={playerNames}
       />
     );
   }
@@ -845,7 +840,11 @@ export default function DuoGameScreen({
         <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight + 5 }]} onScroll={onScroll} scrollEventThrottle={16}>
         {/* Opponent timeline - överst, kan kollapsa */}
        <Box mt="$3">
-          {renderTimeline(players[player1Name === activePlayer ? player2Name : player1Name], false)}
+          {playerNames.filter(name => name !== activePlayer).map((opponentName) => (
+            <Box key={opponentName}>
+              {renderTimeline(players[opponentName], false)}
+            </Box>
+          ))}
         </Box>
         
         {/* Aktiv spelare timeline - näst överst, kan kollapsa */}

@@ -5,7 +5,7 @@ import { VStack, Input, InputField, Button, ButtonText, Center, Text, HStack, Bo
 import { UserPlus, PlayCircle, Music2, Globe, Disc, Star, Film, Sparkles, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 type Props = {
- onStart: (player1: string, player2: string, gameMode: string) => void;
+  onStart: (playerNames: string[], gameMode: string) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: number;
 };
@@ -29,20 +29,21 @@ const GAME_MODES = [
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 5;
+
 export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: Props) {
-  const [player1, setPlayer1] = useState('');
-  const [player2, setPlayer2] = useState('');
+  const [playerNames, setPlayerNames] = useState<string[]>(['', '']);
   const [selectedMode, setSelectedMode] = useState('default');
   const [error, setError] = useState('');
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Rensa felmeddelande när användaren ändrar något
   useEffect(() => {
     if (error) {
       setError('');
     }
-  }, [player1, player2]);
+  }, [playerNames]);
 
   const handleScrollCategories = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -51,19 +52,44 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
   };
 
   const handleStart = () => {
-    if (!player1.trim() || !player2.trim()) {
-      setError('Please enter names for both players.');
+    const trimmed = playerNames.map(n => n.trim());
+    
+    if (trimmed.some(n => n === '')) {
+      setError('Alla players must have a name.');
       return;
     }
-    if (player1.trim().toLowerCase() === player2.trim().toLowerCase()) {
+    
+    const uniqueNames = new Set(trimmed.map(n => n.toLowerCase()));
+    if (uniqueNames.size !== trimmed.length) {
       setError('Players cannot have the same name.');
       return;
     }
+    
     setError('');
-    onStart(player1.trim(), player2.trim(), selectedMode);
+    onStart(trimmed, selectedMode);
   };
 
-  const isFormValid = player1.trim() !== '' && player2.trim() !== '';
+  const handleAddPlayer = () => {
+    if (playerNames.length < MAX_PLAYERS) {
+      setPlayerNames([...playerNames, '']);
+    }
+  };
+
+  const handleRemovePlayer = (index: number) => {
+    if (playerNames.length > MIN_PLAYERS) {
+      setPlayerNames(playerNames.filter((_, i) => i !== index));
+    }
+  };
+
+  const handlePlayerNameChange = (index: number, value: string) => {
+    const updated = [...playerNames];
+    updated[index] = value;
+    setPlayerNames(updated);
+  };
+
+  const isFormValid = playerNames.every(name => name.trim() !== '');
+  const canAddPlayer = playerNames.length < MAX_PLAYERS;
+  const canRemovePlayer = playerNames.length > MIN_PLAYERS;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -122,85 +148,54 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
 
             {/* Player Inputs */}
             <VStack space="lg">
-              <HStack space="md" w="$full">
-                {/* Player 1 */}
-                <VStack space="sm" flex={1}>
-                  <Text
-                    fontSize="$xs"
-                    fontWeight="black"
-                    color="$textLight400"
-                    sx={{
-                      _dark: { color: '$textDark500' }
-                    }}
-                  >
-                    PLAYER 1
-                  </Text>
-                  <Input
-                    rounded="$2xl"
-                    borderWidth={2}
-                    borderColor="$backgroundLight100"
-                    bg="$backgroundLight50"
-                    sx={{
-                      _dark: {
-                        borderColor: '$backgroundDark800',
-                        bg: '$backgroundDark950',
-                      },
-                      _focus: {
-                        borderColor: '$emerald500',
-                      },
-                    }}
-                  >
-                    <InputField
-                      placeholder="Player 1"
-                      value={player1}
-                      onChangeText={setPlayer1}
-                      fontWeight="bold"
+              {playerNames.map((name, index) => (
+                <HStack key={index} space="md" w="$full" alignItems="flex-start">
+                  <VStack space="sm" flex={1}>
+                    <Text fontSize="$xs" fontWeight="black" color="$textLight400" sx={{ _dark: { color: '$textDark500' } }}>
+                      PLAYER {index + 1}
+                    </Text>
+                    <Input
+                      rounded="$2xl"
+                      borderWidth={2}
+                      borderColor="$backgroundLight100"
+                      bg="$backgroundLight50"
                       sx={{
-                        _dark: { color: '$textDark50' }
+                        _dark: { borderColor: '$backgroundDark800', bg: '$backgroundDark950' },
+                        _focus: { borderColor: '$emerald500' },
                       }}
-                    />
-                  </Input>
-                </VStack>
+                    >
+                      <InputField
+                        placeholder={`Player ${index + 1}`}
+                        value={name}
+                        onChangeText={(value) => handlePlayerNameChange(index, value)}
+                        fontWeight="bold"
+                        sx={{ _dark: { color: '$textDark50' } }}
+                      />
+                    </Input>
+                  </VStack>
 
-                {/* Player 2 */}
-                <VStack space="sm" flex={1}>
-                  <Text
-                    fontSize="$xs"
-                    fontWeight="black"
-                    color="$textLight400"
-                    sx={{
-                      _dark: { color: '$textDark500' }
-                    }}
-                  >
-                    PLAYER 2
-                  </Text>
-                  <Input
-                    rounded="$2xl"
-                    borderWidth={2}
-                    borderColor="$backgroundLight100"
-                    bg="$backgroundLight50"
-                    sx={{
-                      _dark: {
-                        borderColor: '$backgroundDark800',
-                        bg: '$backgroundDark950',
-                      },
-                      _focus: {
-                        borderColor: '$emerald500',
-                      },
-                    }}
-                  >
-                    <InputField
-                      placeholder="Player 2"
-                      value={player2}
-                      onChangeText={setPlayer2}
-                      fontWeight="bold"
-                      sx={{
-                        _dark: { color: '$textDark50' }
-                      }}
-                    />
-                  </Input>
-                </VStack>
-              </HStack>
+                  {canRemovePlayer && (
+                    <Box justifyContent="flex-end" mt="$6">
+                      <Pressable onPress={() => handleRemovePlayer(index)} hitSlop={12}>
+                        <Box w="$10" h="$10" rounded="$full" bg="$error500" justifyContent="center" alignItems="center" sx={{ _dark: { bg: '$error600' } }}>
+                          <Text color="$white" fontSize="$lg" fontWeight="bold">−</Text>
+                        </Box>
+                      </Pressable>
+                    </Box>
+                  )}
+                </HStack>
+              ))}
+
+              {canAddPlayer && (
+                <Pressable onPress={handleAddPlayer}>
+                  <Box w="$full" h="$12" rounded="$2xl" borderWidth={2} borderColor="$emerald500" borderStyle="dashed" justifyContent="center" alignItems="center" bg="rgba(16, 185, 129, 0.05)" sx={{ _dark: { bg: 'rgba(16, 185, 129, 0.08)' } }}>
+                    <HStack space="sm" alignItems="center">
+                      <Text fontSize="$md" fontWeight="bold" color="$emerald500">+ Add Player</Text>
+                      <Text fontSize="$xs" color="$textLight400" sx={{ _dark: { color: '$textDark500' } }}>({playerNames.length}/{MAX_PLAYERS})</Text>
+                    </HStack>
+                  </Box>
+                </Pressable>
+              )}
             </VStack>
 
             {/* Category Selection - Scrollable */}
