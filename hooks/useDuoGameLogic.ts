@@ -59,8 +59,17 @@ type UseDuoGameLogicProps = {
 export function useDuoGameLogic({ playerNames, gameMode = 'default', onNewCardNeeded }: UseDuoGameLogicProps) {
   const [players, setPlayers] = useState<{ [key: string]: Player }>(() => {
     const initialPlayers: { [key: string]: Player } = {};
+    const usedYears = new Set<number>();
+    
     for (const playerName of playerNames) {
-      initialPlayers[playerName] = { name: playerName, startYear: getRandomYear(gameMode), timeline: [], cards: [], stars: 1 };
+      let year: number;
+      // Säkerställ att varje spelare får ett unikt startYear
+      do {
+        year = getRandomYear(gameMode);
+      } while (usedYears.has(year));
+      
+      usedYears.add(year);
+      initialPlayers[playerName] = { name: playerName, startYear: year, timeline: [], cards: [], stars: 1 };
     }
     return initialPlayers;
   });
