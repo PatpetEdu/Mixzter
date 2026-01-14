@@ -111,6 +111,13 @@ function titleMatches(found: string, want: string): boolean {
   return tokenOverlap(f, w) >= 0.6;
 }
 
+// Kontrollera om en Spotify-låt är en originalversion (inte remix, cover, live osv)
+function isSpotifyOriginalVersion(spotifyTrack: any): boolean {
+  const trackName = String(spotifyTrack?.name || '').toLowerCase();
+  const excludePatterns = /remix|cover|live|acoustic|version|remaster|edit|alternate|karaoke|tribute|feat\.|featuring/i;
+  return !excludePatterns.test(trackName);
+}
+
 async function searchApple(artist: string, title: string, wantYear?: number): Promise<SearchMatch | null> {
   try {
     const { data } = await axios.get('https://itunes.apple.com/search', {
@@ -345,10 +352,15 @@ ${jsonFormatExample}`;
           try {
             const query = encodeURIComponent(`${parsedOpenAISong.artist} ${parsedOpenAISong.title}`);
             const searchRes = await axios.get(
-              `https://api.spotify.com/v1/search?q=${query}&type=track&limit=1`,
+              `https://api.spotify.com/v1/search?q=${query}&type=track&limit=5`,
               { headers: { Authorization: `Bearer ${accessToken}` } }
             );
-            spotifyItem = searchRes.data.tracks.items[0];
+            const allTracks: any[] = Array.isArray(searchRes.data?.tracks?.items) ? searchRes.data.tracks.items : [];
+            
+            // Filtrera för originalversioner först – ta den första som matchar
+            const originalVersionTracks = allTracks.filter(t => isSpotifyOriginalVersion(t));
+            spotifyItem = originalVersionTracks.length > 0 ? originalVersionTracks[0] : allTracks[0];
+            
             if (spotifyItem) {
               // 🎵 Parallell Apple/Deezer-sökning medan vi har Spotify
               // Denna är optional - om den misslyckas returnerar vi bara Spotify
