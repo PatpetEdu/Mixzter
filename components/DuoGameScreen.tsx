@@ -4,7 +4,7 @@ import {
   Box, Text, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
 import ScoreScreen from './ScoreScreen';
@@ -96,10 +96,21 @@ export default function DuoGameScreen({
 
   // Dynamic player based on current preview URL
   const previewPlayer = useAudioPlayer(currentPreviewUrl || '');
+  
+  // Lysna på playback status för att detektera när låten är slut
+  const playerStatus = useAudioPlayerStatus(previewPlayer);
 
   useEffect(() => {
     previewPlayerRef.current = previewPlayer;
   }, [previewPlayer]);
+
+  // Detektera när låten är slut via didJustFinish-flagga
+  useEffect(() => {
+    if (isPlayingPreview && playerStatus.didJustFinish) {
+      setIsPlayingPreview(false);
+      setCurrentPreviewUrl(null);
+    }
+  }, [isPlayingPreview, playerStatus.didJustFinish]);
 
   // 🎵 State för modal över år i tidslinjen
   const [selectedYearCard, setSelectedYearCard] = useState<Card | null>(null);
@@ -224,20 +235,7 @@ export default function DuoGameScreen({
     }
   }, [isPlayingPreview, currentPreviewUrl]);
 
-  // Auto-reset play icon when preview finishes (previews are ~30 seconds)
-  useEffect(() => {
-    if (!isPlayingPreview) return;
-
-    // Set a timeout to reset play state after preview duration
-    // Most previews are 30 seconds, we use 35 to be safe
-    const previewTimeout = setTimeout(() => {
-      setIsPlayingPreview(false);
-    }, 35000);
-
-    return () => clearTimeout(previewTimeout);
-  }, [isPlayingPreview]);
-
-  // Auto-play when URL changes
+  // Auto-play när URL ändras och isPlayingPreview är true
   useEffect(() => {
     if (currentPreviewUrl && previewPlayerRef.current && isPlayingPreview) {
       previewPlayerRef.current.play();

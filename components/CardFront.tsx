@@ -58,8 +58,31 @@ export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPl
   const ring1Anim = useRef(new Animated.Value(0)).current;
   const ring2Anim = useRef(new Animated.Value(0)).current;
   const ring3Anim = useRef(new Animated.Value(0)).current;
+  const ringsVisibilityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!isPlayingPreview) {
+      // Dölj ringarna med fade-out
+      Animated.timing(ringsVisibilityAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      
+      // Stoppa animationerna när ljud inte spelas
+      ring1Anim.setValue(0);
+      ring2Anim.setValue(0);
+      ring3Anim.setValue(0);
+      return;
+    }
+
+    // Visa ringarna med fade-in
+    Animated.timing(ringsVisibilityAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+
     // Ring 1 - 3 second cycle
     const ring1Loop = Animated.loop(
       Animated.sequence([
@@ -117,33 +140,42 @@ export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPl
       ring2Loop.stop();
       ring3Loop.stop();
     };
-  }, [ring1Anim, ring2Anim, ring3Anim]);
+  }, [ring1Anim, ring2Anim, ring3Anim, ringsVisibilityAnim, isPlayingPreview]);
 
   // Interpolate animations
-  const ring1Opacity = ring1Anim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0.5, 0],
-  });
+  const ring1Opacity = Animated.multiply(
+    ringsVisibilityAnim,
+    ring1Anim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [1, 0.5, 0],
+    })
+  );
 
   const ring1Scale = ring1Anim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.8, 1.2],
   });
 
-  const ring2Opacity = ring2Anim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0.5, 0],
-  });
+  const ring2Opacity = Animated.multiply(
+    ringsVisibilityAnim,
+    ring2Anim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [1, 0.5, 0],
+    })
+  );
 
   const ring2Scale = ring2Anim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.8, 1.2],
   });
 
-  const ring3Opacity = ring3Anim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0.5, 0],
-  });
+  const ring3Opacity = Animated.multiply(
+    ringsVisibilityAnim,
+    ring3Anim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [1, 0.5, 0],
+    })
+  );
 
   const ring3Scale = ring3Anim.interpolate({
     inputRange: [0, 1],
