@@ -111,10 +111,12 @@ function titleMatches(found: string, want: string): boolean {
   return tokenOverlap(f, w) >= 0.6;
 }
 
-// Kontrollera om en Spotify-låt är en originalversion (inte remix, cover, live osv)
+// Kontrollera om en Spotify-låt ser ut som en originalversion (inte remix, cover, live version osv)
 function isSpotifyOriginalVersion(spotifyTrack: any): boolean {
   const trackName = String(spotifyTrack?.name || '').toLowerCase();
-  const excludePatterns = /remix|cover|live|acoustic|version|remaster|edit|alternate|karaoke|tribute|feat\.|featuring/i;
+  // Bara filtrera de MEST UPPENBART oönskade versioner
+  // Exkludera: remix, cover, live version (men INTE "acoustic", "version", "feat" osv som är vanligt i originaler)
+  const excludePatterns = /\bremix\b|\bcover\b|\blive\s+version\b|\blive\s+at\b/i;
   return !excludePatterns.test(trackName);
 }
 
@@ -126,8 +128,8 @@ async function searchApple(artist: string, title: string, wantYear?: number): Pr
     });
     const results: any[] = Array.isArray(data?.results) ? data.results : [];
     
-    // Filter out remixes, covers, live versions, etc.
-    const excludePatterns = /remix|cover|live|acoustic|version|remaster|edit|alternate|karaoke/i;
+    // Filter out clear non-original versions (but allow remasters and edits as they're often originals)
+    const excludePatterns = /remix|cover|live|acoustic|version|alternate|karaoke/i;
     
     const candidates: SearchMatch[] = results
       .filter((r) => r?.previewUrl && !excludePatterns.test(r.trackName || ''))
@@ -163,8 +165,8 @@ async function searchDeezer(artist: string, title: string, wantYear?: number): P
     });
     const arr: any[] = Array.isArray(data?.data) ? data.data : [];
     
-    // Filter out remixes, covers, live versions, etc.
-    const excludePatterns = /remix|cover|live|acoustic|version|remaster|edit|alternate|karaoke/i;
+    // Filter out clear non-original versions (but allow remasters and edits as they're often originals)
+    const excludePatterns = /remix|cover|live|acoustic|version|alternate|karaoke/i;
     
     const candidates: SearchMatch[] = arr
       .filter((d) => d?.preview && !excludePatterns.test(d.title || ''))
@@ -357,9 +359,30 @@ ${jsonFormatExample}`;
             );
             const allTracks: any[] = Array.isArray(searchRes.data?.tracks?.items) ? searchRes.data.tracks.items : [];
             
-            // Filtrera för originalversioner först – ta den första som matchar
+            // Filtrera för originalversioner
             const originalVersionTracks = allTracks.filter(t => isSpotifyOriginalVersion(t));
-            spotifyItem = originalVersionTracks.length > 0 ? originalVersionTracks[0] : allTracks[0];
+            const candidateTracks = originalVersionTracks.length > 0 ? originalVersionTracks : allTracks;
+            
+            if (candidateTracks.length > 0) {
+              // Sortera med artist-matchning som primär sort, popularity som sekundär
+              spotifyItem = candidateTracks.sort((a, b) => {
+                // Hämta första artisten från varje track (Spotify returnerar array av artists)
+                const artistA = a.artists?.[0]?.name || '';
+                const artistB = b.artists?.[0]?.name || '';
+                
+                // Kontrollera om artistnamnet matchar den vi sökte efter
+                const aMatches = artistMatches(artistA, parsedOpenAISong.artist) ? 1 : 0;
+                const bMatches = artistMatches(artistB, parsedOpenAISong.artist) ? 1 : 0;
+                
+                // Föredra exakta artistmatcher först
+                if (aMatches !== bMatches) return bMatches - aMatches;
+                
+                // Om båda matchar (eller ingen matchar), använd popularity
+                return (b.popularity || 0) - (a.popularity || 0);
+              })[0];
+            } else {
+              spotifyItem = null;
+            }
             
             if (spotifyItem) {
               // 🎵 Parallell Apple/Deezer-sökning medan vi har Spotify
