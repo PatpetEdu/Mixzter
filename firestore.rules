@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Game documents
+    match /games/{gameId} {
+      // Värd kan skapa och uppdatera sitt eget spel
+      allow create: if request.auth.uid != null;
+      allow write: if request.auth.uid == resource.data.hostUid;
+      
+      // Läsa: värd + spektatorer (via subcollection) + alla autentiserade
+      allow read: if request.auth.uid == resource.data.hostUid || 
+                     exists(/databases/$(database)/documents/games/$(gameId)/spectators/$(request.auth.uid)) ||
+                     request.auth.uid != null;
+      
+      // Spectators subcollection
+      match /spectators/{spectatorUid} {
+        allow create: if request.auth.uid == spectatorUid;
+        allow delete: if request.auth.uid == spectatorUid;
+        allow read: if request.auth.uid == spectatorUid || 
+                       request.auth.uid == get(/databases/$(database)/documents/games/$(gameId)).data.hostUid;
+      }
+    }
+
+    // Deny-all fallback
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

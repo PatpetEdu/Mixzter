@@ -8,9 +8,13 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
 import ScoreScreen from './ScoreScreen';
+import GameCodeBadge from './GameCodeBadge';
 import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic, MAX_STARS } from '../hooks/useDuoGameLogic';
 import { useAuth } from '../hooks/useAuth';
+import { useGameSync } from '../hooks/useGameSync';
+import { useGameInitializer } from '../hooks/useGameInitializer';
+import { useSpectatorCounter } from '../hooks/useSpectatorCounter';
 import { deleteActiveGame, loadActiveGame, saveActiveGame, SavedDuoGameState } from '../storage/gameStorage';
 import { Music, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 
@@ -78,6 +82,10 @@ export default function DuoGameScreen({
   const [activePlayerExpanded, setActivePlayerExpanded] = useState(true);
   const [isSkipping, setIsSkipping] = useState(false);
   const [wasSkipped, setWasSkipped] = useState(false);
+
+  // Spectator mode state
+  const [gameCode, setGameCode] = useState<string | null>(null);
+  const { count: spectatorCount } = useSpectatorCounter(gameId);
 
     // Ny state för "Före/Efter"-logiken
   const [showPlacementChoice, setShowPlacementChoice] = useState(false);
@@ -242,6 +250,15 @@ export default function DuoGameScreen({
     }
   }, [currentPreviewUrl, isPlayingPreview]);
 
+  // 🎮 Initialize game in Firestore (create game doc + generate code)
+  useGameInitializer({
+    gameId,
+    hostUid: user?.uid || null,
+    gameMode,
+    playerNames,
+    onGameCodeReady: (code) => setGameCode(code),
+  });
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -386,6 +403,18 @@ export default function DuoGameScreen({
       })();
     }
   }, [gameOverMessage, user, isAnonymous, gameId, gameMode]);
+
+  // 🎮 Synka game state till Firestore för spectators
+  useGameSync({
+    gameId,
+    players,
+    activePlayer,
+    roundCards,
+    currentCard: card,
+    backCardUnlocked: showBack,
+    wasCorrect,
+    playerNames,
+  });
 
   const handleAwardStar = () => awardStar();
   const handleSkipSong = () => {
@@ -834,6 +863,14 @@ export default function DuoGameScreen({
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
+      {/* Game Code Badge - diskret i övre högra hörnet */}
+      {gameCode && (
+        <GameCodeBadge 
+          gameCode={gameCode}
+          spectatorCount={spectatorCount}
+        />
+      )}
+      
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <AnimatedScrollView contentContainerStyle={[styles.container, { paddingTop: headerHeight + 5 }]} onScroll={onScroll} scrollEventThrottle={16}>
         {/* Opponent timeline - överst, kan kollapsa */}

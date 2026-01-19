@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { ActivityIndicator, StatusBar, Animated, NativeSyntheticEvent, NativeScrollEvent, AppState, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Sun, Moon, User, Users, Trophy, ChevronRight, X } from 'lucide-react-native';
+import { Sun, Moon, User, Users, Trophy, ChevronRight, X, Eye } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // UI & Theme
@@ -18,6 +18,8 @@ import DuoGameScreen from './components/DuoGameScreen';
 import LoginScreen from './components/LoginScreen';
 import SignupScreen from './components/SignupScreen';
 import SinglePlayerScreen from './components/SinglePlayerScreen';
+import SpectatorJoinScreen from './components/SpectatorJoinScreen';
+import SpectatorScreen from './components/SpectatorScreen';
 import GameHeader from './components/GameHeader';
 import GameFooter from './components/GameFooter';
 import { AuthProvider } from './context/AuthContext';
@@ -27,7 +29,7 @@ import { auth } from './firebase';
 import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame } from './storage/gameStorage';
 
 export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
-export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single';
+export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single' | 'spectator-join' | 'spectator';
 
 const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
 const GLOBAL_DUO_PRELOAD_KEY = (uid: string) => `globalPreload:duo:${uid}`;
@@ -82,6 +84,7 @@ function AppContent() {
   const [activeGames, setActiveGames] = useState<ActiveGameMeta[]>([]);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [spectatorGameId, setSpectatorGameId] = useState<string | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation logic
@@ -601,6 +604,60 @@ const resumeGame = (meta: ActiveGameMeta) => {
                     Max 5 aktiva spel nått. Avsluta ett spel för att starta nytt.
                   </Text>
                 )}
+
+                {/* SPECTATOR MODE - Small Button */}
+                <Pressable
+                  onPress={() => setMode('spectator-join')}
+                  disabled={isScrolling}
+                  hitSlop={8}
+                  alignSelf="flex-start"
+                  mt="$2"
+                >
+                  <HStack 
+                    bg="$backgroundLight100"
+                    rounded="$2xl"
+                    px="$5"
+                    py="$3"
+                    space="md"
+                    alignItems="center"
+                    sx={{
+                      _dark: { bg: '$backgroundDark900' }
+                    }}
+                  >
+                    <Box 
+                      w={32}
+                      h={32}
+                      bg="$backgroundLight200"
+                      rounded="$lg"
+                      justifyContent="center"
+                      alignItems="center"
+                      sx={{
+                        _dark: { bg: '$backgroundDark800' }
+                      }}
+                    >
+                      <Eye size={16} color="#6366f1" />
+                    </Box>
+                    <VStack space="xs">
+                      <Text 
+                        fontSize="$sm" 
+                        fontWeight="bold"
+                        sx={{
+                          _dark: { color: '$textDark100' }
+                        }}
+                      >
+                        Watch Live
+                      </Text>
+                      <Text 
+                        fontSize="$xs" 
+                        sx={{
+                          _dark: { color: '$textDark400' }
+                        }}
+                      >
+                        Follow a friend's game
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </Pressable>
               </VStack>
 
               {/* Active Games Section */}
@@ -879,6 +936,56 @@ const resumeGame = (meta: ActiveGameMeta) => {
           )}
         </Box>
         <GameFooter onBackToMenu={returnToMenu} />
+      </Box>
+    );
+  }
+
+  // Spectator Mode
+  if (mode === 'spectator-join') {
+    return (
+      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+        <SpectatorJoinScreen 
+          onJoinGame={(gameId) => {
+            setSpectatorGameId(gameId);
+            setMode('spectator');
+          }}
+          onBack={() => setMode('menu')}
+        />
+      </Box>
+    );
+  }
+
+  if (mode === 'spectator' && spectatorGameId) {
+    return (
+      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1,
+            height: HEADER_HEIGHT,
+            transform: [{ translateY: headerTranslateY }],
+          }}
+          pointerEvents="box-none"
+        >
+          <GameHeader />
+        </Animated.View>
+
+        <Box flex={1} position="relative">
+          <SpectatorScreen 
+            gameId={spectatorGameId}
+            onLeave={() => {
+              setSpectatorGameId(null);
+              setMode('menu');
+            }}
+          />
+        </Box>
+        <GameFooter onBackToMenu={() => {
+          setSpectatorGameId(null);
+          setMode('menu');
+        }} />
       </Box>
     );
   }

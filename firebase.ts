@@ -3,6 +3,7 @@
 // =============================
 import { initializeApp } from 'firebase/app';
 import * as firebaseAuth from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -17,6 +18,9 @@ const firebaseConfig = {
 
 // Init Firebase App
 export const app = initializeApp(firebaseConfig);
+
+// Firestore
+export const db = getFirestore(app);
 
 // special-lösning för RN-persistens
 export const auth = firebaseAuth.initializeAuth(app, {
