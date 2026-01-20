@@ -903,6 +903,7 @@ export default function DuoGameScreen({
               onPlayPreview={handlePlayPreview}
               isPlayingPreview={isPlayingPreview}
               onShowGameCode={() => setShowGameCodeModal(true)}
+              gameId={gameId}
             />
            
              {/* Guess section */}
@@ -1235,6 +1236,7 @@ export default function DuoGameScreen({
               showFlipButton={false}
               onPlayPreview={handlePlayPreview}
               isPlayingPreview={isPlayingPreview}
+              gameId={gameId}
             />
             
             {wasSkipped ? (

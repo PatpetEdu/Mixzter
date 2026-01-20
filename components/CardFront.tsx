@@ -4,6 +4,7 @@ import { Box, Text, VStack, HStack, Icon, Pressable, useColorMode } from '@glues
 import { QrCode, Play, X, Pause, Eye } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSpectatorCounter } from '../hooks/useSpectatorCounter';
 
 export type PreviewData = {
   previewUrl: string;
@@ -20,6 +21,7 @@ export type CardFrontProps = {
   onPlayPreview?: (previewUrl: string) => void;
   isPlayingPreview?: boolean;
   onShowGameCode?: () => void;
+  gameId?: string | null;
 };
 
 async function openSpotify(spotifyUrl: string) {
@@ -51,9 +53,10 @@ async function openSpotify(spotifyUrl: string) {
   }
 }
 
-export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false, onShowGameCode }: CardFrontProps) {
+export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false, onShowGameCode, gameId }: CardFrontProps) {
   const [showQR, setShowQR] = useState(false);
   const colorMode = useColorMode();
+  const { count: spectatorCount } = useSpectatorCounter(gameId || null);
 
   // Animation refs for pulsing rings
   const ring1Anim = useRef(new Animated.Value(0)).current;
@@ -226,8 +229,16 @@ export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPl
           zIndex={20}
           onPress={onShowGameCode}
           p="$2"
+          flexDirection="row"
+          alignItems="center"
+          gap="$1"
         >
           <Eye size={16} color="rgba(255, 255, 255, 0.6)" />
+          {spectatorCount > 0 && (
+            <Text fontSize="$sm" color="rgba(255, 255, 255, 0.6)" fontWeight="$semibold">
+              {spectatorCount}
+            </Text>
+          )}
         </Pressable>
       )}
 
