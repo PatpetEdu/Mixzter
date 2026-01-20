@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
-import { ScrollView, View, Animated as RNAnimated, Pressable as RNPressable } from 'react-native';
+import { ScrollView, View, Animated as RNAnimated, Pressable as RNPressable, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Box, Center, Heading, VStack, HStack, Text, Pressable } from '@gluestack-ui/themed';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useSpectatorListener, GameData } from '../hooks/useSpectatorListener';
@@ -8,14 +9,17 @@ import { useAuth } from '../hooks/useAuth';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
 interface SpectatorScreenProps {
   gameId: string;
   onLeave: () => void;
+  headerHeight?: number;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }
 
-export default function SpectatorScreen({ gameId, onLeave }: SpectatorScreenProps) {
+export default function SpectatorScreen({ gameId, onLeave, headerHeight = 80, onScroll }: SpectatorScreenProps) {
   const { gameData, loading, error } = useSpectatorListener({ gameId });
-  const { count: spectatorCount } = useSpectatorCounter(gameId);
   const { user } = useAuth();
   const [lastPlayedSong, setLastPlayedSong] = useState<any>(null);
 
@@ -250,52 +254,7 @@ export default function SpectatorScreen({ gameId, onLeave }: SpectatorScreenProp
       bg="$backgroundLight0"
       sx={{ _dark: { bg: '$backgroundDark950' } }}
     >
-      {/* Header med Leave-knapp och spektator-count */}
-      <HStack
-        px="$6"
-        py="$4"
-        borderBottomWidth={1}
-        borderBottomColor="$backgroundLight200"
-        sx={{
-          _dark: { borderBottomColor: '$backgroundDark800' },
-        }}
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        <VStack space="xs" flex={1}>
-          <Text
-            fontSize="$xs"
-            fontWeight="bold"
-            sx={{ _dark: { color: '$textDark400' } }}
-          >
-            WATCHING LIVE • 👥 {spectatorCount} {spectatorCount === 1 ? 'spectator' : 'spectators'}
-          </Text>
-          <Text
-            fontSize="$lg"
-            fontWeight="black"
-            sx={{ _dark: { color: '$textDark100' } }}
-          >
-            Music Battle
-          </Text>
-        </VStack>
-
-        <Pressable
-          onPress={onLeave}
-          hitSlop={8}
-          bg="rgba(239, 68, 68, 0.1)"
-          p="$2"
-          rounded="$lg"
-          sx={{
-            borderWidth: 1,
-            borderColor: 'rgba(239,68,68,0.35)',
-            _dark: { borderColor: 'rgba(239,68,68,0.45)' },
-          }}
-        >
-          <X size={20} color="#dc2626" />
-        </Pressable>
-      </HStack>
-
-      <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
+      <AnimatedScrollView contentContainerStyle={{ paddingTop: headerHeight + 5, paddingHorizontal: 24, paddingBottom: 24, flexGrow: 1 }} onScroll={onScroll} scrollEventThrottle={16}>
         <VStack space="xl">
           {/* Player Stats Section */}
           {playerStats.length > 0 && (
@@ -536,7 +495,7 @@ export default function SpectatorScreen({ gameId, onLeave }: SpectatorScreenProp
             </VStack>
           )}
         </VStack>
-      </ScrollView>
+      </AnimatedScrollView>
       {renderYearModal()}
     </Box>
   );

@@ -997,10 +997,12 @@ const resumeGame = (meta: ActiveGameMeta) => {
         <Box flex={1} position="relative">
           <SpectatorScreen 
             gameId={spectatorGameId}
+            headerHeight={HEADER_HEIGHT}
             onLeave={() => {
               setSpectatorGameId(null);
               setMode('menu');
             }}
+            onScroll={handleScroll}
           />
         </Box>
         <GameFooter onBackToMenu={() => {
