@@ -92,7 +92,7 @@ export default function SpectatorScreen({ gameId, onLeave }: SpectatorScreenProp
     return Object.entries(gameData.players).map(([name, data]) => ({
       name,
       timeline: data.timeline,
-      score: data.timeline.length,
+      score: 1 + data.timeline.length, // startYear räknas som 1 poäng + alla intjänade år
       stars: data.stars,
     }));
   }, [gameData]);

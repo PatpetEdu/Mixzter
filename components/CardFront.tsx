@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Linking, Platform, Animated, View, Vibration } from 'react-native';
 import { Box, Text, VStack, HStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
-import { QrCode, Play, X, Pause } from 'lucide-react-native';
+import { QrCode, Play, X, Pause, Eye } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -19,6 +19,7 @@ export type CardFrontProps = {
   showFlipButton: boolean;
   onPlayPreview?: (previewUrl: string) => void;
   isPlayingPreview?: boolean;
+  onShowGameCode?: () => void;
 };
 
 async function openSpotify(spotifyUrl: string) {
@@ -50,7 +51,7 @@ async function openSpotify(spotifyUrl: string) {
   }
 }
 
-export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false }: CardFrontProps) {
+export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false, onShowGameCode }: CardFrontProps) {
   const [showQR, setShowQR] = useState(false);
   const colorMode = useColorMode();
 
@@ -215,6 +216,21 @@ export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPl
           borderRadius: 24,
         }}
       />
+
+      {/* Game Code Icon - övre högra hörnet */}
+      {onShowGameCode && (
+        <Pressable
+          position="absolute"
+          top="$4"
+          right="$4"
+          zIndex={20}
+          onPress={onShowGameCode}
+          p="$2"
+        >
+          <Eye size={16} color="rgba(255, 255, 255, 0.6)" />
+        </Pressable>
+      )}
+
       {/* Background Ambient Effects - Removed for cleaner look */}
 
       {/* Central Pulsing Audio Visualizer */}

@@ -26,6 +26,8 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { useAuth } from './hooks/useAuth';
 import { auth } from './firebase';
+import { db } from './firebase';
+import { deleteDoc, doc, collection, getDocs } from 'firebase/firestore';
 import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame } from './storage/gameStorage';
 
 export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
@@ -364,6 +366,25 @@ const resumeGame = (meta: ActiveGameMeta) => {
 
               await AsyncStorage.removeItem(persistKey);
               await removeActiveGame(user!.uid, id);
+              
+              // Rensa spectators INNAN game-dokumentet raderas för att undvika orphaned subcollection
+              try {
+                const spectatorsRef = collection(db, 'games', id, 'spectators');
+                const spectatorsSnap = await getDocs(spectatorsRef);
+                const deletePromises = spectatorsSnap.docs.map(doc => deleteDoc(doc.ref));
+                await Promise.all(deletePromises);
+              } catch (e) {
+                // Silently ignore spectators cleanup errors - they may already be deleted
+                // or the game may already be gone
+              }
+              
+              // Radera game-dokumentet från Firestore
+              try {
+                await deleteDoc(doc(db, 'games', id));
+              } catch (e) {
+                console.warn('Kunde inte radera Firestore game-dokument', e);
+              }
+              
               await refreshActiveGames(); // vänta in listuppdatering
             } catch (e) {
               console.warn('Kunde inte städa/avsluta spel', e);

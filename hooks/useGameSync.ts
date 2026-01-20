@@ -90,8 +90,13 @@ export function useGameSync({
         });
 
         lastSyncRef.current = Date.now();
-      } catch (error) {
-        console.error('Error syncing game state:', error);
+      } catch (error: any) {
+        // Ignorera permission-denied och not-found errors när spelet raderas
+        if (error?.code === 'permission-denied' || error?.code === 'not-found') {
+          console.log('Game was deleted - sync no longer needed');
+        } else {
+          console.error('Error syncing game state:', error);
+        }
       }
     }, 1000);
 

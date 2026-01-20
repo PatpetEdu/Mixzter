@@ -2,9 +2,9 @@ import { getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export function useGameCode() {
-  // Generera en unik 6-char game code
+  // Generera en unik 6-siffrig game code
   const generateCode = (): string => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = '0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));

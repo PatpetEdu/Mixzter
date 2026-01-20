@@ -69,9 +69,15 @@ export function useSpectatorListener({ gameId }: UseSpectatorListenerProps): Use
             setLoading(false);
           }
         },
-        (err) => {
-          console.error('Error listening to game:', err);
-          setError(err);
+        (err: any) => {
+          // Ignorera permission-denied och not-found errors - det är ok om spelet raderas
+          if (err?.code === 'permission-denied' || err?.code === 'not-found') {
+            console.log('Game deleted or not accessible - expected behavior');
+            setError(new Error('Game not found'));
+          } else {
+            console.error('Error listening to game:', err);
+            setError(err);
+          }
           setLoading(false);
         }
       );

@@ -118,15 +118,22 @@ export default function SpectatorJoinScreen({ onJoinGame, onBack }: SpectatorJoi
             }}
           >
             <InputField
-              placeholder="e.g. ABC123"
-              value={code.toUpperCase()}
+              placeholder="e.g. 123456"
+              value={code}
               onChangeText={(text) => {
-                setCode(text.toUpperCase());
+                // Bara acceptera siffror
+                const numericText = text.replace(/[^0-9]/g, '');
+                setCode(numericText);
                 setError(null);
               }}
               maxLength={6}
               editable={!loading}
               placeholderTextColor="#9ca3af"
+              keyboardType="numeric"
+              autoComplete="off"
+              autoCorrect={false}
+              autoCapitalize="none"
+              spellCheck={false}
               style={{ textAlign: 'center', fontSize: 18, fontWeight: '600', letterSpacing: 2 }}
             />
           </Input>

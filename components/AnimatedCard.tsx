@@ -17,9 +17,10 @@ interface Props {
   showFlipButton?: boolean;
   onPlayPreview?: (previewUrl: string) => void;
   isPlayingPreview?: boolean;
+  onShowGameCode?: () => void;
 }
 
-export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = true, onPlayPreview, isPlayingPreview }: Props) {
+export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = true, onPlayPreview, isPlayingPreview, onShowGameCode }: Props) {
   const flipAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = 
           ],
         } as any}
       >
-        <CardFront spotifyUrl={card.spotifyUrl || ''} previewData={card.previewData} onFlip={onFlip || (() => {})} showFlipButton={showFlipButton} onPlayPreview={onPlayPreview} isPlayingPreview={isPlayingPreview} />
+        <CardFront spotifyUrl={card.spotifyUrl || ''} previewData={card.previewData} onFlip={onFlip || (() => {})} showFlipButton={showFlipButton} onPlayPreview={onPlayPreview} isPlayingPreview={isPlayingPreview} onShowGameCode={onShowGameCode} />
       </Animated.View>
 
       {/* Back Card */}

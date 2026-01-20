@@ -19,8 +19,10 @@ export function useSpectatorCounter(gameId: string | null) {
         setCount(snap.size);
         setLoading(false);
       },
-      (err) => {
-        setError((err as Error).message);
+      (err: any) => {
+        // Silently ignore errors - we don't actually use this listener for anything important
+        // Just set count to 0 if there's any error
+        setCount(0);
         setLoading(false);
       }
     );

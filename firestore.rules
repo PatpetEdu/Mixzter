@@ -7,17 +7,16 @@ service cloud.firestore {
       allow create: if request.auth.uid != null;
       allow write: if request.auth.uid == resource.data.hostUid;
       
-      // Läsa: värd + spektatorer (via subcollection) + alla autentiserade
-      allow read: if request.auth.uid == resource.data.hostUid || 
-                     exists(/databases/$(database)/documents/games/$(gameId)/spectators/$(request.auth.uid)) ||
-                     request.auth.uid != null;
+      // 🔧 Läsa: Värd kan läsa sitt eget spel, eller alla inloggade kan läsa (för att validera kod)
+      allow read: if request.auth.uid != null;
       
       // Spectators subcollection
       match /spectators/{spectatorUid} {
         allow create: if request.auth.uid == spectatorUid;
         allow delete: if request.auth.uid == spectatorUid;
-        allow read: if request.auth.uid == spectatorUid || 
-                       request.auth.uid == get(/databases/$(database)/documents/games/$(gameId)).data.hostUid;
+        
+        // Spectators kan läsa sin egen document
+        allow read: if request.auth.uid == spectatorUid;
       }
     }
 
@@ -27,3 +26,4 @@ service cloud.firestore {
     }
   }
 }
+
