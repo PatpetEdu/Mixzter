@@ -20,8 +20,7 @@ export function useSpectatorCounter(gameId: string | null) {
         setLoading(false);
       },
       (err: any) => {
-        // Silently ignore errors - we don't actually use this listener for anything important
-        // Just set count to 0 if there's any error
+        // Silently ignore errors - just set count to 0
         setCount(0);
         setLoading(false);
       }

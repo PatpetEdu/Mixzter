@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useGameCode } from './useGameCode';
 
@@ -49,6 +49,21 @@ export function useGameInitializer({
         });
 
         onGameCodeReady(gameCode);
+
+        // Lyssna på spectator-räknaren
+        const spectatorsRef = collection(db, 'games', gameId, 'spectators');
+        const unsubscribe = onSnapshot(
+          spectatorsRef,
+          (snapshot) => {
+            // Update spectator count automatically
+          },
+          (err: any) => {
+            // Silently ignore errors - spectators may be deleted
+            // Just continue without spectator count
+          }
+        );
+
+        return () => unsubscribe();
       } catch (error) {
         console.error('Error initializing game:', error);
       }
