@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react';
 import { doc, setDoc, serverTimestamp, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useGameCode } from './useGameCode';
+import { generatePublicToken } from '../utils/generateToken';
 
 interface UseGameInitializerProps {
   gameId: string | null;
   hostUid: string | null;
   gameMode: string;
   playerNames: string[];
-  onGameCodeReady: (code: string) => void;
+  onGameCodeReady: (code: string, token: string) => void;
 }
 
 export function useGameInitializer({
@@ -29,11 +30,13 @@ export function useGameInitializer({
     const initializeGame = async () => {
       try {
         const gameCode = generateCode();
+        const publicToken = await generatePublicToken();
 
         // Skapa game-dokumentet
         await setDoc(doc(db, 'games', gameId), {
           hostUid,
           gameCode,
+          publicToken,
           gameMode,
           status: 'active',
           createdAt: serverTimestamp(),
@@ -48,7 +51,7 @@ export function useGameInitializer({
           },
         });
 
-        onGameCodeReady(gameCode);
+        onGameCodeReady(gameCode, publicToken);
 
         // Lyssna på spectator-räknaren
         const spectatorsRef = collection(db, 'games', gameId, 'spectators');

@@ -8,6 +8,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
 import ScoreScreen from './ScoreScreen';
+import QRCodeModal from './QRCodeModal';
 import { Copy } from 'lucide-react-native';
 import { useGenerateSongs } from './useGenerateSongs';
 import { useDuoGameLogic, MAX_STARS } from '../hooks/useDuoGameLogic';
@@ -85,8 +86,10 @@ export default function DuoGameScreen({
 
   // Spectator mode state
   const [gameCode, setGameCode] = useState<string | null>(null);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
   const { count: spectatorCount } = useSpectatorCounter(gameId);
   const [showGameCodeModal, setShowGameCodeModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleCopyCode = () => {
@@ -263,7 +266,10 @@ export default function DuoGameScreen({
     hostUid: user?.uid || null,
     gameMode,
     playerNames,
-    onGameCodeReady: (code) => setGameCode(code),
+    onGameCodeReady: (code, token) => {
+      setGameCode(code);
+      setPublicToken(token);
+    },
   });
 
   // Cleanup on unmount
@@ -1570,6 +1576,26 @@ export default function DuoGameScreen({
                   </HStack>
                 </Pressable>
 
+                {/* QR Code Button */}
+                {publicToken && gameId && (
+                  <Pressable
+                    onPress={() => setShowQRModal(true)}
+                    bg="$emerald600"
+                    px="$6"
+                    py="$3"
+                    rounded="$lg"
+                    w="100%"
+                    alignItems="center"
+                  >
+                    <HStack space="sm" alignItems="center">
+                      <Icon as={() => <Text>📱</Text>} size="lg" />
+                      <Text fontWeight="bold" color="white">
+                        Show QR Code
+                      </Text>
+                    </HStack>
+                  </Pressable>
+                )}
+
                 {/* Spectator Count */}
                 <Box
                   bg="$backgroundDark800"
@@ -1604,6 +1630,16 @@ export default function DuoGameScreen({
             </ModalBody>
           </ModalContent>
         </Modal>
+      )}
+
+      {/* QR Code Modal for Web Spectators */}
+      {showQRModal && publicToken && gameId && (
+        <QRCodeModal
+          gameId={gameId}
+          publicToken={publicToken}
+          onClose={() => setShowQRModal(false)}
+          webDomain="https://musikquiz-app.web.app"
+        />
       )}
     </KeyboardAvoidingView>
     </View>
