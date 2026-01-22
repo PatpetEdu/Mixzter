@@ -94,20 +94,25 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
     setSelectedCard(carouselCards[newIndex]);
   };
 
-  const playerStats: PlayerStats[] = Object.entries(players).map(([name, data]) => ({
-    name,
-    timeline: data.timeline || [],
-    startYear: data.startYear,
-    score: 1 + (data.timeline?.length || 0),
-    stars: data.stars || 0,
-    cards: data.cards,
-  }));
+  const activePlayerName = game?.gameState?.activePlayer;
+
+  const playerStats: PlayerStats[] = Object.entries(players).map(([name, data]) => {
+    const cardCount = data.cards?.length || 0;
+    const roundCardCount = activePlayerName === name ? (game?.roundCards?.length || 0) : 0;
+    return {
+      name,
+      timeline: data.timeline || [],
+      startYear: data.startYear,
+      score: 1 + cardCount + roundCardCount,
+      stars: data.stars || 0,
+      cards: data.cards,
+    };
+  });
 
   console.log('playerStats:', playerStats);
   console.log('players object:', players);
   console.log('Object.entries(players):', Object.entries(players));
 
-  const activePlayerName = game?.gameState?.activePlayer;
   const firstPlayerName = playerStats.length > 0 ? playerStats[0].name : null;
 
   if (loading) {
@@ -155,18 +160,31 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
           className="spotify-btn"
           style={{
             display: 'block',
-            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-            border: '2px solid rgba(16, 185, 129, 0.8)',
-            borderRadius: '1rem',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.12) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '12px',
             padding: '16px 24px',
             margin: '16px',
             textAlign: 'center',
-            color: '#10b981',
+            color: '#34d399',
             textDecoration: 'none',
-            fontWeight: 'bold',
-            fontSize: '1rem',
-            letterSpacing: '1px',
+            fontWeight: '650',
+            fontSize: '0.96rem',
+            letterSpacing: '0.9px',
             textTransform: 'uppercase',
+            boxShadow: '0 5px 16px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(20px)',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.32) 0%, rgba(16, 185, 129, 0.18) 100%)';
+            e.currentTarget.style.boxShadow = '0 7px 20px rgba(16, 185, 129, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.12) 100%)';
+            e.currentTarget.style.boxShadow = '0 5px 16px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
           ▶ GO TO SONG
@@ -192,8 +210,14 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
               }}
             >
               <h2 className="section-title" style={{ margin: 0 }}>CURRENT SONG</h2>
-              <span style={{ color: '#6b7280', fontSize: '1.2rem' }}>
-                {expandCurrentSong ? '▼' : '▶'}
+              <span style={{ 
+                color: '#34d399', 
+                fontSize: '1.2rem',
+                transition: 'transform 0.3s ease',
+                transform: expandCurrentSong ? 'rotate(180deg)' : 'rotate(0deg)',
+                display: 'inline-block'
+              }}>
+                ⌃
               </span>
             </div>
             
