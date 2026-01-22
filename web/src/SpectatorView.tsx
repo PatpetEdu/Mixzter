@@ -28,6 +28,7 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
   const [carouselCards, setCarouselCards] = useState<Card[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [lastPlayedSong, setLastPlayedSong] = useState<Card | null>(null);
+  const [expandCurrentSong, setExpandCurrentSong] = useState(false);
 
   useEffect(() => {
     // Lyssnare på game-dokumentet
@@ -137,13 +138,76 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
 
   return (
     <div className="spectator-container">
-      {/* Header */}
-      <div className="spectator-header">
-        <div className="header-logo">🎵</div>
-        <p className="game-code">Spel: {game.gameCode}</p>
-      </div>
+      {/* Header - visas endast om GO TO SONG inte är aktivt */}
+      {!(game?.gameState?.shareSpotifyUrl && game?.currentCard?.spotifyUrl) && (
+        <div className="spectator-header">
+          <div className="header-logo">🎵</div>
+          <p className="game-code">Spel: {game.gameCode}</p>
+        </div>
+      )}
+
+      {/* GO TO SONG Button - ersätter header när aktivt */}
+      {game?.gameState?.shareSpotifyUrl && game?.currentCard?.spotifyUrl && (
+        <a 
+          href={game.currentCard.spotifyUrl} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="spotify-btn"
+          style={{
+            display: 'block',
+            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+            border: '2px solid rgba(16, 185, 129, 0.8)',
+            borderRadius: '1rem',
+            padding: '16px 24px',
+            margin: '16px',
+            textAlign: 'center',
+            color: '#10b981',
+            textDecoration: 'none',
+            fontWeight: 'bold',
+            fontSize: '1rem',
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+          }}
+        >
+          ▶ GO TO SONG
+        </a>
+      )}
 
       <div className="spectator-content">
+        {/* Current Song with Spotify Link - Collapsible, högst upp */}
+        {game?.gameState?.shareSpotifyUrl && game?.currentCard?.spotifyUrl && (
+          <div className="current-song-section" style={{ marginBottom: '20px' }}>
+            <div 
+              className="current-song-header"
+              onClick={() => setExpandCurrentSong(!expandCurrentSong)}
+              style={{
+                backgroundColor: 'rgba(100, 100, 110, 0.1)',
+                border: '1px solid rgba(100, 100, 110, 0.3)',
+                borderRadius: '0.75rem',
+                padding: '12px 16px',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <h2 className="section-title" style={{ margin: 0 }}>CURRENT SONG</h2>
+              <span style={{ color: '#6b7280', fontSize: '1.2rem' }}>
+                {expandCurrentSong ? '▼' : '▶'}
+              </span>
+            </div>
+            
+            {expandCurrentSong && (
+              <div style={{ marginTop: '12px' }}>
+                <div className="latest-song-card">
+                  <div className="song-title">{game.currentCard.title}</div>
+                  <div className="song-artist">{game.currentCard.artist}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Timeline Section */}
         {playerStats.length > 0 && (
           <div className="timeline-section">

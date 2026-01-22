@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Linking, Platform, Animated, View, Vibration } from 'react-native';
 import { Box, Text, VStack, HStack, Icon, Pressable, useColorMode } from '@gluestack-ui/themed';
-import { QrCode, Play, X, Pause, Eye } from 'lucide-react-native';
+import { QrCode, Play, X, Pause, Eye, Send } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSpectatorCounter } from '../hooks/useSpectatorCounter';
@@ -22,6 +22,8 @@ export type CardFrontProps = {
   isPlayingPreview?: boolean;
   onShowGameCode?: () => void;
   gameId?: string | null;
+  onToggleShareSpotify?: () => void;
+  shareSpotifyUrl?: boolean;
 };
 
 async function openSpotify(spotifyUrl: string) {
@@ -53,7 +55,7 @@ async function openSpotify(spotifyUrl: string) {
   }
 }
 
-export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false, onShowGameCode, gameId }: CardFrontProps) {
+export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPlayingPreview = false, onShowGameCode, gameId, onToggleShareSpotify, shareSpotifyUrl = false }: CardFrontProps) {
   const [showQR, setShowQR] = useState(false);
   const colorMode = useColorMode();
   const { count: spectatorCount } = useSpectatorCounter(gameId || null);
@@ -219,6 +221,22 @@ export default function CardFront({ spotifyUrl, previewData, onPlayPreview, isPl
           borderRadius: 24,
         }}
       />
+
+      {/* Send/Share Spotify URL Icon - övre vänstra hörnet */}
+      <Pressable
+        position="absolute"
+        top="$4"
+        left="$4"
+        zIndex={20}
+        onPress={onToggleShareSpotify}
+        p="$2"
+      >
+        <Icon 
+          as={Send} 
+          size="lg" 
+          color={shareSpotifyUrl ? "$emerald500" : "rgba(255, 255, 255, 0.4)"} 
+        />
+      </Pressable>
 
       {/* Game Code Icon - övre högra hörnet */}
       {onShowGameCode && (

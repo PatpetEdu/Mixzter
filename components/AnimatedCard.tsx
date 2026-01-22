@@ -19,9 +19,11 @@ interface Props {
   isPlayingPreview?: boolean;
   onShowGameCode?: () => void;
   gameId?: string | null;
+  onToggleShareSpotify?: () => void;
+  shareSpotifyUrl?: boolean;
 }
 
-export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = true, onPlayPreview, isPlayingPreview, onShowGameCode, gameId }: Props) {
+export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = true, onPlayPreview, isPlayingPreview, onShowGameCode, gameId, onToggleShareSpotify, shareSpotifyUrl = false }: Props) {
   const flipAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function AnimatedCard({ showBack, card, onFlip, showFlipButton = 
           ],
         } as any}
       >
-        <CardFront spotifyUrl={card.spotifyUrl || ''} previewData={card.previewData} onFlip={onFlip || (() => {})} showFlipButton={showFlipButton} onPlayPreview={onPlayPreview} isPlayingPreview={isPlayingPreview} onShowGameCode={onShowGameCode} gameId={gameId} />
+        <CardFront spotifyUrl={card.spotifyUrl || ''} previewData={card.previewData} onFlip={onFlip || (() => {})} showFlipButton={showFlipButton} onPlayPreview={onPlayPreview} isPlayingPreview={isPlayingPreview} onShowGameCode={onShowGameCode} gameId={gameId} onToggleShareSpotify={onToggleShareSpotify} shareSpotifyUrl={shareSpotifyUrl} />
       </Animated.View>
 
       {/* Back Card */}

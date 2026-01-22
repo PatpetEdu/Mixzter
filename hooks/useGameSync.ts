@@ -27,6 +27,7 @@ interface UseGameSyncProps {
   backCardUnlocked: boolean;
   wasCorrect: boolean;
   playerNames: string[];
+  shareSpotifyUrl?: boolean;
 }
 
 export function useGameSync({
@@ -38,6 +39,7 @@ export function useGameSync({
   backCardUnlocked,
   wasCorrect,
   playerNames,
+  shareSpotifyUrl = false,
 }: UseGameSyncProps) {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncRef = useRef<number>(0);
@@ -73,6 +75,7 @@ export function useGameSync({
               artist: currentCard.artist,
               title: currentCard.title,
               year: currentCard.year,
+              spotifyUrl: shareSpotifyUrl ? currentCard.spotifyUrl : null,
               ...(currentCard.source !== undefined && { source: currentCard.source }),
             }
           : null;
@@ -85,6 +88,7 @@ export function useGameSync({
             activePlayer,
             backCardUnlocked,
             wasCorrect,
+            shareSpotifyUrl,
           },
           updatedAt: serverTimestamp(),
         });
@@ -105,5 +109,5 @@ export function useGameSync({
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [gameId, players, activePlayer, currentCard, backCardUnlocked, wasCorrect, playerNames]);
+  }, [gameId, players, activePlayer, currentCard, backCardUnlocked, wasCorrect, playerNames, shareSpotifyUrl]);
 }

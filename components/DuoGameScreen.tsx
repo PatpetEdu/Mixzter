@@ -91,6 +91,7 @@ export default function DuoGameScreen({
   const [showGameCodeModal, setShowGameCodeModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareSpotifyUrl, setShareSpotifyUrl] = useState(false);
 
   const handleCopyCode = () => {
     setCopied(true);
@@ -427,6 +428,7 @@ export default function DuoGameScreen({
     backCardUnlocked: showBack,
     wasCorrect,
     playerNames,
+    shareSpotifyUrl,
   });
 
   const handleAwardStar = () => awardStar();
@@ -910,6 +912,8 @@ export default function DuoGameScreen({
               isPlayingPreview={isPlayingPreview}
               onShowGameCode={() => setShowGameCodeModal(true)}
               gameId={gameId}
+              onToggleShareSpotify={() => setShareSpotifyUrl(!shareSpotifyUrl)}
+              shareSpotifyUrl={shareSpotifyUrl}
             />
            
              {/* Guess section */}
@@ -1243,6 +1247,8 @@ export default function DuoGameScreen({
               onPlayPreview={handlePlayPreview}
               isPlayingPreview={isPlayingPreview}
               gameId={gameId}
+              onToggleShareSpotify={() => setShareSpotifyUrl(!shareSpotifyUrl)}
+              shareSpotifyUrl={shareSpotifyUrl}
             />
             
             {wasSkipped ? (
