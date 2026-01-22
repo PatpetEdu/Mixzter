@@ -327,42 +327,66 @@ export default function SpectatorScreen({ gameId, onLeave, headerHeight = 80, on
                       <HStack flexWrap="wrap" space="xs">
                         {allYears.map((year, i) => {
                           const isStartYear = year === startYear;
-                          const isPrelim = roundCardsForPlayer.some(c => c.year === year);
-                          const isEarned = player.timeline.includes(year);
+                          const earnedCards = startYear && year === startYear ? [startYear] : [];
+                          const earnedCardsFromTimeline = player.timeline.filter(y => y === year);
+                          const earnedCount = earnedCards.length + earnedCardsFromTimeline.length;
+                          const prelimCount = roundCardsForPlayer.filter(c => c.year === year).length;
+                          const isEarned = earnedCount > 0;
+                          const isPrelim = prelimCount > 0;
                           
-                          let bgColor = 'rgba(16, 185, 129, 0.15)';
-                          let borderColor = 'rgba(16, 185, 129, 0.6)';
-                          let textColor = '#059669';
-                          
-                          if (isPrelim && !isEarned) {
-                            bgColor = 'rgba(251, 146, 60, 0.15)';
-                            borderColor = 'rgba(251, 146, 60, 0.7)';
-                            textColor = '#ea580c';
-                          }
-
                           return (
-                            <RNPressable
-                              key={i}
-                              onPress={() => handleYearPress(player.name, year)}
-                            >
-                              <Box
-                                bg={bgColor}
-                                px="$2"
-                                py="$1"
-                                rounded="$lg"
-                                borderWidth={1}
-                                borderColor={borderColor}
-                              >
-                                <Text
-                                  fontSize="$xs"
-                                  fontWeight="bold"
-                                  color={textColor}
+                            <HStack key={i} space="xs">
+                              {/* Tjänade år eller startår */}
+                              {(isStartYear || isEarned) && (
+                                <RNPressable
+                                  onPress={() => handleYearPress(player.name, year)}
                                 >
-                                  {isStartYear && '📍 '}
-                                  {String(year)}
-                                </Text>
-                              </Box>
-                            </RNPressable>
+                                  <Box
+                                    bg={isStartYear || isEarned ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 100, 110, 0.08)'}
+                                    px="$2"
+                                    py="$1"
+                                    rounded="$lg"
+                                    borderWidth={1}
+                                    borderColor={isStartYear || isEarned ? 'rgba(16, 185, 129, 0.6)' : 'rgba(100, 100, 110, 0.3)'}
+                                  >
+                                    <Text
+                                      fontSize="$xs"
+                                      fontWeight="bold"
+                                      color={isStartYear || isEarned ? '#059669' : '#78716c'}
+                                    >
+                                      {isStartYear && '📍 '}
+                                      {String(year)}
+                                      {isEarned && earnedCount > 1 && ` (${earnedCount}x)`}
+                                    </Text>
+                                  </Box>
+                                </RNPressable>
+                              )}
+                              
+                              {/* Preliminära år */}
+                              {isPrelim && (
+                                <RNPressable
+                                  onPress={() => handleYearPress(player.name, year)}
+                                >
+                                  <Box
+                                    bg="rgba(251, 146, 60, 0.15)"
+                                    px="$2"
+                                    py="$1"
+                                    rounded="$lg"
+                                    borderWidth={1}
+                                    borderColor="rgba(251, 146, 60, 0.7)"
+                                  >
+                                    <Text
+                                      fontSize="$xs"
+                                      fontWeight="bold"
+                                      color="#ea580c"
+                                    >
+                                      {String(year)}
+                                      {prelimCount > 1 && ` (${prelimCount}x)`}
+                                    </Text>
+                                  </Box>
+                                </RNPressable>
+                              )}
+                            </HStack>
                           );
                         })}
                       </HStack>

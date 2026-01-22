@@ -179,18 +179,37 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
                     <div className="years-container">
                       {allYears.map((year, i) => {
                         const isStartYear = year === player.startYear;
-                        const isPrelim = roundCardsForPlayer.some(c => c.year === year);
-                        const isEarned = player.timeline.includes(year);
+                        const earnedCards = [player.startYear, ...player.timeline].filter(y => y === year);
+                        const earnedCount = earnedCards.length;
+                        const prelimCount = roundCardsForPlayer.filter(c => c.year === year).length;
+                        const isEarned = earnedCount > 0;
+                        const isPrelim = prelimCount > 0;
                         
                         return (
-                          <button
-                            key={i}
-                            className={`year-badge ${isPrelim && !isEarned ? 'preliminary' : isStartYear ? 'start' : 'earned'}`}
-                            onClick={() => handleYearPress(player.name, year)}
-                          >
-                            {isStartYear && '📍 '}
-                            {year}
-                          </button>
+                          <div key={i} className="year-badge-group">
+                            {/* Tjänade år eller startår */}
+                            {(isStartYear || isEarned) && (
+                              <button
+                                className={`year-badge ${isStartYear ? 'start' : 'earned'}`}
+                                onClick={() => handleYearPress(player.name, year)}
+                              >
+                                {isStartYear && '📍 '}
+                                {year}
+                                {isEarned && earnedCount > 1 && ` (${earnedCount}x)`}
+                              </button>
+                            )}
+                            
+                            {/* Preliminära år */}
+                            {isPrelim && (
+                              <button
+                                className="year-badge preliminary"
+                                onClick={() => handleYearPress(player.name, year)}
+                              >
+                                {year}
+                                {prelimCount > 1 && ` (${prelimCount}x)`}
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
