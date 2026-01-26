@@ -111,15 +111,6 @@ function titleMatches(found: string, want: string): boolean {
   return tokenOverlap(f, w) >= 0.6;
 }
 
-// Kontrollera om en Spotify-låt ser ut som en originalversion (inte remix, cover, live version osv)
-function isSpotifyOriginalVersion(spotifyTrack: any): boolean {
-  const trackName = String(spotifyTrack?.name || '').toLowerCase();
-  // Bara filtrera de MEST UPPENBART oönskade versioner
-  // Exkludera: remix, cover, live version (men INTE "acoustic", "version", "feat" osv som är vanligt i originaler)
-  const excludePatterns = /\bremix\b|\bcover\b|\blive\s+version\b|\blive\s+at\b/i;
-  return !excludePatterns.test(trackName);
-}
-
 async function searchApple(artist: string, title: string, wantYear?: number): Promise<SearchMatch | null> {
   try {
     const { data } = await axios.get('https://itunes.apple.com/search', {
@@ -354,82 +345,57 @@ ${jsonFormatExample}`;
           try {
             const query = encodeURIComponent(`${parsedOpenAISong.artist} ${parsedOpenAISong.title}`);
             const searchRes = await axios.get(
-              `https://api.spotify.com/v1/search?q=${query}&type=track&limit=5`,
+              `https://api.spotify.com/v1/search?q=${query}&type=track&limit=1`,
               { headers: { Authorization: `Bearer ${accessToken}` } }
             );
-            const allTracks: any[] = Array.isArray(searchRes.data?.tracks?.items) ? searchRes.data.tracks.items : [];
-            
-            // Filtrera för originalversioner
-            const originalVersionTracks = allTracks.filter(t => isSpotifyOriginalVersion(t));
-            const candidateTracks = originalVersionTracks.length > 0 ? originalVersionTracks : allTracks;
-            
-            if (candidateTracks.length > 0) {
-              // Sortera med artist-matchning som primär sort, popularity som sekundär
-              spotifyItem = candidateTracks.sort((a, b) => {
-                // Hämta första artisten från varje track (Spotify returnerar array av artists)
-                const artistA = a.artists?.[0]?.name || '';
-                const artistB = b.artists?.[0]?.name || '';
-                
-                // Kontrollera om artistnamnet matchar den vi sökte efter
-                const aMatches = artistMatches(artistA, parsedOpenAISong.artist) ? 1 : 0;
-                const bMatches = artistMatches(artistB, parsedOpenAISong.artist) ? 1 : 0;
-                
-                // Föredra exakta artistmatcher först
-                if (aMatches !== bMatches) return bMatches - aMatches;
-                
-                // Om båda matchar (eller ingen matchar), använd popularity
-                return (b.popularity || 0) - (a.popularity || 0);
-              })[0];
-            } else {
-              spotifyItem = null;
-            }
-            
-            if (spotifyItem) {
-              // 🎵 Parallell Apple/Deezer-sökning medan vi har Spotify
-              // Denna är optional - om den misslyckas returnerar vi bara Spotify
-              let previewMatch: SearchMatch | null = null;
-              try {
-                const [appleResult, deezerResult] = await Promise.allSettled([
-                  searchApple(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
-                  searchDeezer(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
-                ]);
-                
-                // Föredra Apple, fallback till Deezer
-                if (appleResult.status === 'fulfilled' && appleResult.value) {
-                  previewMatch = appleResult.value;
-                } else if (deezerResult.status === 'fulfilled' && deezerResult.value) {
-                  previewMatch = deezerResult.value;
-                }
-              } catch (previewErr) {
-                // Preview search failed - log but continue with Spotify-only response
-                logger.warn("generateCard: Preview-sökning misslyckades:", previewErr);
-              }
-              
-              finalSong = {
-                artist: parsedOpenAISong.artist,
-                title: parsedOpenAISong.title,
-                year: parsedOpenAISong.year,
-                spotifyUrl: spotifyItem.external_urls.spotify,
-                ...(parsedOpenAISong.source && {
-                  source: parsedOpenAISong.source,
-                }),
-                ...(previewMatch && {
-                  previewData: {
-                    previewUrl: previewMatch.previewUrl,
-                    artworkUrl: previewMatch.artworkUrl,
-                    externalUrl: previewMatch.externalUrl,
-                    source: previewMatch.source,
-                  },
-                }),
-              };
-            } else {
+            spotifyItem = searchRes.data.tracks.items[0];
+
+            if (!spotifyItem) {
+              logger.warn("generateCard: Spotify returnerade inga resultat för \"" + parsedOpenAISong.artist + " - " + parsedOpenAISong.title + "\"");
               spotifySearchAttempts++;
-              break;
+              continue;
             }
+
+            // 🎵 Parallell Apple/Deezer-sökning medan vi har Spotify
+            // Denna är optional - om den misslyckas returnerar vi bara Spotify
+            let previewMatch: SearchMatch | null = null;
+            try {
+              const [appleResult, deezerResult] = await Promise.allSettled([
+                searchApple(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
+                searchDeezer(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
+              ]);
+              
+              // Föredra Apple, fallback till Deezer
+              if (appleResult.status === 'fulfilled' && appleResult.value) {
+                previewMatch = appleResult.value;
+              } else if (deezerResult.status === 'fulfilled' && deezerResult.value) {
+                previewMatch = deezerResult.value;
+              }
+            } catch (previewErr) {
+              // Preview search failed - log but continue with Spotify-only response
+              logger.warn("generateCard: Preview-sökning misslyckades:", previewErr);
+            }
+            
+            finalSong = {
+              artist: parsedOpenAISong.artist,
+              title: parsedOpenAISong.title,
+              year: parsedOpenAISong.year,
+              spotifyUrl: spotifyItem.external_urls.spotify,
+              ...(parsedOpenAISong.source && {
+                source: parsedOpenAISong.source,
+              }),
+              ...(previewMatch && {
+                previewData: {
+                  previewUrl: previewMatch.previewUrl,
+                  artworkUrl: previewMatch.artworkUrl,
+                  externalUrl: previewMatch.externalUrl,
+                  source: previewMatch.source,
+                },
+              }),
+            };
           } catch (searchErr) {
-            logger.error("generateCard: Fel vid sökning på Spotify:", searchErr);
+            logger.error("generateCard: Fel vid sökning på Spotify (försök " + (spotifySearchAttempts + 1) + "):", searchErr);
             spotifySearchAttempts++;
-            break;
           }
         }
         openAITries++;
