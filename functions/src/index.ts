@@ -3,13 +3,18 @@ import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import axios from "axios";
-import OpenAI from "openai";
 
 // 🔒 Admin SDK – init bara EN gång
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { Request } from "firebase-functions/v2/https";
+
+// AI Provider imports
+import { AIProvider } from "./aiProvider";
+import { GeminiProvider } from "./providers/geminiProvider";
+import { OpenAIProvider } from "./providers/openaiProvider";
+import { optimizeSeenSongsList } from "./utils/seenSongsOptimizer";
 
 // 👇 re-exportera dina Apple/Preview-funktioner
 export * from "./appleIndex";
@@ -22,12 +27,12 @@ if (getApps().length === 0) {
 const db = getFirestore();
 const adminAuth = getAuth();
 
-// Definiera hemligheter
+// Definiera hemligheter - Gemini är nu primär, OpenAI är fallback
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 const spotifyClientId = defineSecret("SPOTIFY_CLIENT_ID");
 const spotifyClientSecret = defineSecret("SPOTIFY_CLIENT_SECRET");
 
-let openai: OpenAI;
 let accessToken: string | null = null;
 let tokenExpiresAt = 0;
 
@@ -47,9 +52,11 @@ type Card = {
 
 const CURRENT_YEAR = new Date().getFullYear();
 const MAX_USER_SEEN_SONGS_HISTORY = 500;
-// *** FIX: Sänkt till 5 eftersom prompten nu är mycket mer effektiv ***
-const MAX_OPENAI_TRIES = 5;
+// Reduced from 5 to 3 - providers are more reliable now
+const MAX_AI_GENERATION_TRIES = 3;
 const MAX_SPOTIFY_SEARCH_ATTEMPTS = 3;
+// Optimize seen songs list to reduce prompt size and costs
+const MAX_SEEN_SONGS_IN_PROMPT = 100;
 
 // ====================
 // Apple/Deezer Search Types & Helpers
@@ -225,9 +232,27 @@ const PROMPTS: Record<string, string> = {
 };
 
 export const generateCard = onRequest(
-  { timeoutSeconds: 120, secrets: [openaiApiKey, spotifyClientId, spotifyClientSecret] },
+  { timeoutSeconds: 120, secrets: [geminiApiKey, openaiApiKey, spotifyClientId, spotifyClientSecret] },
   async (req, res) => {
-    openai = new OpenAI({ apiKey: openaiApiKey.value() });
+    // Initialize AI providers (Gemini primary, OpenAI fallback)
+    const providers: AIProvider[] = [];
+    
+    // Add Gemini as primary provider if API key is available
+    if (geminiApiKey.value()) {
+      providers.push(new GeminiProvider(geminiApiKey.value()));
+      logger.info('Using Gemini as primary AI provider');
+    }
+    
+    // Add OpenAI as fallback provider if API key is available
+    if (openaiApiKey.value()) {
+      providers.push(new OpenAIProvider(openaiApiKey.value()));
+      logger.info(`Using OpenAI as ${providers.length === 1 ? 'primary' : 'fallback'} provider`);
+    }
+    
+    if (providers.length === 0) {
+      res.status(500).send("No AI provider configured. Please set GEMINI_API_KEY or OPENAI_API_KEY.");
+      return;
+    }
 
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed. Use POST.");
@@ -252,13 +277,14 @@ export const generateCard = onRequest(
       snapshot.forEach((doc) => { firestoreHistory.add(doc.data().songIdentifier); });
 
       const allSeenSongs = new Set([...firestoreHistory, ...clientSeenSongsSet]);
-      const seenSongsPromptPart = Array.from(allSeenSongs).join(", ");
+      // ✨ NEW: Optimize seen songs list to reduce prompt size and costs
+      const seenSongsPromptPart = optimizeSeenSongsList(allSeenSongs, MAX_SEEN_SONGS_IN_PROMPT);
 
       let finalSong: Card | null = null;
       let spotifyItem: any = null;
-      let openAITries = 0;
+      let aiGenerationTries = 0;
 
-      while (!finalSong && openAITries < MAX_OPENAI_TRIES) {
+      while (!finalSong && aiGenerationTries < MAX_AI_GENERATION_TRIES) {
         // 👇 HÄR BYGGER VI DEN DYNAMISKA PROMPTEN
         const isSourceMode = gameMode === 'filmmusik' || gameMode === 'disney';
         const jsonFormatExample = isSourceMode 
@@ -284,36 +310,40 @@ Använd detta unika slumptal för att förstärka variationen: ${Math.random()}.
 Svara **ENDAST** med ett JSON-objekt på följande exakta format:
 ${jsonFormatExample}`;
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-5-mini",
-          messages: [{ role: "user", content: prompt }],
-          temperature: 1.0,
-        });
-
-        const rawContent = completion.choices[0].message?.content ?? "";
-        let parsedOpenAISong: any = null;
-
-        try {
-          const match = rawContent.match(/\{[\s\S]*\}/);
-          if (match) parsedOpenAISong = JSON.parse(match[0]);
-        } catch (jsonErr) {
-          logger.warn("generateCard: Kunde inte parsa JSON:", rawContent, jsonErr);
+        // ✨ NEW: Try each AI provider in order (Gemini first, then OpenAI if available)
+        let parsedAISong: any = null;
+        let usedProvider: string = '';
+        
+        for (const provider of providers) {
+          try {
+            logger.info(`Attempting song generation with ${provider.name}`);
+            parsedAISong = await provider.generateSong(prompt);
+            
+            if (parsedAISong) {
+              usedProvider = provider.name;
+              logger.info(`Successfully generated song with ${provider.name}`);
+              break;
+            }
+          } catch (providerError) {
+            logger.warn(`Provider ${provider.name} failed:`, providerError);
+            // Continue to next provider
+          }
         }
 
-        if (!parsedOpenAISong?.artist || !parsedOpenAISong?.title || !parsedOpenAISong?.year) {
-          logger.warn("generateCard: Ogiltigt JSON-format:", rawContent);
-          openAITries++;
+        if (!parsedAISong) {
+          logger.warn("generateCard: All AI providers failed to generate a valid song");
+          aiGenerationTries++;
           continue;
         }
 
-        const currentSongIdentifier = `${parsedOpenAISong.artist} - ${parsedOpenAISong.title}`.toLowerCase().trim();
+        const currentSongIdentifier = `${parsedAISong.artist} - ${parsedAISong.title}`.toLowerCase().trim();
 
-      // Behåll denna kontroll som en extra säkerhetsåtgärd ifall OpenAI ignorerar instruktionen
+      // Behåll denna kontroll som en extra säkerhetsåtgärd ifall AI ignorerar instruktionen
         if (allSeenSongs.has(currentSongIdentifier)) {
           logger.info(
-            `generateCard: OpenAI ignorerade instruktionen och föreslog en sedd låt: ${currentSongIdentifier}.`
+            `generateCard: AI provider (${usedProvider}) ignorerade instruktionen och föreslog en sedd låt: ${currentSongIdentifier}.`
           );
-          openAITries++;
+          aiGenerationTries++;
           continue;
         }
 
@@ -334,7 +364,7 @@ ${jsonFormatExample}`;
             tokenExpiresAt = Date.now() + tokenRes.data.expires_in * 1000;
           } catch (tokenErr) {
             logger.error("generateCard: Fel vid hämtning av Spotify token:", tokenErr);
-            openAITries++;
+            aiGenerationTries++;
             continue;
           }
         }
@@ -343,7 +373,7 @@ ${jsonFormatExample}`;
         
         while (!spotifyItem && spotifySearchAttempts < MAX_SPOTIFY_SEARCH_ATTEMPTS) {
           try {
-            const query = encodeURIComponent(`${parsedOpenAISong.artist} ${parsedOpenAISong.title}`);
+            const query = encodeURIComponent(`${parsedAISong.artist} ${parsedAISong.title}`);
             const searchRes = await axios.get(
               `https://api.spotify.com/v1/search?q=${query}&type=track&limit=1`,
               { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -351,7 +381,7 @@ ${jsonFormatExample}`;
             spotifyItem = searchRes.data.tracks.items[0];
 
             if (!spotifyItem) {
-              logger.warn("generateCard: Spotify returnerade inga resultat för \"" + parsedOpenAISong.artist + " - " + parsedOpenAISong.title + "\"");
+              logger.warn("generateCard: Spotify returnerade inga resultat för \"" + parsedAISong.artist + " - " + parsedAISong.title + "\"");
               spotifySearchAttempts++;
               continue;
             }
@@ -361,8 +391,8 @@ ${jsonFormatExample}`;
             let previewMatch: SearchMatch | null = null;
             try {
               const [appleResult, deezerResult] = await Promise.allSettled([
-                searchApple(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
-                searchDeezer(parsedOpenAISong.artist, parsedOpenAISong.title, parsedOpenAISong.year),
+                searchApple(parsedAISong.artist, parsedAISong.title, parsedAISong.year),
+                searchDeezer(parsedAISong.artist, parsedAISong.title, parsedAISong.year),
               ]);
               
               // Föredra Apple, fallback till Deezer
@@ -377,12 +407,12 @@ ${jsonFormatExample}`;
             }
             
             finalSong = {
-              artist: parsedOpenAISong.artist,
-              title: parsedOpenAISong.title,
-              year: parsedOpenAISong.year,
+              artist: parsedAISong.artist,
+              title: parsedAISong.title,
+              year: parsedAISong.year,
               spotifyUrl: spotifyItem.external_urls.spotify,
-              ...(parsedOpenAISong.source && {
-                source: parsedOpenAISong.source,
+              ...(parsedAISong.source && {
+                source: parsedAISong.source,
               }),
               ...(previewMatch && {
                 previewData: {
@@ -398,7 +428,7 @@ ${jsonFormatExample}`;
             spotifySearchAttempts++;
           }
         }
-        openAITries++;
+        aiGenerationTries++;
       }
 
       if (!finalSong) {
