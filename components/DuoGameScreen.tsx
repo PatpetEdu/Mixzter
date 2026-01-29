@@ -1362,6 +1362,18 @@ export default function DuoGameScreen({
                     Genius!
                   </Text>
 
+                  {/* User's guess */}
+                  <Text 
+                    fontSize="$sm" 
+                    fontWeight="700" 
+                    color="$emerald600"
+                    sx={{ _dark: { color: '$emerald400' } }}
+                    textAlign="center"
+                    letterSpacing={0.5}
+                  >
+                    YOU GUESSED {guess}
+                  </Text>
+
                   {/* Award Star Button */}
                   <Pressable
                     onPress={handleAwardStar}
@@ -1493,6 +1505,17 @@ export default function DuoGameScreen({
                     adjustsFontSizeToFit
                   >
                     Not Quite
+                  </Text>
+
+                  {/* User's guess */}
+                  <Text 
+                    fontSize="$sm" 
+                    fontWeight="700" 
+                    color="rgba(239, 68, 68, 0.8)"
+                    textAlign="center"
+                    letterSpacing={0.5}
+                  >
+                    YOU GUESSED {guess}
                   </Text>
 
                   {/* Action button */}
