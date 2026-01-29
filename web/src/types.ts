@@ -15,6 +15,8 @@ export interface Card {
   spotifyId: string;
   imageUrl: string;
   spotifyUrl?: string;
+  source?: string;
+  artworkUrl?: string;
 }
 
 export interface Game {
@@ -29,7 +31,7 @@ export interface Game {
   gameState?: {
     activePlayer?: string;
     backCardUnlocked?: boolean;
-    wasCorrect?: boolean;
+    wasCorrect?: boolean | null;
     shareSpotifyUrl?: boolean;
   };
   createdAt: number;

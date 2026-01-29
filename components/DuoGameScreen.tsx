@@ -426,7 +426,7 @@ export default function DuoGameScreen({
     roundCards,
     currentCard: card,
     backCardUnlocked: showBack,
-    wasCorrect,
+    wasCorrect: wasSkipped ? null : wasCorrect,
     playerNames,
     shareSpotifyUrl,
   });

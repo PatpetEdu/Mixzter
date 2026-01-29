@@ -192,6 +192,172 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
       )}
 
       <div className="spectator-content">
+        {/* Guess Feedback Section - Visar när backCardUnlocked är true */}
+        {game?.gameState?.backCardUnlocked && game?.currentCard && (
+          <div 
+            className="guess-feedback-section" 
+            style={{ 
+              marginBottom: '24px',
+              animation: 'slideInDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+          >
+            {/* Card with Artwork Background */}
+            <div 
+              className="feedback-card" 
+              style={{
+                position: 'relative',
+                backgroundColor: (game.currentCard as any).artworkUrl 
+                  ? 'transparent' 
+                  : 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '1.5rem',
+                overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+              }}
+            >
+              {/* Artwork Background if available */}
+              {(game.currentCard as any).artworkUrl && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundImage: `url(${(game.currentCard as any).artworkUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'blur(2px)',
+                    transform: 'scale(1.1)',
+                  }}
+                />
+              )}
+              
+              {/* Dark Overlay for readability */}
+              {(game.currentCard as any).artworkUrl && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.5) 100%)',
+                  }}
+                />
+              )}
+
+              {/* Content */}
+              <div style={{ position: 'relative', padding: '32px 24px' }}>
+                {/* Year */}
+                <div style={{ 
+                  fontSize: '3.5rem', 
+                  fontWeight: '900', 
+                  color: (game.currentCard as any).artworkUrl ? '#ffffff' : '#10b981',
+                  marginBottom: '16px',
+                  textAlign: 'center',
+                  textShadow: (game.currentCard as any).artworkUrl ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
+                }}>
+                  {game.currentCard.year}
+                </div>
+                
+                {/* Divider */}
+                <div style={{
+                  width: '64px',
+                  height: '3px',
+                  background: '#10b981',
+                  margin: '0 auto 20px',
+                  borderRadius: '2px',
+                }} />
+
+                {/* Artist & Title */}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ 
+                    fontSize: '0.65rem', 
+                    fontWeight: '900', 
+                    color: (game.currentCard as any).artworkUrl ? 'rgba(255,255,255,0.7)' : '#9ca3af',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                    marginBottom: '8px',
+                  }}>
+                    Artist & Låt
+                  </div>
+                  <div style={{ 
+                    fontSize: '1.5rem', 
+                    fontWeight: '900', 
+                    color: (game.currentCard as any).artworkUrl ? '#ffffff' : '#1f2937',
+                    marginBottom: '8px',
+                    textShadow: (game.currentCard as any).artworkUrl ? '0 2px 6px rgba(0,0,0,0.3)' : 'none',
+                  }}>
+                    {game.currentCard.artist}
+                  </div>
+                  <div style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '600',
+                    fontStyle: 'italic',
+                    color: (game.currentCard as any).artworkUrl ? 'rgba(255,255,255,0.9)' : '#6b7280',
+                    textShadow: (game.currentCard as any).artworkUrl ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                  }}>
+                    "{game.currentCard.title}"
+                  </div>
+                  {(game.currentCard as any).source && (
+                    <div style={{ 
+                      fontSize: '0.85rem', 
+                      fontWeight: '600',
+                      fontStyle: 'italic',
+                      color: (game.currentCard as any).artworkUrl ? 'rgba(255,255,255,0.7)' : '#9ca3af',
+                      marginTop: '12px',
+                    }}>
+                      — {(game.currentCard as any).source}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Banner at bottom */}
+                <div style={{
+                  marginTop: '24px',
+                  padding: '12px 20px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  ...(game.gameState.wasCorrect === true && {
+                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                    border: '2px solid rgba(16, 185, 129, 0.6)',
+                  }),
+                  ...(game.gameState.wasCorrect === false && {
+                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                    border: '2px solid rgba(239, 68, 68, 0.6)',
+                  }),
+                  ...(game.gameState.wasCorrect === null && {
+                    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                    border: '2px solid rgba(168, 85, 247, 0.6)',
+                  }),
+                }}>
+                  <span style={{ fontSize: '1.5rem' }}>
+                    {game.gameState.wasCorrect === true && '✓'}
+                    {game.gameState.wasCorrect === false && '✗'}
+                    {game.gameState.wasCorrect === null && '⏭'}
+                  </span>
+                  <span style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '800', 
+                    letterSpacing: '1.5px',
+                    textTransform: 'uppercase',
+                    ...(game.gameState.wasCorrect === true && { color: '#10b981' }),
+                    ...(game.gameState.wasCorrect === false && { color: '#ef4444' }),
+                    ...(game.gameState.wasCorrect === null && { color: '#a855f7' }),
+                  }}>
+                    {game.gameState.wasCorrect === true && 'Correct!'}
+                    {game.gameState.wasCorrect === false && 'Not Quite'}
+                    {game.gameState.wasCorrect === null && 'Skipped'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Current Song with Spotify Link - Collapsible, högst upp */}
         {game?.gameState?.shareSpotifyUrl && game?.currentCard?.spotifyUrl && (
           <div className="current-song-section" style={{ marginBottom: '20px' }}>
@@ -364,11 +530,6 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <div className="spectator-footer">
-        <p>Direktsänd spektator-vy</p>
-      </div>
     </div>
   );
 }

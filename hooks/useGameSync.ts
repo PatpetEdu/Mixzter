@@ -25,7 +25,7 @@ interface UseGameSyncProps {
   roundCards: Card[];
   currentCard: Card | null;
   backCardUnlocked: boolean;
-  wasCorrect: boolean;
+  wasCorrect: boolean | null;
   playerNames: string[];
   shareSpotifyUrl?: boolean;
 }
@@ -77,6 +77,7 @@ export function useGameSync({
               year: currentCard.year,
               spotifyUrl: shareSpotifyUrl ? currentCard.spotifyUrl : null,
               ...(currentCard.source !== undefined && { source: currentCard.source }),
+              ...(currentCard.previewData?.artworkUrl && { artworkUrl: currentCard.previewData.artworkUrl }),
             }
           : null;
 
