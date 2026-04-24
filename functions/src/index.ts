@@ -213,7 +213,7 @@ const getUidFromRequest = async (req: Request): Promise<string | null> => {
 function getPrompts(n: number): Record<string, string> {
   return {
     default: `Välj **${n} populära, välkända eller kulturellt betydelsefulla låtar** från perioden **1950 till ${CURRENT_YEAR}**.
-    Föredra låtar på engelska, men andra språk är också acceptabla om de är kända globalt.`,
+    Föredra låtar på engelska, men även andra språk är också acceptabla om de är kända globalt.`,
 
     svenska: `Välj **${n} svenska låtar** (sjungs på svenska eller av en mycket känd svensk artist) som är klassiker, hits eller allsångsfavoriter från **1960 till ${CURRENT_YEAR}**.`,
 
@@ -367,13 +367,13 @@ export const generateCard = onRequest(
 
       const selectedModeDescription = getPrompts(batchCount)[gameMode] || getPrompts(batchCount)['default'];
 
-      // När många låtar är sedda – ersätt "populära/välkända" med uppmaning om bredare urval
+      // När många låtar är sedda – lägg till uppmaning om bredare urval utan att ändra huvudprompten
       const depthInstruction = allSeenSongs.size > 200
-        ? `Välj **exakt ${batchCount} låtar** som inte nödvändigtvis är de allra mest välkända hitsen – gå på djupet i katalogen. Välj mindre kända singlar eller artister som mindre sällan hamnar på topplistor. Kvalitet framför kännedom.`
-        : `Välj **exakt ${batchCount} låtar** som är populära, välkända eller kulturellt betydelsefulla.`;
+        ? `\nObs: Många låtar är redan spelade. Gå gärna på djupet – mindre kända singlar, albumspår och bortglömda artister är välkomna så länge de håller kvalitet.`
+        : '';
 
       // Be om exakt batchCount låtar – undvika-listan och numrerat format hjälper modellen
-      const prompt = `VIKTIGT – Du måste undvika ALLA låtar i listan nedan. Läs igenom hela listan noggrant innan du väljer. Ingen av låtarna i ditt svar får matcha något i listan.
+      const prompt = `VIKTIGT – Du måste undvika ALLA låtar i listan nedan. Läs igenom hela listan noggrant innan du väljer. Innan du inkluderar en låt i ditt svar, kontrollera att den inte finns i listan. Exempel: om "michael jackson - billie jean" finns i listan får du INTE välja den, oavsett hur känd den är.
 
 Låtar att undvika (${Array.from(allSeenSongs).length} st):
 ${seenSongsPromptPart}
@@ -400,11 +400,20 @@ ${jsonArrayExample}`;
       let openAITries = 0;
       while (accumulatedSongs.length < MIN_VALID_SONGS && openAITries < 5) {
         openAITries++;
+
+        // Vid retry – bygg ny prompt med redan ackumulerade låtar inkluderade i undvika-listan
+        const retryAvoidList = openAITries === 1
+          ? seenSongsPromptPart
+          : Array.from(new Set([...allSeenSongs, ...accumulatedIds]))
+              .map((s, i) => `${i + 1}. ${s}`)
+              .join('\n');
+        const retryPrompt = openAITries === 1 ? prompt : prompt.replace(seenSongsPromptPart, retryAvoidList);
+
         try {
           const completion = await openai.chat.completions.create({
-            model: "gpt-5.4-nano",
-            messages: [{ role: "user", content: prompt }],
-            temperature: openAITries === 1 ? 1.0 : 1.0, // Lägre temp = bättre instruktionsföljning
+            model: "gpt-5-mini",
+            messages: [{ role: "user", content: retryPrompt }],
+            temperature: 1.0,
           });
           const rawContent = completion.choices[0].message?.content ?? "";
           dbg(`OpenAI ← råsvar (försök ${openAITries})`, rawContent);
