@@ -123,7 +123,7 @@ export function useDuoGameLogic({ playerNames, gameMode = 'default', onNewCardNe
   setStarAwardedThisTurn(false);
 };
 
-  // Logik för att ge en stjärna
+  // Logik för att ge en stjärna (efter rätt svar, aktiv spelare)
   const awardStar = () => {
     setPlayers((prev) => {
       const current = prev[activePlayer];
@@ -133,6 +133,16 @@ export function useDuoGameLogic({ playerNames, gameMode = 'default', onNewCardNe
       return prev;
     });
     setStarAwardedThisTurn(true);
+  };
+
+  // Manuell justering av stjärnor för valfri spelare (felhantering/spelarens eget val)
+  const addStarToPlayer = (playerName: string, count: number) => {
+    setPlayers((prev) => {
+      const p = prev[playerName];
+      if (!p) return prev;
+      const clamped = Math.min(Math.max(0, count), MAX_STARS);
+      return { ...prev, [playerName]: { ...p, stars: clamped } };
+    });
   };
 
   // Logik för att hoppa över en låt
@@ -254,6 +264,7 @@ export function useDuoGameLogic({ playerNames, gameMode = 'default', onNewCardNe
     gameOverMessage,
     starAwardedThisTurn,
     awardStar,
+    addStarToPlayer,
     skipSong,
     confirmGuess,
     saveAndEndTurn,

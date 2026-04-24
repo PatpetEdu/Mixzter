@@ -30,45 +30,9 @@ import { db } from './firebase';
 import { deleteDoc, doc, collection, getDocs } from 'firebase/firestore';
 import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame } from './storage/gameStorage';
 
-export type CardData = { artist: string; title: string; year: number; spotifyUrl: string };
 export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single' | 'spectator-join' | 'spectator';
 
-const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
-const GLOBAL_DUO_PRELOAD_KEY = (uid: string) => `globalPreload:duo:${uid}`;
 const HEADER_HEIGHT = 80;
-
-// Hämtar ett kort för global preload (konsumeras EJ här)
-const fetchFirstCardForPreload = async (): Promise<CardData | null> => {
-  const user = auth.currentUser;
-  const token = user ? await user.getIdToken() : null;
-  try {
-    const storedSongs = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-       // Säker parse av lokal cache – behåller namnen storedSongs & clientSeenSongsArray
-    const clientSeenSongsArray: string[] = (() => {
-      try {
-        return storedSongs ? JSON.parse(storedSongs) : [];
-      } catch {
-        return [];
-      }
-    })();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch('https://us-central1-musikquiz-app.cloudfunctions.net/generateCard', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ clientSeenSongs: clientSeenSongsArray }),
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('App.tsx Preload: Fel från servern:', res.status, errorText);
-      return null;
-    }
-    return (await res.json()) as CardData;
-  } catch (err) {
-    console.error('App.tsx Preload: Kritiskt fel i nätverksanrop:', err);
-    return null;
-  }
-};
 
 function AppContent() {
   const { user, loadingAuth, isAnonymous, signOut } = useAuth();
@@ -77,10 +41,8 @@ function AppContent() {
   const [mode, setMode] = useState<GameMode>('menu');
   const [gameMode, setGameMode] = useState<string>('default');
   const [playerNames, setPlayerNames] = useState<string[] | null>(null);
-  const [preloadedDuoCard, setPreloadedDuoCard] = useState<CardData | null>(null);
   const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
 
-  const [isPreloading, setIsPreloading] = useState(false);
   const [isSoloPressed, setIsSoloPressed] = useState(false);
   const appState = useRef(AppState.currentState);
   const [activeGames, setActiveGames] = useState<ActiveGameMeta[]>([]);
@@ -207,67 +169,16 @@ function AppContent() {
     ]).start();
   };
 
-  const ensureGlobalDuoPreload = useCallback(async () => {
-    if (!user || isAnonymous) return; // Kräver inloggad användare
-    if (isPreloading || preloadedDuoCard) return; // Undvik dubbla anrop
-
-    try {
-      // 1) Försök hämta från lokal persist först
-      const key = GLOBAL_DUO_PRELOAD_KEY(user.uid);
-      const raw = await AsyncStorage.getItem(key);
-      if (raw) {
-        try {
-          const cached = JSON.parse(raw) as CardData;
-          setPreloadedDuoCard(cached);
-          return; // Inget behov av att hämta nytt
-        } catch {}
-      }
-      
-        // 2) Annars – hämta från servern
-      setIsPreloading(true);
-      const card = await fetchFirstCardForPreload();
-      if (card) {
-        setPreloadedDuoCard(card);
-        try { await AsyncStorage.setItem(key, JSON.stringify(card)); } catch {}
-      }
-    } finally {
-      setIsPreloading(false);
-    }
-  }, [user, isAnonymous, isPreloading, preloadedDuoCard]);
-
-    // ⬇️ NYTT: När preload-kortet förbrukas i DuoGame – nolla och värm upp nästa
-  const handlePreloadConsumed = useCallback(async () => {
-    const uid = user?.uid;
-    if (uid) {
-      try { await AsyncStorage.removeItem(GLOBAL_DUO_PRELOAD_KEY(uid)); } catch {}
-    }
-    setPreloadedDuoCard(null);
-      // Starta ny preload i bakgrunden för nästa nya spelomgång
-    ensureGlobalDuoPreload();
-  }, [user?.uid, ensureGlobalDuoPreload]);
-
-  // ⬇️ Uppstart/inloggning: säkra att preload finns
-  useEffect(() => {
-    if (user && !isAnonymous) {
-      ensureGlobalDuoPreload();
-    } else {
-      // Utloggad eller anonym – rensa ev. preload i minnet (persist ligger kvar per användare)
-      setPreloadedDuoCard(null);
-    }
-  }, [user, isAnonymous, ensureGlobalDuoPreload]);
-
-  // Hämta/uppdatera listan när appen blir aktiv + se till att preload finns
+  // Hämta/uppdatera listan när appen blir aktiv
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('Appen blev aktiv, kontrollerar global preload & aktiva spel...');
-        ensureGlobalDuoPreload();
         refreshActiveGames();
       }
       appState.current = nextAppState;
     });
     return () => { subscription.remove(); };
-  }, [ensureGlobalDuoPreload]);
+  }, []);
 
   // NYTT: Hämta aktiva spel för nuvarande användare
   const refreshActiveGames = useCallback(async () => {
@@ -348,23 +259,8 @@ const resumeGame = (meta: ActiveGameMeta) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const persistKey = `nextCard:${user!.uid}:${id}`;
-              const rawNext = await AsyncStorage.getItem(persistKey);
-
-              if (rawNext) {
-                try {
-                  const pending: CardData = JSON.parse(rawNext);
-                  const songIdentifier = `${pending.artist} - ${pending.title}`.toLowerCase();
-                  const rawSeen = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-                  const arr = rawSeen ? (JSON.parse(rawSeen) as string[]) : [];
-                  const filtered = arr.filter((s) => s !== songIdentifier);
-                  await AsyncStorage.setItem(SEEN_SONGS_KEY, JSON.stringify(filtered));
-                } catch (e) {
-                  console.warn('Kunde inte parsa pending nextCard', e);
-                }
-              }
-
-              await AsyncStorage.removeItem(persistKey);
+              // Rensa persisterad nextCard för detta spel
+              await AsyncStorage.removeItem(`nextCard:${user!.uid}:${id}`).catch(() => {});
               await removeActiveGame(user!.uid, id);
               
               // Rensa spectators INNAN game-dokumentet raderas för att undvika orphaned subcollection
@@ -398,7 +294,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
 
   const returnToMenu = () => {
     setPlayerNames(null);
-     // ❗Behåll globalt preload-kort i minnet; det ska EJ nollas här
     setActiveGameId(null);
     setGameMode('default');
     setMode('menu');
@@ -948,8 +843,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
               playerNames={playerNames}
               gameMode={gameMode}
               onBackToMenu={returnToMenu}
-              initialPreloadedCard={gameMode === 'default' ? preloadedDuoCard : null}
-              onPreloadComplete={handlePreloadConsumed}
               onScroll={handleScroll}
               headerHeight={HEADER_HEIGHT}
               gameId={activeGameId}

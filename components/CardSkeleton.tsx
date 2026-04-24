@@ -1,246 +1,139 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
 import { Box, VStack, HStack, Text } from '@gluestack-ui/themed';
+import { Music2 } from 'lucide-react-native';
 
 export default function CardSkeleton() {
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-  const dotsAnim = useRef(new Animated.Value(0)).current;
+  const pulse1 = useRef(new Animated.Value(0)).current;
+  const pulse2 = useRef(new Animated.Value(0)).current;
+  const pulse3 = useRef(new Animated.Value(0)).current;
+  const iconOpacity = useRef(new Animated.Value(0.5)).current;
 
+  // Tre punkter som pulsar i stagger
+  useEffect(() => {
+    const makeLoop = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ])
+      );
+    const l1 = makeLoop(pulse1, 0);
+    const l2 = makeLoop(pulse2, 160);
+    const l3 = makeLoop(pulse3, 320);
+    l1.start(); l2.start(); l3.start();
+    return () => { l1.stop(); l2.stop(); l3.stop(); };
+  }, [pulse1, pulse2, pulse3]);
+
+  // Ikon slow-fade
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmerAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-        Animated.timing(shimmerAnim, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
+        Animated.timing(iconOpacity, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(iconOpacity, { toValue: 0.4, duration: 1400, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [shimmerAnim]);
+  }, [iconOpacity]);
 
+  // Shimmer för skeleton-block
+  const shimmer = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const dotsLoop = Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(dotsAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: false,
-        }),
-        Animated.delay(300),
-        Animated.timing(dotsAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.delay(300),
-        Animated.timing(dotsAnim, {
-          toValue: 2,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.delay(300),
+        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0.4, duration: 900, useNativeDriver: true }),
       ])
     );
-    dotsLoop.start();
-    return () => dotsLoop.stop();
-  }, [dotsAnim]);
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
 
-  const shimmerOpacity = shimmerAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.5, 0.8, 0.5],
-  });
-
-  const dot1Opacity = dotsAnim.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [0.3, 1, 0.3],
-  });
-
-  const dot2Opacity = dotsAnim.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [0.3, 0.3, 1],
-  });
+  const SkeletonBlock = ({ w, h, rounded = 12 }: { w: string | number; h: number; rounded?: number }) => (
+    <Animated.View style={{ opacity: shimmer, width: w as any, height: h, borderRadius: rounded, backgroundColor: undefined }}>
+      <Box
+        w="$full" h="$full"
+        bg="$backgroundLight200"
+        sx={{ _dark: { bg: '$backgroundDark800' } }}
+        style={{ borderRadius: rounded }}
+      />
+    </Animated.View>
+  );
 
   return (
-    <VStack w="$full" space="md" mt="$4">
-      {/* Main card skeleton with details */}
-      <Animated.View
-        style={{
-          opacity: shimmerOpacity,
-        }}
+    <VStack w="$full" space="lg" mt="$2">
+
+      {/* ── Kortsilhuett ─────────────────────────────────────────────── */}
+      <Box
+        h={300}
+        w="$full"
+        bg="$backgroundLight100"
+        borderRadius="$3xl"
+        borderWidth={1}
+        borderColor="$backgroundLight200"
+        p="$6"
+        sx={{ _dark: { bg: '$backgroundDark900', borderColor: '$backgroundDark800' } }}
+        justifyContent="space-between"
+        overflow="hidden"
       >
-        <Box
-          h={320}
-          w="$full"
-          bg="$backgroundLight200"
-          borderRadius="$3xl"
-          borderWidth={1}
-          borderColor="$backgroundLight300"
-          p="$6"
-          sx={{
-            _dark: {
-              bg: '$backgroundDark800',
-              borderColor: '$backgroundDark700',
-            },
-          }}
-          justifyContent="space-between"
-        >
-          {/* Top section - empty space for pulsing rings */}
-          <VStack alignItems="center" justifyContent="center" flex={1} space="md">
-            {/* Circle placeholder for album art */}
-            <Box
-              w={100}
-              h={100}
-              rounded="$full"
-              bg="$backgroundLight300"
-              sx={{
-                _dark: {
-                  bg: '$backgroundDark700',
-                },
-              }}
-            />
-
-            {/* Text placeholders */}
-            <VStack w="$full" space="sm" alignItems="center">
-              {/* Title placeholder */}
-              <Box
-                h="$4"
-                w="80%"
-                rounded="$md"
-                bg="$backgroundLight300"
-                sx={{
-                  _dark: {
-                    bg: '$backgroundDark700',
-                  },
-                }}
-              />
-
-              {/* Artist placeholder */}
-              <Box
-                h="$3"
-                w="60%"
-                rounded="$md"
-                bg="$backgroundLight300"
-                sx={{
-                  _dark: {
-                    bg: '$backgroundDark700',
-                  },
-                }}
-              />
-
-              {/* Year placeholder */}
-              <Box
-                h="$3"
-                w="40%"
-                rounded="$md"
-                bg="$backgroundLight300"
-                sx={{
-                  _dark: {
-                    bg: '$backgroundDark700',
-                  },
-                }}
-              />
-            </VStack>
+        <VStack alignItems="center" justifyContent="center" flex={1} space="md">
+          {/* Albumart-cirkel */}
+          <SkeletonBlock w={88} h={88} rounded={44} />
+          {/* Textplatshållare */}
+          <VStack w="$full" space="sm" alignItems="center">
+            <SkeletonBlock w="65%" h={14} />
+            <SkeletonBlock w="45%" h={11} />
+            <SkeletonBlock w="28%" h={11} />
           </VStack>
+        </VStack>
+        {/* Knapplatshållare */}
+        <HStack space="sm" w="$full">
+          <Animated.View style={{ opacity: shimmer, flex: 1 }}>
+            <Box h={44} rounded="$xl" bg="$backgroundLight200" sx={{ _dark: { bg: '$backgroundDark800' } }} />
+          </Animated.View>
+          <Animated.View style={{ opacity: shimmer, width: 44 }}>
+            <Box h={44} rounded="$xl" bg="$backgroundLight200" sx={{ _dark: { bg: '$backgroundDark800' } }} />
+          </Animated.View>
+        </HStack>
+      </Box>
 
-          {/* Bottom buttons placeholders */}
-          <HStack space="md" w="$full">
-            <Box
-              flex={1}
-              h={12}
-              rounded="$xl"
-              bg="$backgroundLight300"
-              sx={{
-                _dark: {
-                  bg: '$backgroundDark700',
-                },
-              }}
-            />
-            <Box
-              w={16}
-              h={12}
-              rounded="$xl"
-              bg="$backgroundLight300"
-              sx={{
-                _dark: {
-                  bg: '$backgroundDark700',
-                },
-              }}
-            />
+      {/* ── Ikon + text + punkter ─────────────────────────────────────── */}
+      <VStack alignItems="center" space="sm" py="$2">
+        <Animated.View style={{ opacity: iconOpacity }}>
+          <Music2 size={22} color="#6B7280" />
+        </Animated.View>
+        <HStack alignItems="center" space="sm">
+          <Text
+            fontSize="$sm"
+            color="$textLight400"
+            sx={{ _dark: { color: '$textDark500' } }}
+            letterSpacing={0.5}
+          >
+            Loading songs
+          </Text>
+          <HStack space="xs" alignItems="center">
+            {[pulse1, pulse2, pulse3].map((anim, i) => (
+              <Animated.View
+                key={i}
+                style={{
+                  opacity: anim,
+                  width: 4,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: '#6B7280',
+                }}
+              />
+            ))}
           </HStack>
-        </Box>
-      </Animated.View>
+        </HStack>
+      </VStack>
 
-      {/* Loading text with animated dots */}
-      <HStack alignItems="center" justifyContent="center" space="xs">
-        <Text
-          fontSize="$sm"
-          color="$textLight500"
-          sx={{
-            _dark: { color: '$textDark400' },
-          }}
-          fontWeight="500"
-        >
-          Loading next song
-        </Text>
-        <Animated.View style={{ opacity: dot1Opacity }}>
-          <Text fontSize="$sm" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
-            •
-          </Text>
-        </Animated.View>
-        <Animated.View style={{ opacity: dot2Opacity }}>
-          <Text fontSize="$sm" color="$textLight500" sx={{ _dark: { color: '$textDark400' } }}>
-            •
-          </Text>
-        </Animated.View>
-      </HStack>
+      {/* ── Input-platshållare ────────────────────────────────────────── */}
+      <SkeletonBlock w="100%" h={52} rounded={16} />
+      <SkeletonBlock w="100%" h={52} rounded={16} />
 
-      {/* Input field placeholder */}
-      <Animated.View
-        style={{
-          opacity: shimmerOpacity,
-        }}
-      >
-        <Box
-          h={12}
-          w="$full"
-          bg="$backgroundLight200"
-          borderRadius="$2xl"
-          borderWidth={1}
-          borderColor="$backgroundLight300"
-          sx={{
-            _dark: {
-              bg: '$backgroundDark800',
-              borderColor: '$backgroundDark700',
-            },
-          }}
-        />
-      </Animated.View>
-
-      {/* Button placeholder */}
-      <Animated.View
-        style={{
-          opacity: shimmerOpacity,
-        }}
-      >
-        <Box
-          h={12}
-          w="$full"
-          bg="$backgroundLight200"
-          borderRadius="$2xl"
-          sx={{
-            _dark: {
-              bg: '$backgroundDark800',
-            },
-          }}
-        />
-      </Animated.View>
     </VStack>
   );
 }

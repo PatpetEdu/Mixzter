@@ -3,7 +3,6 @@ import { StyleSheet, ActivityIndicator, ScrollView, NativeSyntheticEvent, Native
 import {
   Box, Text, Button, ButtonText, VStack, HStack, Input, InputField, Center, Icon, Pressable, Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, ModalBody, CloseIcon,
 } from '@gluestack-ui/themed';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
@@ -39,40 +38,28 @@ type Props = {
   playerNames: string[]; // ⬅️ Changed to array supporting 2-5 players
   gameMode: string;    // ⬅️ NYTT: Tar emot spelläget
   onBackToMenu: () => void;
-  initialPreloadedCard: Card | null;
-  onPreloadComplete: () => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: number;
-    // ID för aktivt spel (för sparning/återupptag)
+  // ID för aktivt spel (för sparning/återupptag)
   gameId: string | null;
 };
 
 const currentYear = new Date().getFullYear();
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
-// Lokal konstant för delad historiknyckel
-const SEEN_SONGS_KEY = 'duoSeenSongsHistory';
-
 export default function DuoGameScreen({
   playerNames, // ⬅️ Changed to array supporting 2-5 players
   gameMode,    // ⬅️ NYTT
-  initialPreloadedCard,
-  onPreloadComplete,
   onScroll,
   headerHeight,
   gameId,
 }: Props) {
   const { user, isAnonymous } = useAuth();
 
-    // Persist per spel (och användare) för nextCard
+  // Persist queue-toppen per spel och användare för seamless resume
   const persistKey = user && gameId ? `nextCard:${user.uid}:${gameId}` : undefined;
 
- const { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating } = useGenerateSongs(
-    initialPreloadedCard,
-    onPreloadComplete,
-    gameMode, 
-    persistKey
-  );
+  const { card, setCard, isLoadingCard, errorMessage, generateCard, isHydrating, clearPersistedQueue } = useGenerateSongs(gameMode, persistKey);
 
   const [guess, setGuess] = useState('');
   const [guessConfirmed, setGuessConfirmed] = useState(false);
@@ -199,6 +186,7 @@ export default function DuoGameScreen({
     gameOverMessage,
     starAwardedThisTurn,
     awardStar,
+    addStarToPlayer,
     skipSong,
     confirmGuess,
     saveAndEndTurn,
@@ -284,7 +272,7 @@ export default function DuoGameScreen({
 
   // Vänta in hydrering OCH återställning innan första autogenerate
   useEffect(() => {
-    if (!isHydrating && !isRestoring && !card && !initialPreloadedCard && !gameOverMessage) {
+    if (!isHydrating && !isRestoring && !card && !gameOverMessage) {
       generateCard(resetInputs);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -390,33 +378,14 @@ export default function DuoGameScreen({
     guess, showPlacementChoice, placement, isSongInfoVisible, guessConfirmed
   ]);
 
-  // 🧹 Ta bort sparat spel + städa ev. pending nextCard vid game over
+  // 🧹 Ta bort sparat spel + rensa persisterad nextCard vid game over
   useEffect(() => {
     if (gameOverMessage && user && !isAnonymous && gameId) {
-      (async () => {
-        try {
-          const persist = `nextCard:${user.uid}:${gameId}_${gameMode}`;
-          const rawNext = await AsyncStorage.getItem(persist);
-          if (rawNext) {
-            try {
-              const pending: Card = JSON.parse(rawNext);
-              const songIdentifier = `${pending.artist} - ${pending.title}`.toLowerCase();
-              const rawSeen = await AsyncStorage.getItem(SEEN_SONGS_KEY);
-              const arr = rawSeen ? (JSON.parse(rawSeen) as string[]) : [];
-              const filtered = arr.filter((s) => s !== songIdentifier);
-              await AsyncStorage.setItem(SEEN_SONGS_KEY, JSON.stringify(filtered));
-            } catch {}
-            await AsyncStorage.removeItem(persist);
-          } else {
-            await AsyncStorage.removeItem(persist);
-          }
-        } catch (e) {
-          console.warn('Kunde inte städa pending nextCard/seenSongs vid game over', e);
-        }
-        await deleteActiveGame(user.uid, gameId).catch(() => {});
-      })();
+      clearPersistedQueue();
+      deleteActiveGame(user.uid, gameId).catch(() => {});
     }
-  }, [gameOverMessage, user, isAnonymous, gameId, gameMode]);
+  }, [gameOverMessage, user, isAnonymous, gameId, clearPersistedQueue]);
+
 
   // 🎮 Synka game state till Firestore för spectators
   useGameSync({
@@ -539,10 +508,16 @@ export default function DuoGameScreen({
               </HStack>
               <HStack alignItems="center" space="md">
                 <HStack alignItems="center" space="xs">
-                  {[...Array(5)].map((_, i) => (
-                    <Text key={i} fontSize="$lg" color={i < player.stars ? '$amber400' : '$secondary400'}>
-                      {i < player.stars ? '⭐' : '☆'}
-                    </Text>
+                  {[...Array(MAX_STARS)].map((_, i) => (
+                    <Pressable
+                      key={i}
+                      onPress={(e) => { e.stopPropagation?.(); addStarToPlayer(player.name, i + 1 === player.stars ? i : i + 1); }}
+                      hitSlop={6}
+                    >
+                      <Text fontSize="$lg" color={i < player.stars ? '$amber400' : '$secondary400'}>
+                        {i < player.stars ? '⭐' : '☆'}
+                      </Text>
+                    </Pressable>
                   ))}
                 </HStack>
                 {!isCurrentPlayer && (
@@ -895,7 +870,12 @@ export default function DuoGameScreen({
         {isLoadingCard ? (
           <CardSkeleton />
         ) : errorMessage ? (
-          <Text color="$error600">{errorMessage}</Text>
+          <VStack space="md" alignItems="center">
+            <Text color="$error600" textAlign="center">{errorMessage}</Text>
+            <Button onPress={() => generateCard(resetInputs)}>
+              <ButtonText>Försök igen</ButtonText>
+            </Button>
+          </VStack>
         ) : !card ? (
           <Button onPress={() => generateCard(resetInputs)}><ButtonText>Starta spelet</ButtonText></Button>
         ) : null}
