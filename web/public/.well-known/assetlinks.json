@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.clyd3frog.musikquiz",
+      "sha256_cert_fingerprints": [
+        "A6:F2:AE:0C:F2:BB:D3:1D:B3:FB:AE:24:23:F4:93:9A:84:D4:00:E4:E2:B5:35:8E:08:8E:A6:10:13:46:44:C3"
+      ]
+    }
+  }
+]
