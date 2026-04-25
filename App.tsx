@@ -15,6 +15,8 @@ import { config } from '@gluestack-ui/config';
 // Egen kod
 import PlayerSetupScreen from './components/PlayerSetupScreen';
 import DuoGameScreen from './components/DuoGameScreen';
+import ScoreBattleScreen from './components/ScoreBattleScreen';
+import ScoreBattleSetupScreen from './components/ScoreBattleSetupScreen';
 import LoginScreen from './components/LoginScreen';
 import SignupScreen from './components/SignupScreen';
 import SinglePlayerScreen from './components/SinglePlayerScreen';
@@ -28,9 +30,9 @@ import { useAuth } from './hooks/useAuth';
 import { auth } from './firebase';
 import { db } from './firebase';
 import { deleteDoc, doc, collection, getDocs } from 'firebase/firestore';
-import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame } from './storage/gameStorage';
+import { ActiveGameMeta, generateGameId, getActiveGames, deleteActiveGame as removeActiveGame, saveScoreBattleMeta } from './storage/gameStorage';
 
-export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single' | 'spectator-join' | 'spectator';
+export type GameMode = 'menu' | 'duo-setup' | 'duo' | 'single' | 'spectator-join' | 'spectator' | 'score-setup' | 'score';
 
 const HEADER_HEIGHT = 80;
 
@@ -49,6 +51,11 @@ function AppContent() {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const [spectatorGameId, setSpectatorGameId] = useState<string | null>(null);
+  const [scoreBattlePlayers, setScoreBattlePlayers] = useState<string[] | null>(null);
+  const [scoreBattleMode, setScoreBattleMode] = useState<string>('default');
+  const [scoreBattleTarget, setScoreBattleTarget] = useState<number>(30);
+  const [scoreBattleMaxRounds, setScoreBattleMaxRounds] = useState<number | null>(null);
+  const [scoreBattleGameId, setScoreBattleGameId] = useState<string | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation logic
@@ -239,15 +246,25 @@ const startDuoGame = (playerNamesArray: string[], selectedMode: string) => {
 
     // Återuppta ett sparat spel
 const resumeGame = (meta: ActiveGameMeta) => {
-    setActiveGameId(meta.id);
-    setPlayerNames(meta.playerNames);
-    setGameMode(meta.gameMode);
-    setMode('duo');
+    if (meta.gameType === 'score') {
+      setScoreBattlePlayers(meta.playerNames);
+      setScoreBattleMode(meta.gameMode);
+      setScoreBattleTarget(meta.targetScore ?? 30);
+      setScoreBattleMaxRounds(meta.maxRounds ?? null);
+      setScoreBattleGameId(meta.id);
+      setMode('score');
+    } else {
+      setActiveGameId(meta.id);
+      setPlayerNames(meta.playerNames);
+      setGameMode(meta.gameMode);
+      setMode('duo');
+    }
   };
 
    // Ta bort från meny + 🧹 städning av ev. pending nextCard + lokala seenSongs
   const deleteActiveGameFromMenu = (id: string) => {
     if (!user) return;
+    const gameMeta = activeGames.find(g => g.id === id);
 
     Alert.alert(
       'Avsluta spel',
@@ -259,29 +276,32 @@ const resumeGame = (meta: ActiveGameMeta) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Rensa persisterad nextCard för detta spel
+              // Rensa persisterad nextCard och score battle state för detta spel
               await AsyncStorage.removeItem(`nextCard:${user!.uid}:${id}`).catch(() => {});
-              await removeActiveGame(user!.uid, id);
-              
-              // Rensa spectators INNAN game-dokumentet raderas för att undvika orphaned subcollection
-              try {
-                const spectatorsRef = collection(db, 'games', id, 'spectators');
-                const spectatorsSnap = await getDocs(spectatorsRef);
-                const deletePromises = spectatorsSnap.docs.map(doc => deleteDoc(doc.ref));
-                await Promise.all(deletePromises);
-              } catch (e) {
-                // Silently ignore spectators cleanup errors - they may already be deleted
-                // or the game may already be gone
+              await AsyncStorage.removeItem(`scoreBattle:${user!.uid}:${id}`).catch(() => {});
+
+              // Ta bort ur active games-indexet (oavsett speltyp)
+              await removeActiveGame(user!.uid, id).catch(() => {});
+
+              // Firestore-städning – bara för DUO-spel (Score Battle har inget Firestore-dokument)
+              if (!gameMeta || gameMeta.gameType !== 'score') {
+                try {
+                  const spectatorsRef = collection(db, 'games', id, 'spectators');
+                  const spectatorsSnap = await getDocs(spectatorsRef);
+                  const deletePromises = spectatorsSnap.docs.map(doc => deleteDoc(doc.ref));
+                  await Promise.all(deletePromises);
+                } catch (e) {
+                  // Ignorera - spectators kan redan vara raderade
+                }
+
+                try {
+                  await deleteDoc(doc(db, 'games', id));
+                } catch (e) {
+                  console.warn('Kunde inte radera Firestore game-dokument', e);
+                }
               }
-              
-              // Radera game-dokumentet från Firestore
-              try {
-                await deleteDoc(doc(db, 'games', id));
-              } catch (e) {
-                console.warn('Kunde inte radera Firestore game-dokument', e);
-              }
-              
-              await refreshActiveGames(); // vänta in listuppdatering
+
+              await refreshActiveGames();
             } catch (e) {
               console.warn('Kunde inte städa/avsluta spel', e);
             }
@@ -296,6 +316,11 @@ const resumeGame = (meta: ActiveGameMeta) => {
     setPlayerNames(null);
     setActiveGameId(null);
     setGameMode('default');
+    setScoreBattlePlayers(null);
+    setScoreBattleMode('default');
+    setScoreBattleTarget(30);
+    setScoreBattleMaxRounds(null);
+    setScoreBattleGameId(null);
     setMode('menu');
     refreshActiveGames();
   };
@@ -447,6 +472,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                 )}
 
                 {/* SOLO JOURNEY Button */}
+                {/* SOLO JOURNEY – temporärt dold, ej färdig för produktion
                 <Animated.View
                   style={{ 
                     transform: [{ scale: soloScaleAnim }],
@@ -508,6 +534,54 @@ const resumeGame = (meta: ActiveGameMeta) => {
                     </Box>
                   </Pressable>
                 </Animated.View>
+                */ /* end SOLO JOURNEY */}
+
+                {/* SCORE BATTLE */}
+                {(!user || activeGames.length < 5) ? (
+                  <Animated.View
+                    style={{
+                      transform: [{ scale: duoScaleAnim }],
+                      opacity: duoOpacityAnim,
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['#1d4ed8', '#4f46e5']}
+                      start={[0, 0]}
+                      end={[1, 1]}
+                      style={{ borderRadius: 32, padding: 32 }}
+                    >
+                      <Pressable
+                        onPress={() => setMode('score-setup')}
+                        onPressIn={handleDuoPressIn}
+                        onPressOut={handleDuoPressOut}
+                        disabled={isScrolling}
+                        style={{ backgroundColor: 'transparent' }}
+                        hitSlop={8}
+                      >
+                        <VStack space="md">
+                          <Box
+                            bg="rgba(255,255,255,0.15)"
+                            w={48}
+                            h={48}
+                            rounded="$2xl"
+                            justifyContent="center"
+                            alignItems="center"
+                          >
+                            <Trophy size={24} color="white" />
+                          </Box>
+                          <VStack space="xs">
+                            <Text fontSize="$2xl" fontWeight="black" color="white">
+                              SCORE BATTLE
+                            </Text>
+                            <Text fontSize="$sm" color="rgba(255,255,255,0.8)" fontWeight="500">
+                              Gissa år – samla poäng – vinn!
+                            </Text>
+                          </VStack>
+                        </VStack>
+                      </Pressable>
+                    </LinearGradient>
+                  </Animated.View>
+                ) : null}
 
                 {user && activeGames.length >= 5 && (
                   <Text 
@@ -848,6 +922,78 @@ const resumeGame = (meta: ActiveGameMeta) => {
               gameId={activeGameId}
             />
           )}
+        </Box>
+        <GameFooter onBackToMenu={returnToMenu} />
+      </Box>
+    );
+  }
+
+  // Score Battle Setup
+  if (mode === 'score-setup') {
+    return (
+      <Box flex={1} bg="$backgroundLight0" sx={{ _dark: { bg: '$backgroundDark950' } }}>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1,
+            height: HEADER_HEIGHT,
+            transform: [{ translateY: headerTranslateY }],
+          }}
+          pointerEvents="box-none"
+        >
+          <GameHeader />
+        </Animated.View>
+        <Box flex={1} position="relative">
+          <ScoreBattleSetupScreen
+            onStart={(names, selectedMode, target, rounds) => {
+              setScoreBattlePlayers(names);
+              setScoreBattleMode(selectedMode);
+              setScoreBattleTarget(target);
+              setScoreBattleMaxRounds(rounds);
+              setScoreBattleGameId(generateGameId());
+              setMode('score');
+            }}
+            onScroll={handleScroll}
+            headerHeight={HEADER_HEIGHT}
+          />
+        </Box>
+        <GameFooter onBackToMenu={returnToMenu} />
+      </Box>
+    );
+  }
+
+  // Score Battle – spelskärm
+  if (mode === 'score' && scoreBattlePlayers) {
+    return (
+      <Box flex={1} bg="#0b0b0c">
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1,
+            height: HEADER_HEIGHT,
+            transform: [{ translateY: headerTranslateY }],
+          }}
+          pointerEvents="box-none"
+        >
+          <GameHeader />
+        </Animated.View>
+        <Box flex={1} position="relative">
+          <ScoreBattleScreen
+            playerNames={scoreBattlePlayers}
+            gameMode={scoreBattleMode}
+            targetScore={scoreBattleTarget}
+            maxRounds={scoreBattleMaxRounds}
+            gameId={scoreBattleGameId}
+            onBackToMenu={returnToMenu}
+            headerHeight={HEADER_HEIGHT}
+            onScroll={handleScroll}
+          />
         </Box>
         <GameFooter onBackToMenu={returnToMenu} />
       </Box>

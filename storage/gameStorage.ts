@@ -54,10 +54,13 @@ export type SavedDuoGameState = {
 
 export type ActiveGameMeta = {
   id: string;
-  playerNames: string[];  // Array of player names
-  scores: { [playerName: string]: number };  // Score for each player
-  gameMode: string;  // 🔸 NYTT: Spara game mode i metadata
+  playerNames: string[];
+  scores: { [playerName: string]: number };
+  gameMode: string;
+  gameType: 'duo' | 'score';  // distinktion mellan spellägen
   updatedAt: number;
+  targetScore?: number;       // Score Battle: poängmål
+  maxRounds?: number | null;  // Score Battle: max omgångar (null = obegränsat)
 };
 
 const ACTIVE_GAMES_INDEX = (uid: string) => `activeGames:${uid}`;
@@ -100,13 +103,41 @@ export async function saveActiveGame(uid: string, state: SavedDuoGameState): Pro
     id: state.id,
     playerNames: state.playerNames,
     scores,
-    gameMode: state.gameMode, // 🔸 NYTT: Spara game mode
+    gameMode: state.gameMode,
+    gameType: 'duo',
     updatedAt: state.updatedAt,
   };
 
   const idx = list.findIndex((m) => m.id === state.id);
   if (idx >= 0) list[idx] = meta; else list.push(meta);
 
+  await AsyncStorage.setItem(ACTIVE_GAMES_INDEX(uid), JSON.stringify(list));
+}
+
+/** Registrera ett Score Battle-spel i index utan att spara fullt state (state sparas i ScoreBattleScreen) */
+export async function saveScoreBattleMeta(
+  uid: string,
+  id: string,
+  playerNames: [string, string],
+  scores: [number, number],
+  gameMode: string,
+  targetScore?: number,
+  maxRounds?: number | null,
+): Promise<void> {
+  const rawList = await AsyncStorage.getItem(ACTIVE_GAMES_INDEX(uid));
+  const list = safeParse<ActiveGameMeta[]>(rawList, []);
+  const meta: ActiveGameMeta = {
+    id,
+    playerNames,
+    scores: { [playerNames[0]]: scores[0], [playerNames[1]]: scores[1] },
+    gameMode,
+    gameType: 'score',
+    updatedAt: Date.now(),
+    targetScore,
+    maxRounds,
+  };
+  const idx = list.findIndex(m => m.id === id);
+  if (idx >= 0) list[idx] = meta; else list.push(meta);
   await AsyncStorage.setItem(ACTIVE_GAMES_INDEX(uid), JSON.stringify(list));
 }
 

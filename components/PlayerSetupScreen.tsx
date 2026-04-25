@@ -8,6 +8,7 @@ type Props = {
   onStart: (playerNames: string[], gameMode: string) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: number;
+  minPlayers?: number; // default 2
 };
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -29,11 +30,10 @@ const GAME_MODES = [
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
-const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 5;
 
-export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: Props) {
-  const [playerNames, setPlayerNames] = useState<string[]>(['', '']);
+export default function PlayerSetupScreen({ onStart, onScroll, headerHeight, minPlayers = 2 }: Props) {
+  const [playerNames, setPlayerNames] = useState<string[]>(() => Array(minPlayers).fill(''));
   const [selectedMode, setSelectedMode] = useState('default');
   const [error, setError] = useState('');
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
@@ -76,7 +76,7 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
   };
 
   const handleRemovePlayer = (index: number) => {
-    if (playerNames.length > MIN_PLAYERS) {
+    if (playerNames.length > minPlayers) {
       setPlayerNames(playerNames.filter((_, i) => i !== index));
     }
   };
@@ -89,7 +89,7 @@ export default function PlayerSetupScreen({ onStart, onScroll, headerHeight }: P
 
   const isFormValid = playerNames.every(name => name.trim() !== '');
   const canAddPlayer = playerNames.length < MAX_PLAYERS;
-  const canRemovePlayer = playerNames.length > MIN_PLAYERS;
+  const canRemovePlayer = playerNames.length > minPlayers;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
