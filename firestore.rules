@@ -30,6 +30,26 @@ service cloud.firestore {
       }
     }
 
+    // ── Score Battle rum ──────────────────────────────────────────────────────
+    match /scoreBattleRooms/{gameId} {
+      // Alla kan läsa (webbspelare saknar auth)
+      allow read: if true;
+
+      // Värd skapar rummet
+      allow create: if request.auth != null && request.auth.uid != null;
+
+      // Värd kan uppdatera allt; oautentiserade kan bara ändra webGuesses-fältet
+      allow update: if
+        (request.auth != null && request.auth.uid == resource.data.hostUid)
+        || (
+          request.resource.data.keys().hasAll(resource.data.keys())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['webGuesses'])
+        );
+
+      // Värd tar bort rummet när spelet är slut
+      allow delete: if request.auth != null && request.auth.uid == resource.data.hostUid;
+    }
+
     // Deny-all fallback
     match /{document=**} {
       allow read, write: if false;

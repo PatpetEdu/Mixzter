@@ -6,7 +6,9 @@ import QRCode from 'react-native-qrcode-svg';
 
 interface QRCodeModalProps {
   gameId: string;
-  publicToken: string;
+  publicToken?: string;
+  /** Om angiven används denna URL direkt (t.ex. för Score Battle) */
+  url?: string;
   onClose: () => void;
   webDomain?: string; // Default: 'https://musikquiz-app.web.app'
 }
@@ -14,14 +16,15 @@ interface QRCodeModalProps {
 export default function QRCodeModal({
   gameId,
   publicToken,
+  url,
   onClose,
   webDomain = 'https://musikquiz-app.web.app',
 }: QRCodeModalProps) {
   const [copied, setCopied] = useState(false);
   const colorMode = useColorMode();
 
-  // Konstruera QR-länken för webb-spektator
-  const spectatorUrl = `${webDomain}/?gameId=${gameId}&token=${publicToken}`;
+  // Konstruera QR-länken: använd url om den anges, annars spectator-länk
+  const spectatorUrl = url ?? `${webDomain}/?gameId=${gameId}&token=${publicToken}`;
 
   const handleCopyLink = async () => {
     try {

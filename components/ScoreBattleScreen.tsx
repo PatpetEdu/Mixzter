@@ -20,11 +20,12 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Trophy, Star, Eye, EyeOff } from 'lucide-react-native';
+import { Trophy, Star, Eye, EyeOff, QrCode } from 'lucide-react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import AnimatedCard from './AnimatedCard';
 import CardSkeleton from './CardSkeleton';
+import QRCodeModal from './QRCodeModal';
 import { useGenerateSongs, Card } from './useGenerateSongs';
 import { useAuth } from '../hooks/useAuth';
 import { saveScoreBattleMeta, deleteActiveGame } from '../storage/gameStorage';
@@ -33,6 +34,7 @@ import {
   pointsLabel,
   pointsColor,
 } from '../hooks/useScoreBattleLogic';
+import { useScoreBattleSync } from '../hooks/useScoreBattleSync';
 
 // ─── Typer ───────────────────────────────────────────────────────────────────
 
@@ -434,13 +436,48 @@ export default function ScoreBattleScreen({
   const numPlayers = playerNames.length;
   const [guesses, setGuesses] = useState<string[]>(() => Array(numPlayers).fill(''));
   const [locked, setLocked]   = useState<boolean[]>(() => Array(numPlayers).fill(false));
+  const [showQR, setShowQR]   = useState(false);
+
+  // ─── Webb-gissningar från Firestore ──────────────────────────────────────
+
+  const handleWebGuess = useCallback((playerIndex: number, year: number, isLocked: boolean) => {
+    setGuesses(prev => {
+      const n = [...prev];
+      n[playerIndex] = String(year);
+      return n;
+    });
+    // Always sync locked state — including unlock (isLocked=false)
+    setLocked(prev => {
+      const n = [...prev];
+      n[playerIndex] = isLocked;
+      return n;
+    });
+  }, []);
+
+  const { webUrl, clearWebGuesses } = useScoreBattleSync({
+    gameId,
+    hostUid: user?.uid ?? null,
+    phase,
+    playerNames,
+    scores,
+    stars,
+    songCount,
+    card,
+    roundResults,
+    guesses,
+    locked,
+    onWebGuess: handleWebGuess,
+  });
+
+  // ─── Gissningsstate – ett per spelare ────────────────────────────────────
 
   // Nollställ gissningar inför ny runda
   const resetRound = useCallback(async () => {
     await stopAudio();
     setGuesses(Array(numPlayers).fill(''));
     setLocked(Array(numPlayers).fill(false));
-  }, [stopAudio, numPlayers]);
+    clearWebGuesses();
+  }, [stopAudio, numPlayers, clearWebGuesses]);
 
   const handleChangeGuess = useCallback((idx: number, v: string) => {
     setGuesses(prev => { const n = [...prev]; n[idx] = v; return n; });
@@ -535,7 +572,7 @@ export default function ScoreBattleScreen({
         onScroll={onScroll}
         style={{ flex: 1, backgroundColor: '#07070d' }}
       >
-        {/* ── Omgångsindikator ── */}
+        {/* ── Omgångsindikator + QR-knapp ── */}
         <View style={s.roundBadgeRow}>
           <View style={s.roundBadge}>
             <RNText style={s.roundBadgeText}>
@@ -544,7 +581,21 @@ export default function ScoreBattleScreen({
                 : `Omgång ${songCount + 1}`}
             </RNText>
           </View>
+          {webUrl && (
+            <TouchableOpacity onPress={() => setShowQR(true)} style={s.qrBtn} activeOpacity={0.7}>
+              <QrCode size={18} color="#4f46e5" />
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* ── QR Modal ── */}
+        {showQR && webUrl && gameId && (
+          <QRCodeModal
+            gameId={gameId}
+            url={webUrl}
+            onClose={() => setShowQR(false)}
+          />
+        )}
 
         {/* ── Score-kort med inbyggda gissningar ── */}
         <View style={s.scoreGrid}>
@@ -656,7 +707,7 @@ const s = StyleSheet.create({
   },
 
   // Round badge
-  roundBadgeRow: { alignItems: 'center' },
+  roundBadgeRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   roundBadge: {
     backgroundColor: 'rgba(99,102,241,0.1)',
     borderWidth: 1,
@@ -670,6 +721,16 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  qrBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(79,70,229,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Score row

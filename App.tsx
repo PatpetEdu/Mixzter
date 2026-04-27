@@ -288,7 +288,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
               // Ta bort ur active games-indexet (oavsett speltyp)
               await removeActiveGame(user!.uid, id).catch(() => {});
 
-              // Firestore-städning – bara för DUO-spel (Score Battle har inget Firestore-dokument)
+              // Firestore-städning – DUO-spel (spectators + games) och Score Battle (scoreBattleRooms)
               if (!gameMeta || gameMeta.gameType !== 'score') {
                 try {
                   const spectatorsRef = collection(db, 'games', id, 'spectators');
@@ -303,6 +303,13 @@ const resumeGame = (meta: ActiveGameMeta) => {
                   await deleteDoc(doc(db, 'games', id));
                 } catch (e) {
                   console.warn('Kunde inte radera Firestore game-dokument', e);
+                }
+              } else {
+                // Score Battle – radera Firestore-rummet så webbspelarna ser att spelet är slut
+                try {
+                  await deleteDoc(doc(db, 'scoreBattleRooms', id));
+                } catch (e) {
+                  // Ignorera – kanske aldrig skapades (t.ex. ej påbörjat)
                 }
               }
 
