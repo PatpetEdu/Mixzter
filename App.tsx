@@ -203,6 +203,11 @@ function AppContent() {
 
   useEffect(() => { refreshActiveGames(); }, [refreshActiveGames]);
 
+  // Ladda om aktiva spel varje gång menyn visas (hanterar timing vid appstart och retur från spel)
+  useEffect(() => {
+    if (mode === 'menu') refreshActiveGames();
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
 // Helper function to normalize game data (handles both old and new formats)
 const getGameDisplayData = (game: any) => {
   // New format: playerNames and scores

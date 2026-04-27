@@ -1,12 +1,11 @@
-// components/ScoreBattleScreen.tsx
+﻿// components/ScoreBattleScreen.tsx
 //
-// Score Battle – Alt C: blind simultaneous guessing.
-// Bägge gissar på SAMMA låt men ser inte varandras gissning.
+// Score Battle – simultaneous guessing.
+// Alla spelare gissar på SAMMA låt på en gång i sina egna rutor.
 // Persist: köen + spelstate sparas i AsyncStorage.
 //
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,10 +20,11 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Trophy, Star } from 'lucide-react-native';
-import { useAudioPlayer } from 'expo-audio';
+import { Trophy, Star, Eye, EyeOff } from 'lucide-react-native';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import AnimatedCard from './AnimatedCard';
+import CardSkeleton from './CardSkeleton';
 import { useGenerateSongs, Card } from './useGenerateSongs';
 import { useAuth } from '../hooks/useAuth';
 import { saveScoreBattleMeta, deleteActiveGame } from '../storage/gameStorage';
@@ -51,32 +51,42 @@ const AnimatedScrollView = RNAnimated.createAnimatedComponent(ScrollView);
 
 const PERSIST_STATE_KEY = (uid: string, gid: string) => `scoreBattle:${uid}:${gid}`;
 const PERSIST_QUEUE_KEY = (uid: string, gid: string) => `nextCard:${uid}:${gid}`;
+const currentYear = new Date().getFullYear();
+const isValidYear = (s: string) => /^[0-9]{4}$/.test(s) && parseInt(s, 10) >= 1900 && parseInt(s, 10) <= currentYear;
 
-// ─── ScoreCard – poängkort med aktiv-indikator ───────────────────────────────
+// ─── ScoreCard – poängkort med inbyggd gissningsruta ─────────────────────────
 
 function ScoreCard({
   name,
   score,
   targetScore,
   stars,
-  isActive,
+  guess,
+  onChangeGuess,
+  isGuessLocked,
+  onToggleLock,
+  isGuessingPhase,
 }: {
   name: string;
   score: number;
   targetScore: number;
   stars: number;
-  isActive: boolean;
+  guess: string;
+  onChangeGuess: (v: string) => void;
+  isGuessLocked: boolean;
+  onToggleLock: () => void;
+  isGuessingPhase: boolean;
 }) {
   const pct = Math.max(0, Math.min(score / targetScore, 1));
   const isNeg = score < 0;
+  const isValid = isValidYear(guess);
 
   return (
-    <View style={[scStyles.wrap, isActive && scStyles.wrapActive]}>
-      {/* Aktiv-indikator: färgad linje längst upp */}
-      {isActive && <View style={scStyles.activeLine} />}
+    <View style={[scStyles.wrap, isGuessLocked && scStyles.wrapLocked]}>
+      {isGuessLocked && <View style={scStyles.lockedLine} />}
 
       <View style={scStyles.header}>
-        <RNText style={[scStyles.name, isActive && scStyles.nameActive]} numberOfLines={1}>
+        <RNText style={[scStyles.name, isGuessLocked && scStyles.nameLocked]} numberOfLines={1}>
           {name}
         </RNText>
         <View style={scStyles.starsRow}>
@@ -86,26 +96,50 @@ function ScoreCard({
         </View>
       </View>
 
-      {/* Progress */}
+      {/* Progress bar */}
       <View style={scStyles.track}>
-        <View
-          style={[
-            scStyles.fill,
-            { width: `${pct * 100}%` },
-            isActive && scStyles.fillActive,
-          ]}
-        />
+        <View style={[scStyles.fill, { width: `${pct * 100}%` }, isGuessLocked && scStyles.fillLocked]} />
       </View>
 
-      <RNText style={[scStyles.score, isNeg && scStyles.scoreNeg, isActive && scStyles.scoreActive]}>
+      <RNText style={[scStyles.score, isNeg && scStyles.scoreNeg, isGuessLocked && scStyles.scoreLocked]}>
         {score}
         <RNText style={scStyles.target}>/{targetScore}</RNText>
       </RNText>
 
-      {/* "DIN TUR"-badge */}
-      {isActive && (
-        <View style={scStyles.turnBadge}>
-          <RNText style={scStyles.turnText}>DIN TUR</RNText>
+      {/* Gissningsfält – visas bara under gissningsfasen */}
+      {isGuessingPhase && (
+        <View style={scStyles.guessRow}>
+          <View style={scStyles.guessInputWrap}>
+            <TextInput
+              style={[
+                scStyles.guessInput,
+                isGuessLocked && scStyles.guessInputLocked,
+                guess.length === 4 && !isValid && scStyles.guessInputError,
+              ]}
+              placeholder="År?"
+              placeholderTextColor="#2d3748"
+              keyboardType="number-pad"
+              value={isGuessLocked ? '••••' : guess}
+              onChangeText={v => {
+                if (!isGuessLocked) onChangeGuess(v.replace(/\D/g, '').slice(0, 4));
+              }}
+              editable={!isGuessLocked}
+              maxLength={4}
+            />
+          </View>
+          {guess.length === 4 && isValid && (
+            <TouchableOpacity onPress={onToggleLock} style={scStyles.lockBtn} activeOpacity={0.7}>
+              {isGuessLocked
+                ? <EyeOff size={18} color="#818cf8" />
+                : <Eye size={18} color="#475569" />}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {isGuessLocked && isGuessingPhase && (
+        <View style={scStyles.lockedBadge}>
+          <RNText style={scStyles.lockedBadgeText}>KLAR ✓</RNText>
         </View>
       )}
     </View>
@@ -121,16 +155,15 @@ const scStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1a1a2e',
     overflow: 'hidden',
+    gap: 8,
   },
-  wrapActive: {
+  wrapLocked: {
     borderColor: '#4f46e5',
     backgroundColor: '#0d0d1f',
   },
-  activeLine: {
+  lockedLine: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 0, left: 0, right: 0,
     height: 3,
     backgroundColor: '#6366f1',
     borderTopLeftRadius: 16,
@@ -140,127 +173,56 @@ const scStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
     marginTop: 4,
   },
-  name: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 4,
+  name: { color: '#64748b', fontSize: 13, fontWeight: '600', flex: 1, marginRight: 4 },
+  nameLocked: { color: '#a5b4fc' },
+  starsRow: { flexDirection: 'row', gap: 2 },
+  track: { height: 3, backgroundColor: '#1a1a2e', borderRadius: 99, overflow: 'hidden' },
+  fill: { height: 3, borderRadius: 99, backgroundColor: '#312e81' },
+  fillLocked: { backgroundColor: '#6366f1' },
+  score: { color: '#e2e8f0', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  scoreNeg: { color: '#ef4444' },
+  scoreLocked: { color: '#a5b4fc' },
+  target: { color: '#334155', fontSize: 13, fontWeight: '400' },
+  guessRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  guessInputWrap: { flex: 1 },
+  guessInput: {
+    backgroundColor: '#0a0a14',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#1a1a2e',
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
-  nameActive: {
-    color: '#a5b4fc',
+  guessInputLocked: {
+    borderColor: '#4f46e5',
+    color: '#818cf8',
+    backgroundColor: 'rgba(79,70,229,0.08)',
   },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 2,
+  guessInputError: { borderColor: '#7f1d1d' },
+  lockBtn: {
+    width: 38, height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(79,70,229,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  track: {
-    height: 3,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 99,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  fill: {
-    height: 3,
-    borderRadius: 99,
-    backgroundColor: '#312e81',
-  },
-  fillActive: {
-    backgroundColor: '#6366f1',
-  },
-  score: {
-    color: '#e2e8f0',
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-  },
-  scoreNeg: {
-    color: '#ef4444',
-  },
-  scoreActive: {
-    color: '#a5b4fc',
-  },
-  target: {
-    color: '#334155',
-    fontSize: 13,
-    fontWeight: '400',
-    letterSpacing: 0,
-  },
-  turnBadge: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
+  lockedBadge: {
+    alignSelf: 'flex-end',
     backgroundColor: 'rgba(99,102,241,0.15)',
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
+    marginTop: -4,
   },
-  turnText: {
-    color: '#818cf8',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-});
-
-// ─── PassOverlay – tryck var som helst ───────────────────────────────────────
-
-function PassOverlay({ to, onReady }: { to: string; onReady: () => void }) {
-  return (
-    <TouchableOpacity
-      onPress={onReady}
-      activeOpacity={1}
-      style={poStyles.root}
-    >
-      <View style={poStyles.pill}>
-        <RNText style={poStyles.pillText}>nästa spelare</RNText>
-      </View>
-      <RNText style={poStyles.name}>{to}</RNText>
-      <RNText style={poStyles.hint}>tryck var som helst för att fortsätta</RNText>
-    </TouchableOpacity>
-  );
-}
-
-const poStyles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#07070d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 16,
-  },
-  pill: {
-    backgroundColor: 'rgba(99,102,241,0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.25)',
-  },
-  pillText: {
-    color: '#818cf8',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  name: {
-    color: '#f8fafc',
-    fontSize: 44,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: -1,
-  },
-  hint: {
-    color: '#334155',
-    fontSize: 13,
-    marginTop: 8,
-  },
+  lockedBadgeText: { color: '#818cf8', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
 });
 
 // ─── ResultRow ────────────────────────────────────────────────────────────────
@@ -291,7 +253,7 @@ function ResultRow({
       </View>
       <View style={rrStyles.right}>
         <RNText style={[rrStyles.pts, { color: col }]}>
-          {result.skipped ? '—' : `${pts > 0 ? '+' : ''}${pts}`}
+          {result.skipped ? '–' : `${pts > 0 ? '+' : ''}${pts}`}
         </RNText>
         <RNText style={rrStyles.label}>{pointsLabel(pts, result.skipped)}</RNText>
       </View>
@@ -332,18 +294,15 @@ export default function ScoreBattleScreen({
 }: Props) {
   const { user } = useAuth();
 
-  // persistKeys
   const persistKey = user && gameId ? PERSIST_QUEUE_KEY(user.uid, gameId) : undefined;
   const stateKey   = user && gameId ? PERSIST_STATE_KEY(user.uid, gameId) : undefined;
 
   const logic = useScoreBattleLogic(playerNames, targetScore, maxRounds);
   const {
     scores, stars, phase,
-    p1Idx, p2Idx,
     soloMode,
     roundResults, songCount, winnerIdx,
-    confirmP1, skipP1, proceedToP2,
-    confirmP2, skipP2, nextSong, resetGame,
+    confirmGuesses, nextSong, resetGame,
     _restore,
   } = logic;
 
@@ -351,7 +310,6 @@ export default function ScoreBattleScreen({
 
   // ─── Persist: ladda spelstate vid mount ────────────────────────────────────
 
-  // Återställ state + aktuellt kort från AsyncStorage, sedan generera nytt om inget kort finns
   const [isRestoreLoaded, setIsRestoreLoaded] = useState(false);
   const restoredCardRef = useRef<Card | null>(null);
 
@@ -373,7 +331,6 @@ export default function ScoreBattleScreen({
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // När restore är klar: sätt återställt kort direkt ELLER hämta nytt
   useEffect(() => {
     if (!isRestoreLoaded) return;
     if (restoredCardRef.current) {
@@ -383,7 +340,8 @@ export default function ScoreBattleScreen({
     }
   }, [isRestoreLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Registrera / uppdatera i menyns active games index
+  // ─── Persist: spara spelstate ─────────────────────────────────────────────
+
   useEffect(() => {
     if (!user || !gameId) return;
     if (phase === 'game_over') {
@@ -403,31 +361,53 @@ export default function ScoreBattleScreen({
       AsyncStorage.removeItem(stateKey).catch(() => {});
       return;
     }
-    const snap = {
-      scores,
-      stars,
-      songCount,
-      firstPlayerIdx: p1Idx,
-      currentCard: card,
-    };
-    AsyncStorage.setItem(stateKey, JSON.stringify(snap)).catch(() => {});
-  }, [stateKey, scores, stars, songCount, p1Idx, phase, card]);
+    AsyncStorage.setItem(stateKey, JSON.stringify({
+      scores, stars, songCount, currentCard: card, phase, roundResults,
+    })).catch(() => {});
+  }, [stateKey, scores, stars, songCount, phase, card, roundResults]);
 
-  // ─── Ljud ──────────────────────────────────────────────────────────────────
+  // ─── Ljud (samma mönster som DuoGameScreen: ref + URL-state + useEffect) ───
 
-  const player = useAudioPlayer(card?.previewData?.previewUrl ?? null);
+  const [currentPreviewUrl, setCurrentPreviewUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const previewPlayer = useAudioPlayer(currentPreviewUrl ?? '');
+  const playerRef = useRef(previewPlayer);
+  const playerStatus = useAudioPlayerStatus(previewPlayer);
 
-  const stopAudio = useCallback(async () => {
-    try { player.pause(); } catch {}
+  useEffect(() => { playerRef.current = previewPlayer; }, [previewPlayer]);
+
+  // Auto-play när URL sätts och isPlaying är true
+  useEffect(() => {
+    if (currentPreviewUrl && isPlaying) {
+      playerRef.current?.play();
+    }
+  }, [currentPreviewUrl, isPlaying]);
+
+  // Detektera när låten tar slut
+  useEffect(() => {
+    if (isPlaying && playerStatus.didJustFinish) {
+      setIsPlaying(false);
+      setCurrentPreviewUrl(null);
+    }
+  }, [isPlaying, playerStatus.didJustFinish]);
+
+  const stopAudio = useCallback(() => {
+    try { playerRef.current?.pause(); } catch {}
     setIsPlaying(false);
-  }, [player]);
+    setCurrentPreviewUrl(null);
+  }, []);
 
-  const togglePreview = useCallback(() => {
-    if (!card?.previewData?.previewUrl) return;
-    if (isPlaying) { player.pause(); setIsPlaying(false); }
-    else           { player.play();  setIsPlaying(true);  }
-  }, [isPlaying, player, card]);
+  const togglePreview = useCallback((previewUrl: string) => {
+    if (!previewUrl) return;
+    if (isPlaying && currentPreviewUrl === previewUrl) {
+      playerRef.current?.pause();
+      setIsPlaying(false);
+      setCurrentPreviewUrl(null);
+    } else {
+      setCurrentPreviewUrl(previewUrl);
+      setIsPlaying(true);
+    }
+  }, [isPlaying, currentPreviewUrl]);
 
   useEffect(() => {
     if (phase === 'song_summary' || phase === 'game_over') stopAudio();
@@ -435,17 +415,41 @@ export default function ScoreBattleScreen({
 
   useEffect(() => () => { stopAudio(); }, [stopAudio]);
 
-  // ─── Input ────────────────────────────────────────────────────────────────
+  // ─── Gissningsstate – ett per spelare ────────────────────────────────────
 
-  const [guess, setGuess] = useState('');
-  const isGuessValid = useMemo(() => /^(1[89]\d{2}|20[0-2]\d|2025|2026)$/.test(guess), [guess]);
+  const numPlayers = soloMode ? 1 : 2;
+  const [guesses, setGuesses] = useState<string[]>(() => Array(numPlayers).fill(''));
+  const [locked, setLocked]   = useState<boolean[]>(() => Array(numPlayers).fill(false));
 
-  // ─── Nästa / reset låt ───────────────────────────────────────────────────
-
+  // Nollställ gissningar inför ny runda
   const resetRound = useCallback(async () => {
     await stopAudio();
-    setGuess('');
-  }, [stopAudio]);
+    setGuesses(Array(numPlayers).fill(''));
+    setLocked(Array(numPlayers).fill(false));
+  }, [stopAudio, numPlayers]);
+
+  const handleChangeGuess = useCallback((idx: number, v: string) => {
+    setGuesses(prev => { const n = [...prev]; n[idx] = v; return n; });
+  }, []);
+
+  const handleToggleLock = useCallback((idx: number) => {
+    setLocked(prev => { const n = [...prev]; n[idx] = !n[idx]; return n; });
+  }, []);
+
+  // Alla spelare måste ha fyllt i ett giltigt år OCH låst sin gissning
+  const allReady = useMemo(() => {
+    return guesses.every((g, i) => isValidYear(g) && locked[i]);
+  }, [guesses, locked]);
+
+  // ─── Bekräfta alla gissningar ────────────────────────────────────────────
+
+  const handleConfirm = useCallback(() => {
+    if (!card || !allReady) return;
+    const guessList = guesses.map(g => ({ guessYear: parseInt(g, 10), skipped: false }));
+    confirmGuesses(guessList, card.year);
+  }, [card, allReady, guesses, confirmGuesses]);
+
+  // ─── Nästa / reset låt ───────────────────────────────────────────────────
 
   const handleNextSong = useCallback(async () => {
     await resetRound();
@@ -460,32 +464,7 @@ export default function ScoreBattleScreen({
     generateCard();
   }, [resetGame, generateCard, resetRound, stateKey]);
 
-
-  const handleConfirmP1 = useCallback(() => {
-    if (!card || !isGuessValid) return;
-    confirmP1(parseInt(guess, 10), card.year);
-    setGuess('');
-  }, [card, isGuessValid, guess, confirmP1]);
-
-  const handleSkipP1 = useCallback(() => {
-    if (skipP1()) setGuess('');
-  }, [skipP1]);
-
-  const handleConfirmP2 = useCallback(() => {
-    if (!card || !isGuessValid) return;
-    confirmP2(parseInt(guess, 10), card.year);
-    setGuess('');
-  }, [card, isGuessValid, guess, confirmP2]);
-
-  const handleSkipP2 = useCallback(() => {
-    if (skipP2()) setGuess('');
-  }, [skipP2]);
-
-  const p1Name = playerNames[p1Idx];
-  const p2Name = playerNames[p2Idx];
-  const isP1Turn = phase === 'p1_guessing';
-  const isP2Turn = phase === 'p2_guessing';
-  const currentPlayerIdx = isP1Turn ? p1Idx : p2Idx;
+  const isGuessingPhase = phase === 'guessing';
 
   // ─── Game Over ─────────────────────────────────────────────────────────────
 
@@ -531,12 +510,6 @@ export default function ScoreBattleScreen({
     );
   }
 
-  // ─── Pass overlay ──────────────────────────────────────────────────────────
-
-  if (phase === 'pass_to_p2') {
-    return <PassOverlay to={p2Name} onReady={proceedToP2} />;
-  }
-
   // ─── Huvud spelvy ──────────────────────────────────────────────────────────
 
   return (
@@ -559,17 +532,18 @@ export default function ScoreBattleScreen({
           </View>
         </View>
 
-        {/* ── Score-rad ── */}
+        {/* ── Score-kort med inbyggda gissningar ── */}
         <View style={s.scoreRow}>
           <ScoreCard
             name={playerNames[0]}
             score={scores[0]}
             targetScore={targetScore}
             stars={stars[0]}
-            isActive={
-              (phase === 'p1_guessing' && p1Idx === 0) ||
-              (phase === 'p2_guessing' && p2Idx === 0)
-            }
+            guess={guesses[0] ?? ''}
+            onChangeGuess={v => handleChangeGuess(0, v)}
+            isGuessLocked={locked[0] ?? false}
+            onToggleLock={() => handleToggleLock(0)}
+            isGuessingPhase={isGuessingPhase}
           />
           {!soloMode && (
             <>
@@ -579,26 +553,39 @@ export default function ScoreBattleScreen({
                 score={scores[1]}
                 targetScore={targetScore}
                 stars={stars[1]}
-                isActive={
-                  (phase === 'p1_guessing' && p1Idx === 1) ||
-                  (phase === 'p2_guessing' && p2Idx === 1)
-                }
+                guess={guesses[1] ?? ''}
+                onChangeGuess={v => handleChangeGuess(1, v)}
+                isGuessLocked={locked[1] ?? false}
+                onToggleLock={() => handleToggleLock(1)}
+                isGuessingPhase={isGuessingPhase}
               />
             </>
           )}
         </View>
 
         {/* ── Laddning ── */}
-        {isLoadingCard && (
-          <View style={s.loadingWrap}>
-            <ActivityIndicator color="#6366f1" size="large" />
-            <RNText style={s.loadingText}>Hämtar nästa låt…</RNText>
-          </View>
-        )}
+        {isLoadingCard && <CardSkeleton />}
 
-        {/* ── Gissningsfas ── */}
-        {(isP1Turn || isP2Turn) && card && (
+        {/* ── Bekräfta-knapp + Kortvisning ── */}
+        {isGuessingPhase && card && (
           <View style={s.guessSection}>
+            <TouchableOpacity
+              onPress={handleConfirm}
+              disabled={!allReady}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={allReady ? ['#4f46e5', '#7c3aed'] : ['#0f0f17', '#0f0f17']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[s.confirmBtn, !allReady && s.confirmDisabled]}
+              >
+                <RNText style={[s.confirmText, !allReady && { color: '#334155' }]}>
+                  {allReady ? 'Avslöja svar' : 'Alla måste låsa sin gissning'}
+                </RNText>
+              </LinearGradient>
+            </TouchableOpacity>
+
             <AnimatedCard
               showBack={false}
               card={card}
@@ -607,56 +594,6 @@ export default function ScoreBattleScreen({
               onPlayPreview={togglePreview}
               isPlayingPreview={isPlaying}
             />
-
-            {/* Årinput */}
-            <TextInput
-              style={[s.yearInput, guess.length === 4 && !isGuessValid && s.yearInputError]}
-              placeholder="Ange år · t.ex. 1995"
-              placeholderTextColor="#2d3748"
-              keyboardType="number-pad"
-              value={guess}
-              onChangeText={t => setGuess(t.replace(/\D/g, '').slice(0, 4))}
-              returnKeyType="done"
-              maxLength={4}
-              onSubmitEditing={isP1Turn ? handleConfirmP1 : handleConfirmP2}
-            />
-
-            {guess.length === 4 && !isGuessValid && (
-              <RNText style={s.inputError}>Ogiltigt år</RNText>
-            )}
-
-            {/* Bekräfta */}
-            <TouchableOpacity
-              onPress={isP1Turn ? handleConfirmP1 : handleConfirmP2}
-              disabled={!isGuessValid}
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={isGuessValid ? ['#4f46e5', '#7c3aed'] : ['#0f0f17', '#0f0f17']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[s.confirmBtn, !isGuessValid && s.confirmDisabled]}
-              >
-                <RNText style={[s.confirmText, !isGuessValid && { color: '#334155' }]}>
-                  Bekräfta gissning
-                </RNText>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Skip */}
-            <TouchableOpacity
-              onPress={isP1Turn ? handleSkipP1 : handleSkipP2}
-              disabled={stars[currentPlayerIdx] <= 0}
-              activeOpacity={0.6}
-              style={[s.skipBtn, stars[currentPlayerIdx] <= 0 && { opacity: 0.3 }]}
-            >
-              <View style={s.skipInner}>
-                <RNText style={s.skipText}>⭐ Skippa</RNText>
-                <View style={s.skipPill}>
-                  <RNText style={s.skipPillText}>{stars[currentPlayerIdx]} kvar</RNText>
-                </View>
-              </View>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -671,10 +608,9 @@ export default function ScoreBattleScreen({
             </LinearGradient>
 
             <View style={s.resultList}>
-              <ResultRow name={p1Name} result={roundResults[0]} actualYear={card.year} />
-              {!soloMode && (
-                <ResultRow name={p2Name} result={roundResults[1]} actualYear={card.year} />
-              )}
+              {playerNames.map((name, i) => (
+                <ResultRow key={name} name={name} result={roundResults[i] ?? null} actualYear={card.year} />
+              ))}
             </View>
 
             <TouchableOpacity onPress={handleNextSong} activeOpacity={0.85}>
@@ -714,9 +650,7 @@ const s = StyleSheet.create({
   },
 
   // Round badge
-  roundBadgeRow: {
-    alignItems: 'center',
-  },
+  roundBadgeRow: { alignItems: 'center' },
   roundBadge: {
     backgroundColor: 'rgba(99,102,241,0.1)',
     borderWidth: 1,
@@ -732,87 +666,16 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Score
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
+  // Score row
+  scoreRow: { flexDirection: 'row', alignItems: 'stretch' },
   scoreDiv: { width: 8 },
 
   // Loading
-  loadingWrap: { paddingVertical: 48, alignItems: 'center' },
-  loadingText: { color: '#334155', marginTop: 12, fontSize: 14 },
-
-  // Guess
+  // Guessing
   guessSection: { gap: 12 },
-
-  yearInput: {
-    backgroundColor: '#0f0f17',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#1a1a2e',
-    color: '#f8fafc',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  yearInputError: {
-    borderColor: '#7f1d1d',
-  },
-  inputError: {
-    color: '#ef4444',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: -6,
-  },
-
-  confirmBtn: {
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  confirmDisabled: {
-    opacity: 0.6,
-  },
-  confirmText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-
-  skipBtn: {
-    alignSelf: 'center',
-    paddingVertical: 8,
-  },
-  skipInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    backgroundColor: '#0a0a14',
-  },
-  skipText: {
-    color: '#475569',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  skipPill: {
-    backgroundColor: '#1e293b',
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  skipPillText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  confirmBtn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  confirmDisabled: { opacity: 0.6 },
+  confirmText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 
   // Summary
   summarySection: { gap: 12 },
@@ -852,16 +715,8 @@ const s = StyleSheet.create({
   },
   resultList: { gap: 8 },
 
-  bigBtn: {
-    paddingVertical: 17,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  bigBtnText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
+  bigBtn: { paddingVertical: 17, borderRadius: 14, alignItems: 'center' },
+  bigBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   outlineBtn: {
     paddingVertical: 14,
     borderRadius: 14,
@@ -869,11 +724,7 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#1a1a2e',
   },
-  outlineBtnText: {
-    color: '#334155',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  outlineBtnText: { color: '#334155', fontSize: 15, fontWeight: '600' },
 
   // Game over
   gameOverInner: {
@@ -917,10 +768,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  finalRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
-  },
+  finalRowBorder: { borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
   finalName: { color: '#64748b', fontSize: 16, fontWeight: '600' },
   finalNameWinner: { color: '#f59e0b' },
   finalPts: { color: '#334155', fontSize: 24, fontWeight: '900' },
