@@ -76,44 +76,36 @@ export function useScoreBattleLogic(
   maxRounds: number | null = null,
 ) {
   const soloMode = playerNames.length === 1;
-  const numPlayers = soloMode ? 1 : 2;
+  const numPlayers = playerNames.length;
 
-  const [scores, setScores]         = useState<[number, number]>([0, 0]);
-  const [stars, setStars]           = useState<[number, number]>([1, 1]);
+  const [scores, setScores]         = useState<number[]>(() => Array(numPlayers).fill(0));
+  const [stars, setStars]           = useState<number[]>(() => Array(numPlayers).fill(1));
   const [phase, setPhase]           = useState<BattlePhase>('guessing');
-  const [roundResults, setRoundResults] = useState<[RoundResult | null, RoundResult | null]>([null, null]);
+  const [roundResults, setRoundResults] = useState<(RoundResult | null)[]>(() => Array(numPlayers).fill(null));
   const [songCount, setSongCount]   = useState(0);
   const [winnerIdx, setWinnerIdx]   = useState<number | null>(null);
 
-  const scoresRef    = useRef<[number, number]>([0, 0]);
+  const scoresRef    = useRef<number[]>(Array(numPlayers).fill(0));
   const songCountRef = useRef(0);
 
   // ─── Intern ───────────────────────────────────────────────────────────────
 
   const commitRound = useCallback(
-    (results: [RoundResult, RoundResult]) => {
-      const newScores: [number, number] = [
-        scoresRef.current[0] + results[0].points,
-        scoresRef.current[1] + results[1].points,
-      ];
+    (results: RoundResult[]) => {
+      const newScores = scoresRef.current.map((s, i) => s + (results[i]?.points ?? 0));
       scoresRef.current = newScores;
       setScores(newScores);
       setRoundResults(results);
 
-      setStars(prev => {
-        const next = [...prev] as [number, number];
-        if (results[0].points === 10) next[0] += 1;
-        if (results[1].points === 10) next[1] += 1;
-        return next;
-      });
+      setStars(prev => prev.map((s, i) => results[i]?.points === 10 ? s + 1 : s));
 
-      const [s0, s1] = newScores;
       const roundsPlayed = songCountRef.current + 1;
-      const reachedScoreTarget = s0 >= targetScore || s1 >= targetScore;
+      const reachedScoreTarget = newScores.some(s => s >= targetScore);
       const reachedRoundLimit  = maxRounds !== null && roundsPlayed >= maxRounds;
 
       if (reachedScoreTarget || reachedRoundLimit) {
-        setWinnerIdx(s0 >= s1 ? 0 : 1);
+        const maxScore = Math.max(...newScores);
+        setWinnerIdx(newScores.indexOf(maxScore));
         setPhase('game_over');
       } else {
         setPhase('song_summary');
@@ -127,51 +119,48 @@ export function useScoreBattleLogic(
   /** Bekräfta alla spelares gissningar på en gång */
   const confirmGuesses = useCallback(
     (guesses: Array<{ guessYear: number; skipped: boolean }>, actualYear: number) => {
-      const r0: RoundResult = guesses[0].skipped
-        ? { guessYear: 0, points: 0, skipped: true }
-        : { guessYear: guesses[0].guessYear, points: calcPoints(guesses[0].guessYear, actualYear), skipped: false };
-      const r1: RoundResult = soloMode
-        ? { guessYear: 0, points: 0, skipped: true }
-        : guesses[1]?.skipped
-          ? { guessYear: 0, points: 0, skipped: true }
-          : { guessYear: guesses[1].guessYear, points: calcPoints(guesses[1].guessYear, actualYear), skipped: false };
-      commitRound([r0, r1]);
+      const results: RoundResult[] = Array.from({ length: numPlayers }, (_, i) => {
+        const g = guesses[i];
+        if (!g || g.skipped) return { guessYear: 0, points: 0, skipped: true };
+        return { guessYear: g.guessYear, points: calcPoints(g.guessYear, actualYear), skipped: false };
+      });
+      commitRound(results);
     },
-    [soloMode, commitRound]
+    [numPlayers, commitRound]
   );
 
   const nextSong = useCallback(() => {
-    setRoundResults([null, null]);
+    setRoundResults(Array(numPlayers).fill(null));
     songCountRef.current += 1;
     setSongCount(songCountRef.current);
     setPhase('guessing');
-  }, []);
+  }, [numPlayers]);
 
   const resetGame = useCallback(() => {
-    scoresRef.current = [0, 0];
+    scoresRef.current = Array(numPlayers).fill(0);
     songCountRef.current = 0;
-    setScores([0, 0]);
-    setStars([1, 1]);
-    setRoundResults([null, null]);
+    setScores(Array(numPlayers).fill(0));
+    setStars(Array(numPlayers).fill(1));
+    setRoundResults(Array(numPlayers).fill(null));
     setSongCount(0);
     setWinnerIdx(null);
     setPhase('guessing');
-  }, []);
+  }, [numPlayers]);
 
   /** Återställ från persisted snapshot */
   const _restore = useCallback((snap: {
-    scores: [number, number];
-    stars: [number, number];
+    scores: number[];
+    stars: number[];
     songCount: number;
     phase?: BattlePhase;
-    roundResults?: [RoundResult | null, RoundResult | null];
+    roundResults?: (RoundResult | null)[];
   }) => {
     scoresRef.current = snap.scores;
     songCountRef.current = snap.songCount;
     setScores(snap.scores);
     setStars(snap.stars);
     setSongCount(snap.songCount);
-    setRoundResults(snap.roundResults ?? [null, null]);
+    setRoundResults(snap.roundResults ?? Array(snap.scores.length).fill(null));
     setWinnerIdx(null);
     setPhase(snap.phase ?? 'guessing');
   }, []);

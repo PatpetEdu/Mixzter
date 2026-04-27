@@ -56,95 +56,14 @@ const isValidYear = (s: string) => /^[0-9]{4}$/.test(s) && parseInt(s, 10) >= 19
 
 // ─── ScoreCard – poängkort med inbyggd gissningsruta ─────────────────────────
 
-function ScoreCard({
-  name,
-  score,
-  targetScore,
-  stars,
-  guess,
-  onChangeGuess,
-  isGuessLocked,
-  onToggleLock,
-  isGuessingPhase,
-}: {
-  name: string;
-  score: number;
-  targetScore: number;
-  stars: number;
-  guess: string;
-  onChangeGuess: (v: string) => void;
-  isGuessLocked: boolean;
-  onToggleLock: () => void;
-  isGuessingPhase: boolean;
-}) {
-  const pct = Math.max(0, Math.min(score / targetScore, 1));
-  const isNeg = score < 0;
-  const isValid = isValidYear(guess);
-
-  return (
-    <View style={[scStyles.wrap, isGuessLocked && scStyles.wrapLocked]}>
-      {isGuessLocked && <View style={scStyles.lockedLine} />}
-
-      <View style={scStyles.header}>
-        <RNText style={[scStyles.name, isGuessLocked && scStyles.nameLocked]} numberOfLines={1}>
-          {name}
-        </RNText>
-        <View style={scStyles.starsRow}>
-          {Array.from({ length: Math.max(0, stars) }).map((_, i) => (
-            <Star key={i} size={11} color="#f59e0b" fill="#f59e0b" />
-          ))}
-        </View>
-      </View>
-
-      {/* Progress bar */}
-      <View style={scStyles.track}>
-        <View style={[scStyles.fill, { width: `${pct * 100}%` }, isGuessLocked && scStyles.fillLocked]} />
-      </View>
-
-      <RNText style={[scStyles.score, isNeg && scStyles.scoreNeg, isGuessLocked && scStyles.scoreLocked]}>
-        {score}
-        <RNText style={scStyles.target}>/{targetScore}</RNText>
-      </RNText>
-
-      {/* Gissningsfält – visas bara under gissningsfasen */}
-      {isGuessingPhase && (
-        <View style={scStyles.guessRow}>
-          <View style={scStyles.guessInputWrap}>
-            <TextInput
-              style={[
-                scStyles.guessInput,
-                isGuessLocked && scStyles.guessInputLocked,
-                guess.length === 4 && !isValid && scStyles.guessInputError,
-              ]}
-              placeholder="År?"
-              placeholderTextColor="#2d3748"
-              keyboardType="number-pad"
-              value={isGuessLocked ? '••••' : guess}
-              onChangeText={v => {
-                if (!isGuessLocked) onChangeGuess(v.replace(/\D/g, '').slice(0, 4));
-              }}
-              editable={!isGuessLocked}
-              maxLength={4}
-            />
-          </View>
-          {guess.length === 4 && isValid && (
-            <TouchableOpacity onPress={onToggleLock} style={scStyles.lockBtn} activeOpacity={0.7}>
-              {isGuessLocked
-                ? <EyeOff size={18} color="#818cf8" />
-                : <Eye size={18} color="#475569" />}
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {isGuessLocked && isGuessingPhase && (
-        <View style={scStyles.lockedBadge}>
-          <RNText style={scStyles.lockedBadgeText}>KLAR ✓</RNText>
-        </View>
-      )}
-    </View>
-  );
-}
+// Per-player accent palette – 5 distinct hues that work on dark backgrounds
+const PLAYER_COLORS = [
+  { border: '#3730a3', fill: '#4f46e5', fillDim: '#312e81', locked: '#6366f1', nameLocked: '#a5b4fc', scoreLocked: '#a5b4fc', badgeBg: 'rgba(99,102,241,0.15)', badgeText: '#818cf8', inputBorder: '#4f46e5', inputColor: '#818cf8', inputBg: 'rgba(79,70,229,0.08)', btnBg: 'rgba(79,70,229,0.1)', btnBorder: 'rgba(79,70,229,0.25)' },
+  { border: '#065f46', fill: '#10b981', fillDim: '#064e3b', locked: '#34d399', nameLocked: '#6ee7b7', scoreLocked: '#6ee7b7', badgeBg: 'rgba(16,185,129,0.15)', badgeText: '#34d399', inputBorder: '#10b981', inputColor: '#34d399', inputBg: 'rgba(16,185,129,0.08)', btnBg: 'rgba(16,185,129,0.1)', btnBorder: 'rgba(16,185,129,0.25)' },
+  { border: '#92400e', fill: '#f59e0b', fillDim: '#78350f', locked: '#fbbf24', nameLocked: '#fcd34d', scoreLocked: '#fcd34d', badgeBg: 'rgba(245,158,11,0.15)', badgeText: '#fbbf24', inputBorder: '#f59e0b', inputColor: '#fbbf24', inputBg: 'rgba(245,158,11,0.08)', btnBg: 'rgba(245,158,11,0.1)', btnBorder: 'rgba(245,158,11,0.25)' },
+  { border: '#9f1239', fill: '#f43f5e', fillDim: '#881337', locked: '#fb7185', nameLocked: '#fda4af', scoreLocked: '#fda4af', badgeBg: 'rgba(244,63,94,0.15)', badgeText: '#fb7185', inputBorder: '#f43f5e', inputColor: '#fb7185', inputBg: 'rgba(244,63,94,0.08)', btnBg: 'rgba(244,63,94,0.1)', btnBorder: 'rgba(244,63,94,0.25)' },
+  { border: '#164e63', fill: '#06b6d4', fillDim: '#0e7490', locked: '#22d3ee', nameLocked: '#67e8f9', scoreLocked: '#67e8f9', badgeBg: 'rgba(6,182,212,0.15)', badgeText: '#22d3ee', inputBorder: '#06b6d4', inputColor: '#22d3ee', inputBg: 'rgba(6,182,212,0.08)', btnBg: 'rgba(6,182,212,0.1)', btnBorder: 'rgba(6,182,212,0.25)' },
+] as const;
 
 const scStyles = StyleSheet.create({
   wrap: {
@@ -156,10 +75,6 @@ const scStyles = StyleSheet.create({
     borderColor: '#1a1a2e',
     overflow: 'hidden',
     gap: 8,
-  },
-  wrapLocked: {
-    borderColor: '#4f46e5',
-    backgroundColor: '#0d0d1f',
   },
   lockedLine: {
     position: 'absolute',
@@ -176,14 +91,11 @@ const scStyles = StyleSheet.create({
     marginTop: 4,
   },
   name: { color: '#64748b', fontSize: 13, fontWeight: '600', flex: 1, marginRight: 4 },
-  nameLocked: { color: '#a5b4fc' },
   starsRow: { flexDirection: 'row', gap: 2 },
   track: { height: 3, backgroundColor: '#1a1a2e', borderRadius: 99, overflow: 'hidden' },
   fill: { height: 3, borderRadius: 99, backgroundColor: '#312e81' },
-  fillLocked: { backgroundColor: '#6366f1' },
   score: { color: '#e2e8f0', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
   scoreNeg: { color: '#ef4444' },
-  scoreLocked: { color: '#a5b4fc' },
   target: { color: '#334155', fontSize: 13, fontWeight: '400' },
   guessRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   guessInputWrap: { flex: 1 },
@@ -199,31 +111,133 @@ const scStyles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
   },
-  guessInputLocked: {
-    borderColor: '#4f46e5',
-    color: '#818cf8',
-    backgroundColor: 'rgba(79,70,229,0.08)',
-  },
   guessInputError: { borderColor: '#7f1d1d' },
   lockBtn: {
     width: 38, height: 38,
     borderRadius: 10,
-    backgroundColor: 'rgba(79,70,229,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(79,70,229,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   lockedBadge: {
     alignSelf: 'flex-end',
-    backgroundColor: 'rgba(99,102,241,0.15)',
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
     marginTop: -4,
   },
-  lockedBadgeText: { color: '#818cf8', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  lockedBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
 });
+
+function ScoreCard({
+  name,
+  score,
+  targetScore,
+  stars,
+  guess,
+  onChangeGuess,
+  isGuessLocked,
+  onToggleLock,
+  isGuessingPhase,
+  playerIndex,
+}: {
+  name: string;
+  score: number;
+  targetScore: number;
+  stars: number;
+  guess: string;
+  onChangeGuess: (v: string) => void;
+  isGuessLocked: boolean;
+  onToggleLock: () => void;
+  isGuessingPhase: boolean;
+  playerIndex: number;
+}) {
+  const pct = Math.max(0, Math.min(score / targetScore, 1));
+  const isNeg = score < 0;
+  const isValid = isValidYear(guess);
+  const c = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
+
+  return (
+    <View style={[
+      scStyles.wrap,
+      { borderColor: isGuessLocked ? c.locked : c.border },
+      isGuessLocked && { backgroundColor: '#0d0d1a' },
+    ]}>
+      {isGuessLocked && (
+        <View style={[scStyles.lockedLine, { backgroundColor: c.locked }]} />
+      )}
+
+      <View style={scStyles.header}>
+        <RNText
+          style={[scStyles.name, isGuessLocked && { color: c.nameLocked }]}
+          numberOfLines={1}
+        >
+          {name}
+        </RNText>
+        <View style={scStyles.starsRow}>
+          {Array.from({ length: Math.max(0, stars) }).map((_, i) => (
+            <Star key={i} size={11} color="#f59e0b" fill="#f59e0b" />
+          ))}
+        </View>
+      </View>
+
+      {/* Progress bar */}
+      <View style={scStyles.track}>
+        <View style={[scStyles.fill, { width: `${pct * 100}%`, backgroundColor: isGuessLocked ? c.fill : c.fillDim }]} />
+      </View>
+
+      <RNText style={[
+        scStyles.score,
+        isNeg && scStyles.scoreNeg,
+        isGuessLocked && { color: c.scoreLocked },
+      ]}>
+        {score}
+        <RNText style={scStyles.target}>/{targetScore}</RNText>
+      </RNText>
+
+      {/* Gissningsfält – visas bara under gissningsfasen */}
+      {isGuessingPhase && (
+        <View style={scStyles.guessRow}>
+          <View style={scStyles.guessInputWrap}>
+            <TextInput
+              style={[
+                scStyles.guessInput,
+                isGuessLocked && { borderColor: c.inputBorder, color: c.inputColor, backgroundColor: c.inputBg },
+                guess.length === 4 && !isValid && scStyles.guessInputError,
+              ]}
+              placeholder="År?"
+              placeholderTextColor="#2d3748"
+              keyboardType="number-pad"
+              value={isGuessLocked ? '••••' : guess}
+              onChangeText={v => {
+                if (!isGuessLocked) onChangeGuess(v.replace(/\D/g, '').slice(0, 4));
+              }}
+              editable={!isGuessLocked}
+              maxLength={4}
+            />
+          </View>
+          {guess.length === 4 && isValid && (
+            <TouchableOpacity
+              onPress={onToggleLock}
+              style={[scStyles.lockBtn, { backgroundColor: c.btnBg, borderColor: c.btnBorder }]}
+              activeOpacity={0.7}
+            >
+              {isGuessLocked
+                ? <EyeOff size={18} color={c.inputColor} />
+                : <Eye size={18} color="#475569" />}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {isGuessLocked && isGuessingPhase && (
+        <View style={[scStyles.lockedBadge, { backgroundColor: c.badgeBg }]}>
+          <RNText style={[scStyles.lockedBadgeText, { color: c.badgeText }]}>KLAR ✓</RNText>
+        </View>
+      )}
+    </View>
+  );
+}
 
 // ─── ResultRow ────────────────────────────────────────────────────────────────
 
@@ -350,7 +364,7 @@ export default function ScoreBattleScreen({
     }
     saveScoreBattleMeta(
       user.uid, gameId,
-      [playerNames[0], playerNames[1] ?? playerNames[0]] as [string, string],
+      playerNames,
       scores, gameMode, targetScore, maxRounds
     ).catch(() => {});
   }, [user, gameId, scores, phase, playerNames, gameMode, targetScore, maxRounds]);
@@ -417,7 +431,7 @@ export default function ScoreBattleScreen({
 
   // ─── Gissningsstate – ett per spelare ────────────────────────────────────
 
-  const numPlayers = soloMode ? 1 : 2;
+  const numPlayers = playerNames.length;
   const [guesses, setGuesses] = useState<string[]>(() => Array(numPlayers).fill(''));
   const [locked, setLocked]   = useState<boolean[]>(() => Array(numPlayers).fill(false));
 
@@ -533,34 +547,26 @@ export default function ScoreBattleScreen({
         </View>
 
         {/* ── Score-kort med inbyggda gissningar ── */}
-        <View style={s.scoreRow}>
-          <ScoreCard
-            name={playerNames[0]}
-            score={scores[0]}
-            targetScore={targetScore}
-            stars={stars[0]}
-            guess={guesses[0] ?? ''}
-            onChangeGuess={v => handleChangeGuess(0, v)}
-            isGuessLocked={locked[0] ?? false}
-            onToggleLock={() => handleToggleLock(0)}
-            isGuessingPhase={isGuessingPhase}
-          />
-          {!soloMode && (
-            <>
-              <View style={s.scoreDiv} />
+        <View style={s.scoreGrid}>
+          {playerNames.map((name, i) => (
+            <View
+              key={name + i}
+              style={playerNames.length === 1 ? s.scoreGridFull : s.scoreGridItem}
+            >
               <ScoreCard
-                name={playerNames[1]}
-                score={scores[1]}
+                name={name}
+                score={scores[i] ?? 0}
                 targetScore={targetScore}
-                stars={stars[1]}
-                guess={guesses[1] ?? ''}
-                onChangeGuess={v => handleChangeGuess(1, v)}
-                isGuessLocked={locked[1] ?? false}
-                onToggleLock={() => handleToggleLock(1)}
+                stars={stars[i] ?? 1}
+                guess={guesses[i] ?? ''}
+                onChangeGuess={v => handleChangeGuess(i, v)}
+                isGuessLocked={locked[i] ?? false}
+                onToggleLock={() => handleToggleLock(i)}
                 isGuessingPhase={isGuessingPhase}
+                playerIndex={i}
               />
-            </>
-          )}
+            </View>
+          ))}
         </View>
 
         {/* ── Laddning ── */}
@@ -667,8 +673,14 @@ const s = StyleSheet.create({
   },
 
   // Score row
-  scoreRow: { flexDirection: 'row', alignItems: 'stretch' },
-  scoreDiv: { width: 8 },
+  scoreGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+  },
+  scoreGridItem: { width: '48.5%' },
+  scoreGridFull: { width: '100%' },
 
   // Loading
   // Guessing

@@ -118,18 +118,20 @@ export async function saveActiveGame(uid: string, state: SavedDuoGameState): Pro
 export async function saveScoreBattleMeta(
   uid: string,
   id: string,
-  playerNames: [string, string],
-  scores: [number, number],
+  playerNames: string[],
+  scores: number[],
   gameMode: string,
   targetScore?: number,
   maxRounds?: number | null,
 ): Promise<void> {
   const rawList = await AsyncStorage.getItem(ACTIVE_GAMES_INDEX(uid));
   const list = safeParse<ActiveGameMeta[]>(rawList, []);
+  const scoresMap: { [playerName: string]: number } = {};
+  playerNames.forEach((name, i) => { scoresMap[name] = scores[i] ?? 0; });
   const meta: ActiveGameMeta = {
     id,
     playerNames,
-    scores: { [playerNames[0]]: scores[0], [playerNames[1]]: scores[1] },
+    scores: scoresMap,
     gameMode,
     gameType: 'score',
     updatedAt: Date.now(),

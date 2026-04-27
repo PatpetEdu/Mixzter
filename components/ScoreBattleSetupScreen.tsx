@@ -34,6 +34,7 @@ import {
   PlayCircle,
   Film,
   Sparkles,
+  UserPlus,
 } from 'lucide-react-native';
 
 type Props = {
@@ -75,20 +76,39 @@ const MAX_ROUNDS_OPTIONS: Array<{ label: string; value: number | null }> = [
   { label: '25',            value: 25  },
 ];
 
+const MAX_PLAYERS = 5;
+const MIN_PLAYERS = 1;
+
 export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight }: Props) {
-  const [playerNames, setPlayerNames] = useState<[string, string]>(['', '']);
+  const [playerNames, setPlayerNames] = useState<string[]>(['', '']);
   const [selectedMode, setSelectedMode] = useState('default');
   const [targetScore, setTargetScore] = useState<number>(30);
   const [maxRounds, setMaxRounds] = useState<number | null>(null);
   const [error, setError] = useState('');
 
+  const handleChangeName = (i: number, v: string) => {
+    const updated = [...playerNames];
+    updated[i] = v;
+    setPlayerNames(updated);
+    setError('');
+  };
+
+  const handleAddPlayer = () => {
+    if (playerNames.length < MAX_PLAYERS) setPlayerNames([...playerNames, '']);
+  };
+
+  const handleRemovePlayer = (i: number) => {
+    if (playerNames.length > MIN_PLAYERS) setPlayerNames(playerNames.filter((_, idx) => idx !== i));
+  };
+
   const handleStart = () => {
-    const trimmed = playerNames.map(n => n.trim()).filter(n => n !== '');
-    if (trimmed.length === 0) {
-      setError('Ange minst ett spelarnamn.');
+    const trimmed = playerNames.map(n => n.trim());
+    if (trimmed.some(n => n === '')) {
+      setError('Alla spelare måste ha ett namn.');
       return;
     }
-    if (trimmed.length === 2 && trimmed[0].toLowerCase() === trimmed[1].toLowerCase()) {
+    const unique = new Set(trimmed.map(n => n.toLowerCase()));
+    if (unique.size !== trimmed.length) {
       setError('Spelarna kan inte ha samma namn.');
       return;
     }
@@ -96,7 +116,9 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
     onStart(trimmed, selectedMode, targetScore, maxRounds);
   };
 
-  const isFormValid = playerNames.some(n => n.trim() !== '');
+  const isFormValid = playerNames.every(n => n.trim() !== '');
+  const canAdd = playerNames.length < MAX_PLAYERS;
+  const canRemove = playerNames.length > MIN_PLAYERS;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -138,36 +160,54 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
                 SPELARE
               </Text>
 
-              {([0, 1] as const).map(i => (
-                <VStack key={i} space="xs">
-                  <Text fontSize="$xs" fontWeight="bold" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
-                    SPELARE {i + 1}{i === 1 ? '  ·  valfri för solo' : ''}
-                  </Text>
-                  <Input
-                    rounded="$2xl"
-                    borderWidth={2}
-                    borderColor="$backgroundLight100"
-                    bg="$backgroundLight50"
-                    sx={{
-                      _dark: { borderColor: '$backgroundDark800', bg: '$backgroundDark950' },
-                      _focus: { borderColor: '#4f46e5' },
-                    }}
-                  >
-                    <InputField
-                      placeholder={`Spelare ${i + 1}`}
-                      value={playerNames[i]}
-                      onChangeText={v => {
-                        const updated: [string, string] = [...playerNames] as [string, string];
-                        updated[i] = v;
-                        setPlayerNames(updated);
-                        setError('');
+              {playerNames.map((name, i) => (
+                <HStack key={i} space="md" w="$full" alignItems="flex-start">
+                  <VStack space="xs" flex={1}>
+                    <Text fontSize="$xs" fontWeight="bold" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
+                      SPELARE {i + 1}
+                    </Text>
+                    <Input
+                      rounded="$2xl"
+                      borderWidth={2}
+                      borderColor="$backgroundLight100"
+                      bg="$backgroundLight50"
+                      sx={{
+                        _dark: { borderColor: '$backgroundDark800', bg: '$backgroundDark950' },
+                        _focus: { borderColor: '#4f46e5' },
                       }}
-                      fontWeight="bold"
-                      sx={{ _dark: { color: '$textDark50' } }}
-                    />
-                  </Input>
-                </VStack>
+                    >
+                      <InputField
+                        placeholder={`Spelare ${i + 1}`}
+                        value={name}
+                        onChangeText={v => handleChangeName(i, v)}
+                        fontWeight="bold"
+                        sx={{ _dark: { color: '$textDark50' } }}
+                      />
+                    </Input>
+                  </VStack>
+                  {canRemove && (
+                    <Box justifyContent="flex-end" mt="$6">
+                      <Pressable onPress={() => handleRemovePlayer(i)} hitSlop={12}>
+                        <Box w="$10" h="$10" rounded="$full" bg="$error500" justifyContent="center" alignItems="center" sx={{ _dark: { bg: '$error600' } }}>
+                          <Text color="$white" fontSize="$lg" fontWeight="bold">−</Text>
+                        </Box>
+                      </Pressable>
+                    </Box>
+                  )}
+                </HStack>
               ))}
+
+              {canAdd && (
+                <Pressable onPress={handleAddPlayer}>
+                  <Box w="$full" h="$12" rounded="$2xl" borderWidth={2} borderColor="#4f46e5" borderStyle="dashed" justifyContent="center" alignItems="center" bg="rgba(79,70,229,0.05)" sx={{ _dark: { bg: 'rgba(79,70,229,0.1)' } }}>
+                    <HStack space="sm" alignItems="center">
+                      <UserPlus size={16} color="#818cf8" />
+                      <Text fontSize="$sm" fontWeight="bold" color="#818cf8">+ Lägg till spelare</Text>
+                      <Text fontSize="$xs" color="$textLight400" sx={{ _dark: { color: '$textDark500' } }}>({playerNames.length}/{MAX_PLAYERS})</Text>
+                    </HStack>
+                  </Box>
+                </Pressable>
+              )}
 
               {error ? (
                 <Text color="$error500" fontSize="$sm">{error}</Text>
