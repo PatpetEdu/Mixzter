@@ -207,6 +207,20 @@
   color: #818cf8;
 }
 
+/* ── Artwork ──────────────────────────────────────────────────────────────── */
+.sb-artwork-wrap {
+  display: flex;
+  justify-content: center;
+}
+.sb-artwork-img {
+  width: 128px;
+  height: 128px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.06);
+}
+
 /* ── My guess input ───────────────────────────────────────────────────────── */
 .sb-guess-section {
   display: flex;

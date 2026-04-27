@@ -84,6 +84,7 @@ export function useScoreBattleLogic(
   const [roundResults, setRoundResults] = useState<(RoundResult | null)[]>(() => Array(numPlayers).fill(null));
   const [songCount, setSongCount]   = useState(0);
   const [winnerIdx, setWinnerIdx]   = useState<number | null>(null);
+  const [pendingGameOver, setPendingGameOver] = useState(false);
 
   const scoresRef    = useRef<number[]>(Array(numPlayers).fill(0));
   const songCountRef = useRef(0);
@@ -92,7 +93,10 @@ export function useScoreBattleLogic(
 
   const commitRound = useCallback(
     (results: RoundResult[]) => {
-      const newScores = scoresRef.current.map((s, i) => s + (results[i]?.points ?? 0));
+      // Floor each score at 0 — no negative totals
+      const newScores = scoresRef.current.map(
+        (s, i) => Math.max(0, s + (results[i]?.points ?? 0))
+      );
       scoresRef.current = newScores;
       setScores(newScores);
       setRoundResults(results);
@@ -106,7 +110,9 @@ export function useScoreBattleLogic(
       if (reachedScoreTarget || reachedRoundLimit) {
         const maxScore = Math.max(...newScores);
         setWinnerIdx(newScores.indexOf(maxScore));
-        setPhase('game_over');
+        // Show summary of the final round before going to game_over
+        setPendingGameOver(true);
+        setPhase('song_summary');
       } else {
         setPhase('song_summary');
       }
@@ -130,11 +136,16 @@ export function useScoreBattleLogic(
   );
 
   const nextSong = useCallback(() => {
+    if (pendingGameOver) {
+      setPendingGameOver(false);
+      setPhase('game_over');
+      return;
+    }
     setRoundResults(Array(numPlayers).fill(null));
     songCountRef.current += 1;
     setSongCount(songCountRef.current);
     setPhase('guessing');
-  }, [numPlayers]);
+  }, [numPlayers, pendingGameOver]);
 
   const resetGame = useCallback(() => {
     scoresRef.current = Array(numPlayers).fill(0);
@@ -144,6 +155,7 @@ export function useScoreBattleLogic(
     setRoundResults(Array(numPlayers).fill(null));
     setSongCount(0);
     setWinnerIdx(null);
+    setPendingGameOver(false);
     setPhase('guessing');
   }, [numPlayers]);
 
@@ -162,6 +174,7 @@ export function useScoreBattleLogic(
     setSongCount(snap.songCount);
     setRoundResults(snap.roundResults ?? Array(snap.scores.length).fill(null));
     setWinnerIdx(null);
+    setPendingGameOver(false);
     setPhase(snap.phase ?? 'guessing');
   }, []);
 
@@ -169,6 +182,7 @@ export function useScoreBattleLogic(
     scores, stars, phase,
     soloMode, numPlayers,
     roundResults, songCount, winnerIdx,
+    pendingGameOver,
     playerNames,
     confirmGuesses,
     nextSong, resetGame,

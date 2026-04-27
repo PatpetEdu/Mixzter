@@ -8,6 +8,7 @@ import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -20,7 +21,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Trophy, Star, Eye, EyeOff, QrCode } from 'lucide-react-native';
+import { Trophy, Star, Eye, EyeOff, QrCode, Info } from 'lucide-react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import AnimatedCard from './AnimatedCard';
@@ -318,6 +319,7 @@ export default function ScoreBattleScreen({
     scores, stars, phase,
     soloMode,
     roundResults, songCount, winnerIdx,
+    pendingGameOver,
     confirmGuesses, nextSong, resetGame,
     _restore,
   } = logic;
@@ -437,6 +439,9 @@ export default function ScoreBattleScreen({
   const [guesses, setGuesses] = useState<string[]>(() => Array(numPlayers).fill(''));
   const [locked, setLocked]   = useState<boolean[]>(() => Array(numPlayers).fill(false));
   const [showQR, setShowQR]   = useState(false);
+  const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
+  const songInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressDidFireRef = useRef(false);
 
   // ─── Webb-gissningar från Firestore ──────────────────────────────────────
 
@@ -476,6 +481,8 @@ export default function ScoreBattleScreen({
     await stopAudio();
     setGuesses(Array(numPlayers).fill(''));
     setLocked(Array(numPlayers).fill(false));
+    setIsSongInfoVisible(false);
+    if (songInfoTimerRef.current) clearTimeout(songInfoTimerRef.current);
     clearWebGuesses();
   }, [stopAudio, numPlayers, clearWebGuesses]);
 
@@ -548,7 +555,7 @@ export default function ScoreBattleScreen({
 
             <TouchableOpacity onPress={handlePlayAgain} activeOpacity={0.85} style={{ width: '100%' }}>
               <LinearGradient colors={['#4f46e5', '#7c3aed']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.bigBtn}>
-                <RNText style={s.bigBtnText}>Spela igen 🎵</RNText>
+                <RNText style={s.bigBtnText}>Spela igen</RNText>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -651,6 +658,61 @@ export default function ScoreBattleScreen({
               onPlayPreview={togglePreview}
               isPlayingPreview={isPlaying}
             />
+
+            {/* ── Diskret låtinfo (felsökning) ── */}
+            <Pressable
+              onPressIn={() => {
+                longPressDidFireRef.current = false;
+                songInfoTimerRef.current = setTimeout(() => {
+                  longPressDidFireRef.current = true;
+                  setIsSongInfoVisible(true);
+                }, 1200);
+              }}
+              onPressOut={() => {
+                if (songInfoTimerRef.current) {
+                  clearTimeout(songInfoTimerRef.current);
+                  songInfoTimerRef.current = null;
+                }
+              }}
+              onPress={() => {
+                // Vanligt tryck: stäng om öppen (men inte om longpress precis triggade)
+                if (!longPressDidFireRef.current && isSongInfoVisible) {
+                  setIsSongInfoVisible(false);
+                }
+                longPressDidFireRef.current = false;
+              }}
+              style={({ pressed }) => [
+                s.songInfoToggle,
+                pressed && { backgroundColor: 'rgba(79,70,229,0.18)', opacity: 1 },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+            >
+              {({ pressed }) => (
+                <>
+                  <Info size={11} color={(pressed || isSongInfoVisible) ? '#4f46e5' : '#2a3550'} />
+                  <RNText style={[s.songInfoToggleText, (pressed || isSongInfoVisible) && { color: '#4f46e5' }]}>
+                    info
+                  </RNText>
+                </>
+              )}
+            </Pressable>
+
+            {isSongInfoVisible && (
+              <View style={s.songInfoBox}>
+                <View style={[s.songInfoRow, { flexDirection: 'row' }]}>
+                  <RNText style={s.songInfoKey}>Artist  </RNText>
+                  <RNText style={[s.songInfoVal, { flex: 1 }]}>{card.artist}</RNText>
+                </View>
+                <View style={[s.songInfoRow, { flexDirection: 'row' }]}>
+                  <RNText style={s.songInfoKey}>Låt  </RNText>
+                  <RNText style={[s.songInfoVal, { flex: 1 }]}>{card.title}</RNText>
+                </View>
+                <View style={[s.songInfoRow, { flexDirection: 'row' }]}>
+                  <RNText style={s.songInfoKey}>År  </RNText>
+                  <RNText style={s.songInfoVal}>{card.year}</RNText>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -672,15 +734,17 @@ export default function ScoreBattleScreen({
 
             <TouchableOpacity onPress={handleNextSong} activeOpacity={0.85}>
               <LinearGradient
-                colors={['#4f46e5', '#7c3aed']}
+                colors={pendingGameOver ? ['#b45309', '#92400e'] : ['#4f46e5', '#7c3aed']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={s.bigBtn}
               >
                 <RNText style={s.bigBtnText}>
-                  {maxRounds !== null
-                    ? `Nästa låt  ·  ${songCount + 1} / ${maxRounds}  ▶`
-                    : 'Nästa låt  ▶'}
+                  {pendingGameOver
+                    ? 'Se slutresultat  🏆'
+                    : maxRounds !== null
+                      ? `Nästa låt  ·  ${songCount + 1} / ${maxRounds}  ▶`
+                      : 'Nästa låt  ▶'}
                 </RNText>
               </LinearGradient>
             </TouchableOpacity>
@@ -798,6 +862,34 @@ const s = StyleSheet.create({
     borderColor: '#1a1a2e',
   },
   outlineBtnText: { color: '#334155', fontSize: 15, fontWeight: '600' },
+
+  // Song info (debug)
+  songInfoToggle: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    alignSelf: 'center' as const,
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    opacity: 0.65,
+  },
+  songInfoToggleText: {
+    color: '#2a3550',
+    fontSize: 10,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
+  songInfoBox: {
+    backgroundColor: '#080810',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+    padding: 12,
+    gap: 5,
+  },
+  songInfoRow: { marginBottom: 2 },
+  songInfoKey: { color: '#1e2535', fontSize: 11, fontWeight: '700' as const },
+  songInfoVal: { color: '#334155', fontSize: 11 },
 
   // Game over
   gameOverInner: {

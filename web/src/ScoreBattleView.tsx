@@ -380,6 +380,17 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
           })}
         </div>
 
+        {/* ── Artwork (gissningsfas) ── */}
+        {isGuessing && room.card?.artworkUrl && (
+          <div className="sb-artwork-wrap">
+            <img
+              src={room.card.artworkUrl}
+              alt="Album artwork"
+              className="sb-artwork-img"
+            />
+          </div>
+        )}
+
         {/* ── Gissningsfas: min inmatning ── */}
         {isGuessing && (
           <div className="sb-guess-section">
