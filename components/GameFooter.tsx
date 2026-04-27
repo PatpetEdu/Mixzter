@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import {
-  Box,
   Pressable,
   Icon,
   Actionsheet,
@@ -10,7 +10,6 @@ import {
   ActionsheetDragIndicator,
   ActionsheetItem,
   ActionsheetItemText,
-  HStack,
 } from '@gluestack-ui/themed';
 import { MoreVertical, LogOut } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,30 +25,23 @@ export default function GameFooter({ onBackToMenu }: Props) {
 
   return (
     <>
-      <Box
-        pb={insets.bottom} // Safe area padding
-        bg="$backgroundLight50"
-        w="$full"
-        justifyContent="center"
-        sx={{
-          borderTopWidth: 1,
-          borderTopColor: '$borderLight300',
-          _dark: { 
-            bg: '$backgroundDark900',
-            borderTopColor: '$borderDark700'
-          },
-        }}
+      <View
+        style={[
+          styles.fab,
+          { bottom: Math.max(insets.bottom, 16) + 4, right: 16 },
+        ]}
+        pointerEvents="box-none"
       >
-        <HStack py="$2" justifyContent="flex-end" alignItems="center" pr="$3">
-          <Pressable
-            onPress={() => setShowActionsheet(true)}
-            borderRadius="$full"
-            p="$2.5"
-          >
-            <Icon as={MoreVertical} size="xl" />
-          </Pressable>
-        </HStack>
-      </Box>
+        <Pressable
+          onPress={() => setShowActionsheet(true)}
+          style={({ pressed }: { pressed: boolean }) => [
+            styles.fabButton,
+            pressed && styles.fabButtonPressed,
+          ]}
+        >
+          <Icon as={MoreVertical} size="lg" color="$textLight500" />
+        </Pressable>
+      </View>
 
       <Actionsheet isOpen={showActionsheet} onClose={handleClose} zIndex={999}>
         <ActionsheetBackdrop />
@@ -71,3 +63,21 @@ export default function GameFooter({ onBackToMenu }: Props) {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  fab: {
+    position: 'absolute',
+    zIndex: 10,
+  },
+  fabButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabButtonPressed: {
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+});

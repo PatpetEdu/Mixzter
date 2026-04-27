@@ -1,12 +1,27 @@
 import React, { useState } from 'react';
-import { Box, HStack, Text, Pressable, VStack } from '@gluestack-ui/themed';
+import {
+  Box,
+  HStack,
+  Text,
+  Pressable,
+  VStack,
+  Icon,
+  Actionsheet,
+  ActionsheetBackdrop,
+  ActionsheetContent,
+  ActionsheetDragIndicatorWrapper,
+  ActionsheetDragIndicator,
+  ActionsheetItem,
+  ActionsheetItemText,
+} from '@gluestack-ui/themed';
 import { useTheme } from '../context/ThemeContext';
-import { Sun, Moon, User } from 'lucide-react-native';
+import { Sun, Moon, User, MoreVertical, LogOut } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import UserProfile from './UserProfile';
 
 type Props = {
   gameMode?: string;
+  onBackToMenu?: () => void;
 };
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -25,10 +40,11 @@ const GAME_MODE_LABELS: Record<string, string> = {
   modernahits: `Moderna Hits 2005-${CURRENT_YEAR}`,
 };
 
-export default function GameHeader({ gameMode }: Props) {
+export default function GameHeader({ gameMode, onBackToMenu }: Props) {
   const { colorMode, toggleColorMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showActionsheet, setShowActionsheet] = useState(false);
 
   // Splitta genre-namn och år
   const splitGameModeName = (fullName: string): { name: string; years: string } => {
@@ -99,33 +115,77 @@ export default function GameHeader({ gameMode }: Props) {
           </HStack>
 
           <HStack gap="$3" alignItems="center">
-            <Pressable 
-              onPress={toggleColorMode}
-              bg="$backgroundLight200"
-              p="$2.5"
-              rounded="$xl"
-              sx={{ _dark: { bg: '$backgroundDark800' } }}
-            >
-              {colorMode === 'dark' ? (
-                <Sun size={18} color="#fbbf24" />
-              ) : (
-                <Moon size={18} color="#6b7280" />
-              )}
-            </Pressable>
-            <Pressable 
-              onPress={() => setShowUserProfile(true)}
-              bg="$backgroundLight200"
-              p="$2.5"
-              rounded="$xl"
-              sx={{ _dark: { bg: '$backgroundDark800' } }}
-            >
-              <User size={18} color="#9ca3af" />
-            </Pressable>
+            {onBackToMenu ? (
+              <Pressable
+                onPress={() => setShowActionsheet(true)}
+                bg="$backgroundLight200"
+                p="$2.5"
+                rounded="$xl"
+                sx={{ _dark: { bg: '$backgroundDark800' } }}
+              >
+                <MoreVertical size={18} color="#9ca3af" />
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  onPress={toggleColorMode}
+                  bg="$backgroundLight200"
+                  p="$2.5"
+                  rounded="$xl"
+                  sx={{ _dark: { bg: '$backgroundDark800' } }}
+                >
+                  {colorMode === 'dark' ? (
+                    <Sun size={18} color="#fbbf24" />
+                  ) : (
+                    <Moon size={18} color="#6b7280" />
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => setShowUserProfile(true)}
+                  bg="$backgroundLight200"
+                  p="$2.5"
+                  rounded="$xl"
+                  sx={{ _dark: { bg: '$backgroundDark800' } }}
+                >
+                  <User size={18} color="#9ca3af" />
+                </Pressable>
+              </>
+            )}
           </HStack>
         </HStack>
       </Box>
       {showUserProfile && (
         <UserProfile onClose={() => setShowUserProfile(false)} />
+      )}
+      {onBackToMenu && (
+        <Actionsheet isOpen={showActionsheet} onClose={() => setShowActionsheet(false)} zIndex={999}>
+          <ActionsheetBackdrop />
+          <ActionsheetContent pb={insets.bottom}>
+            <ActionsheetDragIndicatorWrapper>
+              <ActionsheetDragIndicator />
+            </ActionsheetDragIndicatorWrapper>
+            <ActionsheetItem
+              onPress={() => {
+                setShowActionsheet(false);
+                toggleColorMode();
+              }}
+            >
+              <Icon as={colorMode === 'dark' ? Sun : Moon} size="md" mr="$2" />
+              <ActionsheetItemText>
+                {colorMode === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
+              </ActionsheetItemText>
+            </ActionsheetItem>
+            <ActionsheetItem
+              onPress={() => {
+                setShowActionsheet(false);
+                onBackToMenu();
+              }}
+            >
+              <Icon as={LogOut} size="md" mr="$2" />
+              <ActionsheetItemText>Tillbaka till menyn</ActionsheetItemText>
+            </ActionsheetItem>
+          </ActionsheetContent>
+        </Actionsheet>
       )}
     </>
   );

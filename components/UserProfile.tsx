@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
+import {
+  Modal,
+  View,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import {
   Box,
-  Pressable,
   VStack,
   HStack,
   Text,
@@ -22,143 +29,138 @@ export default function UserProfile({ onClose }: Props) {
   const insets = useSafeAreaInsets();
 
   const handleSignOut = async () => {
-    await signOut();
-    onClose();
+    Alert.alert(
+      'Logga ut',
+      'Är du säker på att du vill logga ut?',
+      [
+        { text: 'Avbryt', style: 'cancel' },
+        {
+          text: 'Logga ut',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            onClose();
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <Box
-      position="absolute"
-      top={0}
-      left={0}
-      right={0}
-      bottom={0}
-      zIndex={100}
-      justifyContent="flex-start"
-      pt={insets.top + 60}
-      px="$4"
-    >
-      {/* Backdrop */}
-      <Pressable
-        position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        bottom={0}
-        bg="rgba(0,0,0,0.3)"
-        onPress={onClose}
-        zIndex={-1}
-      />
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.backdrop} />
+      </TouchableWithoutFeedback>
 
-      {/* Profile Card */}
-      <Box
-        bg="$backgroundLight0"
-        borderWidth={1}
-        borderColor="$backgroundLight200"
-        rounded="$3xl"
-        p="$6"
-        sx={{
-          _dark: {
-            bg: '$backgroundDark900',
-            borderColor: '$backgroundDark800',
-          },
-        }}
-        w="$full"
-        maxWidth={320}
-      >
-        <HStack alignItems="center" gap="$4" mb="$6">
-          <Box
-            w={48}
-            h={48}
+      <View style={[styles.card, { top: insets.top + 64 }]}>
+        <Box
+          bg="$backgroundLight0"
+          borderWidth={1}
+          borderColor="$backgroundLight200"
+          rounded="$3xl"
+          p="$6"
+          sx={{
+            _dark: {
+              bg: '$backgroundDark900',
+              borderColor: '$backgroundDark800',
+            },
+          }}
+        >
+          <HStack alignItems="center" gap="$4" mb="$6">
+            <Box
+              w={48}
+              h={48}
+              bg="$backgroundLight200"
+              rounded="$2xl"
+              justifyContent="center"
+              alignItems="center"
+              sx={{ _dark: { bg: '$backgroundDark800' } }}
+            >
+              <User size={24} color="#059669" />
+            </Box>
+            <VStack flex={1} space="xs">
+              <Text
+                fontSize="$sm"
+                fontWeight="bold"
+                sx={{ _dark: { color: '$textDark100' } }}
+                numberOfLines={1}
+              >
+                {user?.email || 'Gäst'}
+              </Text>
+              <Text
+                fontSize="$xs"
+                sx={{ _dark: { color: '$textDark500' } }}
+              >
+                {user ? 'Inloggad' : 'Spelar som gäst'}
+              </Text>
+            </VStack>
+          </HStack>
+
+          <Divider my="$4" />
+
+          {user && (
+            <TouchableOpacity
+              onPress={handleSignOut}
+              style={styles.logoutBtn}
+              activeOpacity={0.7}
+            >
+              <LogOut size={16} color="#dc2626" />
+              <Text
+                fontSize="$sm"
+                fontWeight="bold"
+                color="$error600"
+                sx={{ _dark: { color: '$error500' } }}
+              >
+                Logga ut
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <Button
+            w="$full"
             bg="$backgroundLight200"
             rounded="$2xl"
-            justifyContent="center"
-            alignItems="center"
+            py="$3"
+            px="$4"
+            onPress={onClose}
             sx={{
               _dark: { bg: '$backgroundDark800' },
             }}
           >
-            <User size={24} color="#059669" />
-          </Box>
-          <VStack flex={1} space="xs">
-            <Text
+            <ButtonText
               fontSize="$sm"
               fontWeight="bold"
-              sx={{
-                _dark: { color: '$textDark100' },
-              }}
+              sx={{ _dark: { color: '$textDark300' } }}
             >
-              {user?.email || 'Gäst'}
-            </Text>
-            <Text
-              fontSize="$xs"
-              sx={{
-                _dark: { color: '$textDark500' },
-              }}
-            >
-              {user ? 'Inloggad' : 'Spelar som gäst'}
-            </Text>
-          </VStack>
-        </HStack>
-
-        <Divider my="$4" />
-
-        {user && (
-          <Button
-            bg="$backgroundLight100"
-            rounded="$2xl"
-            py="$3"
-            px="$4"
-            mb="$2"
-            onPress={handleSignOut}
-            sx={{
-              borderWidth: 1,
-              borderColor: '$error600',
-              _dark: {
-                bg: '$backgroundDark800',
-                borderColor: '$error500',
-              },
-            }}
-          >
-            <HStack gap="$2" alignItems="center">
-              <LogOut size={16} color="#dc2626" />
-              <ButtonText
-                color="$error600"
-                fontSize="$sm"
-                fontWeight="bold"
-                sx={{
-                  _dark: { color: '$error500' },
-                }}
-              >
-                Logga ut
-              </ButtonText>
-            </HStack>
+              STÄNG
+            </ButtonText>
           </Button>
-        )}
-
-        <Button
-          bg="$backgroundLight200"
-          rounded="$2xl"
-          py="$3"
-          px="$4"
-          onPress={onClose}
-          sx={{
-            _dark: { bg: '$backgroundDark800' },
-            _pressed: { bg: '$backgroundLight300' },
-            _dark_pressed: { bg: '$backgroundDark700' },
-          }}
-        >
-          <ButtonText
-            fontSize="$sm"
-            fontWeight="bold"
-            sx={{
-              _dark: { color: '$textDark300' },
-            }}
-          >
-            STÄNG
-          </ButtonText>
-        </Button>
-      </Box>
-    </Box>
+        </Box>
+      </View>
+    </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  card: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#dc2626',
+    backgroundColor: 'rgba(239,68,68,0.06)',
+  },
+});

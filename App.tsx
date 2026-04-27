@@ -372,8 +372,19 @@ const resumeGame = (meta: ActiveGameMeta) => {
         bg="$backgroundLight0" 
         sx={{ _dark: { bg: '$backgroundDark950' } }}
       >
-        {/* Header */}
-        <GameHeader />
+        {/* Header – absolut så innehåll scrollar under den */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1,
+          }}
+          pointerEvents="box-none"
+        >
+          <GameHeader />
+        </Animated.View>
 
         {/* Main Content */}
         <Box flex={1}>
@@ -385,7 +396,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
             }}
           >
             <ScrollView 
-              contentContainerStyle={{ paddingVertical: 24, paddingHorizontal: 24, flexGrow: 1 }}
+              contentContainerStyle={{ paddingTop: HEADER_HEIGHT + 24, paddingBottom: 24, paddingHorizontal: 24, flexGrow: 1 }}
               scrollEventThrottle={16}
             >
               <VStack space="xl">
@@ -557,7 +568,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
                     }}
                   >
                     <LinearGradient
-                      colors={['#1d4ed8', '#4f46e5']}
+                      colors={['#3730a3', '#4f46e5']}
                       start={[0, 0]}
                       end={[1, 1]}
                       style={{ borderRadius: 32, padding: 32 }}
@@ -885,7 +896,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
             transform: [{ translateY: headerTranslateY }],
           }}
         >
-          <GameHeader />
+          <GameHeader onBackToMenu={returnToMenu} />
         </Animated.View>
 
         <Box flex={1} position="relative">
@@ -895,8 +906,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
             onScroll={handleScroll}
           />
         </Box>
-
-        <GameFooter onBackToMenu={returnToMenu} />
       </Box>
     );
   }
@@ -917,7 +926,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
           }}
           pointerEvents="box-none"
         >
-          <GameHeader gameMode={mode === 'duo' ? gameMode : undefined} />
+          <GameHeader gameMode={mode === 'duo' ? gameMode : undefined} onBackToMenu={returnToMenu} />
         </Animated.View>
 
         <Box flex={1} position="relative">
@@ -935,7 +944,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
             />
           )}
         </Box>
-        <GameFooter onBackToMenu={returnToMenu} />
       </Box>
     );
   }
@@ -956,7 +964,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
           }}
           pointerEvents="box-none"
         >
-          <GameHeader />
+          <GameHeader onBackToMenu={returnToMenu} />
         </Animated.View>
         <Box flex={1} position="relative">
           <ScoreBattleSetupScreen
@@ -972,7 +980,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
             headerHeight={HEADER_HEIGHT}
           />
         </Box>
-        <GameFooter onBackToMenu={returnToMenu} />
       </Box>
     );
   }
@@ -993,7 +1000,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
           }}
           pointerEvents="box-none"
         >
-          <GameHeader />
+          <GameHeader onBackToMenu={returnToMenu} />
         </Animated.View>
         <Box flex={1} position="relative">
           <ScoreBattleScreen
@@ -1007,7 +1014,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
             onScroll={handleScroll}
           />
         </Box>
-        <GameFooter onBackToMenu={returnToMenu} />
       </Box>
     );
   }
@@ -1042,7 +1048,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
           }}
           pointerEvents="box-none"
         >
-          <GameHeader />
+          <GameHeader onBackToMenu={() => { setSpectatorGameId(null); setMode('menu'); }} />
         </Animated.View>
 
         <Box flex={1} position="relative">
@@ -1056,10 +1062,6 @@ const resumeGame = (meta: ActiveGameMeta) => {
             onScroll={handleScroll}
           />
         </Box>
-        <GameFooter onBackToMenu={() => {
-          setSpectatorGameId(null);
-          setMode('menu');
-        }} />
       </Box>
     );
   }
