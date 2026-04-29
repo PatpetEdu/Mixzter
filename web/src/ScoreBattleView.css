@@ -453,3 +453,20 @@
   font-weight: 800;
   white-space: nowrap;
 }
+
+.sb-history-toggle {
+  display: block;
+  margin: 6px auto 0;
+  padding: 6px 16px;
+  border-radius: 99px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.07);
+  color: #818cf8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.sb-history-toggle:hover {
+  background: rgba(99, 102, 241, 0.14);
+}

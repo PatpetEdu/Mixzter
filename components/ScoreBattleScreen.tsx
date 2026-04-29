@@ -453,6 +453,7 @@ export default function ScoreBattleScreen({
   const songInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
   const [songHistory, setSongHistory] = useState<SongHistoryEntry[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const playAgainScaleAnim = useRef(new RNAnimated.Value(1)).current;
   const backMenuScaleAnim  = useRef(new RNAnimated.Value(1)).current;
   const nextSongScaleAnim  = useRef(new RNAnimated.Value(1)).current;
@@ -561,6 +562,18 @@ export default function ScoreBattleScreen({
 
   if (phase === 'game_over') {
     const winner = winnerIdx !== null ? playerNames[winnerIdx] : '?';
+    const HISTORY_PREVIEW = 3;
+    const sortedByInterest = songHistory
+      .map((entry, origIdx) => ({ entry, origIdx }))
+      .sort((a, b) => {
+        const score = (e: SongHistoryEntry) =>
+          Math.max(0, ...e.results.filter((r): r is RoundResult => r !== null).map(r => Math.abs(r.points)));
+        return score(b.entry) - score(a.entry);
+      });
+    const displayedHistory = historyExpanded
+      ? songHistory.map((entry, origIdx) => ({ entry, origIdx }))
+      : sortedByInterest.slice(0, HISTORY_PREVIEW);
+    const hasMoreHistory = songHistory.length > HISTORY_PREVIEW;
     return (
       <View style={{ flex: 1, backgroundColor: '#07070d' }}>
         <ScrollView contentContainerStyle={s.gameOverScroll}>
@@ -590,11 +603,11 @@ export default function ScoreBattleScreen({
             {songHistory.length > 0 && (
               <View style={s.historySection}>
                 <RNText style={s.historyHeader}>SPELHISTORIK</RNText>
-                {songHistory.map((entry, idx) => (
-                  <View key={idx} style={s.historyCard}>
+                {displayedHistory.map(({ entry, origIdx }) => (
+                  <View key={origIdx} style={s.historyCard}>
                     <View style={s.historyCardHead}>
                       <View style={s.historyNumBadge}>
-                        <RNText style={s.historyNumText}>{'#' + (idx + 1)}</RNText>
+                        <RNText style={s.historyNumText}>{'#' + (origIdx + 1)}</RNText>
                       </View>
                       <View style={{ flex: 1, gap: 2 }}>
                         <RNText style={s.historyArtist} numberOfLines={1}>{entry.artist}</RNText>
@@ -627,6 +640,19 @@ export default function ScoreBattleScreen({
                     </View>
                   </View>
                 ))}
+                {hasMoreHistory && (
+                  <TouchableOpacity
+                    onPress={() => setHistoryExpanded(v => !v)}
+                    style={s.historyToggle}
+                    activeOpacity={0.7}
+                  >
+                    <RNText style={s.historyToggleText}>
+                      {historyExpanded
+                        ? 'Dölj'
+                        : `Visa alla ${songHistory.length} omgångar`}
+                    </RNText>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -1060,6 +1086,23 @@ const s = StyleSheet.create({
   historyGuessText: { color: '#334155', fontSize: 11, fontWeight: '700', minWidth: 36, textAlign: 'right' },
   historyPtsBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   historyPtsText: { fontSize: 11, fontWeight: '800' },
+
+  historyToggle: {
+    alignSelf: 'center',
+    marginTop: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 99,
+    backgroundColor: 'rgba(99,102,241,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.2)',
+  },
+  historyToggleText: {
+    color: '#6366f1',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
 
   // Song info (debug)
   songInfoToggle: {

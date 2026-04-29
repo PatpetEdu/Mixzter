@@ -183,6 +183,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
   // Min gissning (lokal)
   const [myGuess, setMyGuess] = useState('');
   const [isLocked, setIsLocked] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   // Spåra rundbyte för att återställa gissning
   const lastSongCountRef = useRef<number>(-1);
@@ -526,47 +527,69 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
             </div>
 
             {/* ── Spelhistorik ── */}
-            {room.songHistory && room.songHistory.length > 0 && (
-              <div className="sb-history">
-                <div className="sb-history-header">SPELHISTORIK</div>
-                {room.songHistory.map((entry, idx) => (
-                  <div key={idx} className="sb-history-card">
-                    <div className="sb-history-card-head">
-                      <span className="sb-history-num">#{ idx + 1}</span>
-                      <div className="sb-history-meta">
-                        <span className="sb-history-artist">{entry.artist}</span>
-                        <span className="sb-history-title-year">
-                          {entry.title} &middot; <strong>{entry.year}</strong>
-                        </span>
+            {room.songHistory && room.songHistory.length > 0 && (() => {
+              const PREVIEW = 3;
+              const sorted = room.songHistory!
+                .map((entry, origIdx) => ({ entry, origIdx }))
+                .sort((a, b) => {
+                  const score = (e: SongHistoryEntry) =>
+                    Math.max(0, ...e.results.filter((r): r is RoundResult => r !== null).map(r => Math.abs(r.points)));
+                  return score(b.entry) - score(a.entry);
+                });
+              const displayed = historyExpanded
+                ? room.songHistory!.map((entry, origIdx) => ({ entry, origIdx }))
+                : sorted.slice(0, PREVIEW);
+              const hasMore = room.songHistory!.length > PREVIEW;
+              return (
+                <div className="sb-history">
+                  <div className="sb-history-header">SPELHISTORIK</div>
+                  {displayed.map(({ entry, origIdx }) => (
+                    <div key={origIdx} className="sb-history-card">
+                      <div className="sb-history-card-head">
+                        <span className="sb-history-num">#{origIdx + 1}</span>
+                        <div className="sb-history-meta">
+                          <span className="sb-history-artist">{entry.artist}</span>
+                          <span className="sb-history-title-year">
+                            {entry.title} &middot; <strong>{entry.year}</strong>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="sb-history-results">
+                        {entry.results.map((result, pi) => {
+                          if (!result) return null;
+                          const c = PLAYER_COLORS[pi % PLAYER_COLORS.length];
+                          const pts = result.points;
+                          const col = pointsColor(pts, result.skipped);
+                          return (
+                            <div key={pi} className="sb-history-player-row">
+                              <span className="sb-history-dot" style={{ backgroundColor: c.fill }} />
+                              <span className="sb-history-player-name">{room.playerNames[pi]}</span>
+                              <span className="sb-history-guess">
+                                {result.skipped ? '–' : result.guessYear}
+                              </span>
+                              <span
+                                className="sb-history-pts-badge"
+                                style={{ backgroundColor: col + '25', color: col }}
+                              >
+                                {result.skipped ? '–' : (pts >= 0 ? '+' : '') + pts + 'p'}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    <div className="sb-history-results">
-                      {entry.results.map((result, pi) => {
-                        if (!result) return null;
-                        const c = PLAYER_COLORS[pi % PLAYER_COLORS.length];
-                        const pts = result.points;
-                        const col = pointsColor(pts, result.skipped);
-                        return (
-                          <div key={pi} className="sb-history-player-row">
-                            <span className="sb-history-dot" style={{ backgroundColor: c.fill }} />
-                            <span className="sb-history-player-name">{room.playerNames[pi]}</span>
-                            <span className="sb-history-guess">
-                              {result.skipped ? '–' : result.guessYear}
-                            </span>
-                            <span
-                              className="sb-history-pts-badge"
-                              style={{ backgroundColor: col + '25', color: col }}
-                            >
-                              {result.skipped ? '–' : (pts >= 0 ? '+' : '') + pts + 'p'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                  {hasMore && (
+                    <button
+                      className="sb-history-toggle"
+                      onClick={() => setHistoryExpanded(v => !v)}
+                    >
+                      {historyExpanded ? 'Dölj' : `Visa alla ${room.songHistory!.length} omgångar`}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
