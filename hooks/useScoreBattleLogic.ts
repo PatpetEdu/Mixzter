@@ -23,7 +23,7 @@ export interface RoundResult {
 
 export function calcPoints(guessYear: number, actualYear: number): number {
   const diff = Math.abs(guessYear - actualYear);
-  if (diff === 0)  return  10;
+  if (diff === 0)  return   8;
   if (diff === 1)  return   6;
   if (diff === 2)  return   5;
   if (diff === 3)  return   4;
@@ -31,18 +31,16 @@ export function calcPoints(guessYear: number, actualYear: number): number {
   if (diff === 5)  return   2;
   if (diff <= 9)   return   1;
   if (diff === 10) return   0;
-  if (diff === 11) return  -1;
-  if (diff === 12) return  -2;
-  if (diff === 13) return  -3;
-  if (diff === 14) return  -4;
-  if (diff === 15) return  -5;
-  if (diff <= 20)  return -10;
-  return -15;
+  if (diff <= 12)  return  -1;
+  if (diff <= 14)  return  -2;
+  if (diff <= 16)  return  -4;
+  if (diff <= 20)  return  -5;
+  return -6;
 }
 
 export function pointsLabel(points: number, skipped = false): string {
   if (skipped) return '⏭ Skippad';
-  if (points === 10) return '🎯 Exakt!';
+  if (points === 8)  return '🎯 Exakt!';
   if (points === 6)  return '🔥 1 år fel';
   if (points === 5)  return '🔥 2 år fel';
   if (points === 4)  return '👍 3 år fel';
@@ -50,13 +48,11 @@ export function pointsLabel(points: number, skipped = false): string {
   if (points === 2)  return '👍 5 år fel';
   if (points === 1)  return '🎵 Nästan';
   if (points === 0)  return '😬 10 år fel';
-  if (points === -1) return '📉 11 år fel';
-  if (points === -2) return '📉 12 år fel';
-  if (points === -3) return '📉 13 år fel';
-  if (points === -4) return '📉 14 år fel';
-  if (points === -5) return '💀 15 år fel';
-  if (points === -10) return '💀 Långt ifrån';
-  if (points === -15) return '☠️ Katastrofalt';
+  if (points === -1) return '📉 11–12 år fel';
+  if (points === -2) return '📉 13–14 år fel';
+  if (points === -4) return '💀 15–16 år fel';
+  if (points === -5) return '💀 17–20 år fel';
+  if (points === -6) return '☠️ Katastrofalt';
   return `${points > 0 ? '+' : ''}${points}p`;
 }
 
