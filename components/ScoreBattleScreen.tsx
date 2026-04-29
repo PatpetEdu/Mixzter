@@ -467,6 +467,7 @@ export default function ScoreBattleScreen({
     scores,
     stars,
     songCount,
+    targetScore,
     card,
     roundResults,
     guesses,
@@ -521,6 +522,12 @@ export default function ScoreBattleScreen({
     resetGame();
     generateCard();
   }, [resetGame, generateCard, resetRound, stateKey]);
+
+  const handleSkipSong = useCallback(async () => {
+    setIsSongInfoVisible(false);
+    await resetRound();
+    generateCard();
+  }, [resetRound, generateCard]);
 
   const isGuessingPhase = phase === 'guessing';
 
@@ -711,6 +718,13 @@ export default function ScoreBattleScreen({
                   <RNText style={s.songInfoKey}>År  </RNText>
                   <RNText style={s.songInfoVal}>{card.year}</RNText>
                 </View>
+                <TouchableOpacity
+                  onPress={handleSkipSong}
+                  style={s.skipSongBtn}
+                  activeOpacity={0.7}
+                >
+                  <RNText style={s.skipSongBtnText}>{'⏭ SKIP LÅT'}</RNText>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -890,6 +904,19 @@ const s = StyleSheet.create({
   songInfoRow: { marginBottom: 2 },
   songInfoKey: { color: '#1e2535', fontSize: 11, fontWeight: '700' as const },
   songInfoVal: { color: '#334155', fontSize: 11 },
+  skipSongBtn: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1a1a2e',
+    paddingTop: 8,
+    alignItems: 'center' as const,
+  },
+  skipSongBtnText: {
+    color: '#7f1d1d',
+    fontSize: 10,
+    fontWeight: '800' as const,
+    letterSpacing: 1,
+  },
 
   // Game over
   gameOverInner: {

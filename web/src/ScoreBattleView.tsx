@@ -31,6 +31,7 @@ interface ScoreBattleRoom {
   scores: number[];
   stars: number[];
   songCount: number;
+  targetScore: number;
   card: RoomCard | null;
   roundResults: (RoundResult | null)[] | null;
   webGuesses: Record<string, { year: number; locked: boolean }>;
@@ -336,10 +337,8 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
     ? room.scores.indexOf(Math.max(...room.scores))
     : null;
 
-  // targetScore: räkna ut från roomets score-array storlek vs namn
-  // Vi vet inte targetScore från rummet – men det är bara visuellt i progress bar.
-  // Eftersom vi inte sparar targetScore i rummet, använd max(scores, 50) som guide.
-  const maxScore = Math.max(...room.scores, 50);
+  // targetScore: hämtas från rummet, fallback 50 om gamla spel saknar fältet
+  const targetScore = room.targetScore ?? 50;
 
   const myWebGuess = room.webGuesses[String(myPlayerIndex)];
   const inputValid = isValidYear(myGuess);
@@ -371,7 +370,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
                 key={i}
                 name={name}
                 score={room.scores[i] ?? 0}
-                targetScore={maxScore}
+                targetScore={targetScore}
                 stars={room.stars[i] ?? 1}
                 isLocked={cardLocked}
                 playerIndex={i}
@@ -379,17 +378,6 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
             );
           })}
         </div>
-
-        {/* ── Artwork (gissningsfas) ── */}
-        {isGuessing && room.card?.artworkUrl && (
-          <div className="sb-artwork-wrap">
-            <img
-              src={room.card.artworkUrl}
-              alt="Album artwork"
-              className="sb-artwork-img"
-            />
-          </div>
-        )}
 
         {/* ── Gissningsfas: min inmatning ── */}
         {isGuessing && (
@@ -455,6 +443,15 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
         {isSummary && room.card && (
           <>
             <div className="sb-summary-card">
+              {room.card.artworkUrl && (
+                <div className="sb-artwork-wrap">
+                  <img
+                    src={room.card.artworkUrl}
+                    alt="Album artwork"
+                    className="sb-artwork-img"
+                  />
+                </div>
+              )}
               <span className="sb-summary-label">RÄTT ÅR</span>
               <span className="sb-summary-year">{room.card.year}</span>
               <span className="sb-summary-artist">{room.card.artist}</span>

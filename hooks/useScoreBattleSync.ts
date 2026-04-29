@@ -33,6 +33,7 @@ interface UseScoreBattleSyncProps {
   scores: number[];
   stars: number[];
   songCount: number;
+  targetScore: number;
   card: SyncCard | null;
   roundResults: (RoundResult | null)[];
   /** Spelarnas aktuella gissningar (appen som master) */
@@ -53,6 +54,7 @@ export function useScoreBattleSync({
   scores,
   stars,
   songCount,
+  targetScore,
   card,
   roundResults,
   guesses,
@@ -78,6 +80,7 @@ export function useScoreBattleSync({
       scores,
       stars,
       songCount,
+      targetScore,
       card: null,
       roundResults: null,
       webGuesses: {},
@@ -107,6 +110,7 @@ export function useScoreBattleSync({
           scores,
           stars,
           songCount,
+          targetScore,
           card: cardData,
           roundResults: phase === 'song_summary' ? roundResults : null,
           updatedAt: Date.now(),

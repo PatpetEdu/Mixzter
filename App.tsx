@@ -180,7 +180,7 @@ function AppContent() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        refreshActiveGames();
+        refreshActiveGamesRef.current();
       }
       appState.current = nextAppState;
     });
@@ -201,12 +201,16 @@ function AppContent() {
     }
   }, [user, isAnonymous]);
 
+  // Ref som alltid pekar på senaste refreshActiveGames – används av AppState-lyssnaren
+  const refreshActiveGamesRef = useRef(refreshActiveGames);
+  useEffect(() => { refreshActiveGamesRef.current = refreshActiveGames; }, [refreshActiveGames]);
+
   useEffect(() => { refreshActiveGames(); }, [refreshActiveGames]);
 
-  // Ladda om aktiva spel varje gång menyn visas (hanterar timing vid appstart och retur från spel)
+  // Ladda om aktiva spel varje gång menyn visas
   useEffect(() => {
-    if (mode === 'menu') refreshActiveGames();
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (mode === 'menu') refreshActiveGamesRef.current();
+  }, [mode]);
 
 // Helper function to normalize game data (handles both old and new formats)
 const getGameDisplayData = (game: any) => {
