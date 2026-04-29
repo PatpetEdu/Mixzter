@@ -32,6 +32,8 @@ import { useAuth } from '../hooks/useAuth';
 import { saveScoreBattleMeta, deleteActiveGame } from '../storage/gameStorage';
 import {
   useScoreBattleLogic,
+  RoundResult,
+  calcPoints,
   pointsLabel,
   pointsColor,
 } from '../hooks/useScoreBattleLogic';
@@ -51,6 +53,13 @@ type Props = {
 };
 
 const AnimatedScrollView = RNAnimated.createAnimatedComponent(ScrollView);
+
+interface SongHistoryEntry {
+  artist: string;
+  title: string;
+  year: number;
+  results: (RoundResult | null)[];
+}
 
 const PERSIST_STATE_KEY = (uid: string, gid: string) => `scoreBattle:${uid}:${gid}`;
 const PERSIST_QUEUE_KEY = (uid: string, gid: string) => `nextCard:${uid}:${gid}`;
@@ -442,6 +451,10 @@ export default function ScoreBattleScreen({
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
   const songInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
+  const [songHistory, setSongHistory] = useState<SongHistoryEntry[]>([]);
+  const playAgainScaleAnim = useRef(new RNAnimated.Value(1)).current;
+  const backMenuScaleAnim  = useRef(new RNAnimated.Value(1)).current;
+  const nextSongScaleAnim  = useRef(new RNAnimated.Value(1)).current;
 
   // ─── Webb-gissningar från Firestore ──────────────────────────────────────
 
@@ -459,7 +472,7 @@ export default function ScoreBattleScreen({
     });
   }, []);
 
-  const { webUrl, clearWebGuesses } = useScoreBattleSync({
+  const { webUrl, clearWebGuesses, deleteRoom } = useScoreBattleSync({
     gameId,
     hostUid: user?.uid ?? null,
     phase,
@@ -472,6 +485,7 @@ export default function ScoreBattleScreen({
     roundResults,
     guesses,
     locked,
+    songHistory,
     onWebGuess: handleWebGuess,
   });
 
@@ -505,6 +519,16 @@ export default function ScoreBattleScreen({
   const handleConfirm = useCallback(() => {
     if (!card || !allReady) return;
     const guessList = guesses.map(g => ({ guessYear: parseInt(g, 10), skipped: false }));
+    setSongHistory(prev => [...prev, {
+      artist: card.artist,
+      title: card.title,
+      year: card.year,
+      results: guessList.map(g => ({
+        guessYear: g.guessYear,
+        points: calcPoints(g.guessYear, card.year),
+        skipped: false,
+      })),
+    }]);
     confirmGuesses(guessList, card.year);
   }, [card, allReady, guesses, confirmGuesses]);
 
@@ -519,6 +543,7 @@ export default function ScoreBattleScreen({
   const handlePlayAgain = useCallback(async () => {
     await resetRound();
     if (stateKey) AsyncStorage.removeItem(stateKey).catch(() => {});
+    setSongHistory([]);
     resetGame();
     generateCard();
   }, [resetGame, generateCard, resetRound, stateKey]);
@@ -537,7 +562,7 @@ export default function ScoreBattleScreen({
     const winner = winnerIdx !== null ? playerNames[winnerIdx] : '?';
     return (
       <View style={{ flex: 1, backgroundColor: '#07070d' }}>
-        <ScrollView contentContainerStyle={s.center}>
+        <ScrollView contentContainerStyle={s.gameOverScroll}>
           <View style={s.gameOverInner}>
             <View style={s.trophyCircle}>
               <Trophy size={52} color="#f59e0b" />
@@ -547,7 +572,7 @@ export default function ScoreBattleScreen({
 
             <View style={s.finalScores}>
               {playerNames.map((name, i) => (
-                <View key={name} style={[s.finalRow, i === 0 && s.finalRowBorder]}>
+                <View key={name} style={[s.finalRow, i < playerNames.length - 1 && s.finalRowBorder]}>
                   <RNText style={[s.finalName, i === winnerIdx && s.finalNameWinner]}>
                     {i === winnerIdx ? '🏆 ' : ''}{name}
                   </RNText>
@@ -560,15 +585,87 @@ export default function ScoreBattleScreen({
 
             <RNText style={s.songCount}>{songCount + 1} omgångar spelades</RNText>
 
-            <TouchableOpacity onPress={handlePlayAgain} activeOpacity={0.85} style={{ width: '100%' }}>
-              <LinearGradient colors={['#4f46e5', '#7c3aed']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.bigBtn}>
-                <RNText style={s.bigBtnText}>Spela igen</RNText>
-              </LinearGradient>
-            </TouchableOpacity>
+            {/* ── Spelhistorik ── */}
+            {songHistory.length > 0 && (
+              <View style={s.historySection}>
+                <RNText style={s.historyHeader}>SPELHISTORIK</RNText>
+                {songHistory.map((entry, idx) => (
+                  <View key={idx} style={s.historyCard}>
+                    <View style={s.historyCardHead}>
+                      <View style={s.historyNumBadge}>
+                        <RNText style={s.historyNumText}>{'#' + (idx + 1)}</RNText>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <RNText style={s.historyArtist} numberOfLines={1}>{entry.artist}</RNText>
+                        <RNText style={s.historyTitleYear} numberOfLines={1}>
+                          {entry.title + ' · '}<RNText style={s.historyYearBold}>{String(entry.year)}</RNText>
+                        </RNText>
+                      </View>
+                    </View>
+                    <View style={s.historyResults}>
+                      {entry.results.map((result, pi) => {
+                        if (!result) return null;
+                        const c = PLAYER_COLORS[pi % PLAYER_COLORS.length];
+                        const pts = result.points;
+                        const col = pointsColor(pts, result.skipped);
+                        return (
+                          <View key={pi} style={s.historyPlayerRow}>
+                            <View style={[s.historyDot, { backgroundColor: c.fill }]} />
+                            <RNText style={s.historyPlayerName} numberOfLines={1}>{playerNames[pi]}</RNText>
+                            <RNText style={s.historyGuessText}>
+                              {result.skipped ? '–' : String(result.guessYear)}
+                            </RNText>
+                            <View style={[s.historyPtsBadge, { backgroundColor: col + '25' }]}>
+                              <RNText style={[s.historyPtsText, { color: col }]}>
+                                {result.skipped ? '–' : (pts >= 0 ? '+' : '') + pts + 'p'}
+                              </RNText>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
-            <TouchableOpacity onPress={onBackToMenu} style={s.outlineBtn}>
-              <RNText style={s.outlineBtnText}>Tillbaka till meny</RNText>
-            </TouchableOpacity>
+            {/* ── Knappar ── */}
+            <RNAnimated.View style={{ width: '100%', transform: [{ scale: playAgainScaleAnim }] }}>
+              <TouchableOpacity
+                onPress={handlePlayAgain}
+                onPressIn={() => {
+                  RNAnimated.spring(playAgainScaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+                }}
+                onPressOut={() => {
+                  RNAnimated.spring(playAgainScaleAnim, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 8 }).start();
+                }}
+                activeOpacity={1}
+                style={{ width: '100%' }}
+              >
+                <LinearGradient colors={['#4f46e5', '#7c3aed']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.bigBtn}>
+                  <RNText style={s.bigBtnText}>Spela igen</RNText>
+                </LinearGradient>
+              </TouchableOpacity>
+            </RNAnimated.View>
+
+            <RNAnimated.View style={{ width: '100%', transform: [{ scale: backMenuScaleAnim }] }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  await deleteRoom();
+                  onBackToMenu();
+                }}
+                onPressIn={() => {
+                  RNAnimated.spring(backMenuScaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+                }}
+                onPressOut={() => {
+                  RNAnimated.spring(backMenuScaleAnim, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 8 }).start();
+                }}
+                activeOpacity={1}
+                style={s.outlineBtn}
+              >
+                <RNText style={s.outlineBtnText}>Avsluta spelet</RNText>
+              </TouchableOpacity>
+            </RNAnimated.View>
           </View>
         </ScrollView>
       </View>
@@ -746,22 +843,33 @@ export default function ScoreBattleScreen({
               ))}
             </View>
 
-            <TouchableOpacity onPress={handleNextSong} activeOpacity={0.85}>
-              <LinearGradient
-                colors={pendingGameOver ? ['#b45309', '#92400e'] : ['#4f46e5', '#7c3aed']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.bigBtn}
+            <RNAnimated.View style={{ width: '100%', transform: [{ scale: nextSongScaleAnim }] }}>
+              <TouchableOpacity
+                onPress={handleNextSong}
+                onPressIn={() => {
+                  RNAnimated.spring(nextSongScaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+                }}
+                onPressOut={() => {
+                  RNAnimated.spring(nextSongScaleAnim, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 8 }).start();
+                }}
+                activeOpacity={1}
               >
-                <RNText style={s.bigBtnText}>
-                  {pendingGameOver
-                    ? 'Se slutresultat  🏆'
-                    : maxRounds !== null
-                      ? `Nästa låt  ·  ${songCount + 1} / ${maxRounds}  ▶`
-                      : 'Nästa låt  ▶'}
-                </RNText>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={pendingGameOver ? ['#b45309', '#92400e'] : ['#4f46e5', '#7c3aed']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={s.bigBtn}
+                >
+                  <RNText style={s.bigBtnText}>
+                    {pendingGameOver
+                      ? 'Se slutresultat  🏆'
+                      : maxRounds !== null
+                        ? `Nästa låt  ·  ${songCount + 1} / ${maxRounds}  ▶`
+                        : 'Nästa låt  ▶'}
+                  </RNText>
+                </LinearGradient>
+              </TouchableOpacity>
+            </RNAnimated.View>
           </View>
         )}
       </AnimatedScrollView>
@@ -782,6 +890,7 @@ const s = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 32,
   },
 
   // Round badge
@@ -874,8 +983,58 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#1a1a2e',
+    width: '100%',
   },
   outlineBtnText: { color: '#334155', fontSize: 15, fontWeight: '600' },
+
+  gameOverScroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
+
+  // Song history
+  historySection: { width: '100%', gap: 8 },
+  historyHeader: {
+    color: '#1e293b',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  historyCard: {
+    backgroundColor: '#0d0d1a',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+    overflow: 'hidden',
+  },
+  historyCardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a2e',
+  },
+  historyNumBadge: {
+    backgroundColor: 'rgba(99,102,241,0.15)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  historyNumText: { color: '#818cf8', fontSize: 11, fontWeight: '800' },
+  historyArtist: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
+  historyTitleYear: { color: '#475569', fontSize: 11 },
+  historyYearBold: { color: '#64748b', fontWeight: '700' },
+  historyResults: { paddingHorizontal: 12, paddingVertical: 8, gap: 5 },
+  historyPlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyDot: { width: 6, height: 6, borderRadius: 3 },
+  historyPlayerName: { color: '#475569', fontSize: 11, fontWeight: '600', flex: 1 },
+  historyGuessText: { color: '#334155', fontSize: 11, fontWeight: '700', minWidth: 36, textAlign: 'right' },
+  historyPtsBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  historyPtsText: { fontSize: 11, fontWeight: '800' },
 
   // Song info (debug)
   songInfoToggle: {

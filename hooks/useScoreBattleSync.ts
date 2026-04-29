@@ -20,6 +20,13 @@ type SyncCard = {
   };
 };
 
+export interface SongHistoryEntry {
+  artist: string;
+  title: string;
+  year: number;
+  results: (RoundResult | null)[];
+}
+
 export interface WebGuess {
   year: number;
   locked: boolean;
@@ -40,6 +47,8 @@ interface UseScoreBattleSyncProps {
   guesses: string[];
   /** Spelarnas låsstatus (appen som master) */
   locked: boolean[];
+  /** Spelhistorik – en post per avslutad omgång */
+  songHistory: SongHistoryEntry[];
   /** Anropas när en webbspelare uppdaterar sin gissning */
   onWebGuess: (playerIndex: number, year: number, locked: boolean) => void;
 }
@@ -59,6 +68,7 @@ export function useScoreBattleSync({
   roundResults,
   guesses,
   locked,
+  songHistory,
   onWebGuess,
 }: UseScoreBattleSyncProps) {
   const initDoneRef       = useRef(false);
@@ -113,6 +123,7 @@ export function useScoreBattleSync({
           targetScore,
           card: cardData,
           roundResults: phase === 'song_summary' ? roundResults : null,
+          ...(phase === 'game_over' && { songHistory }),
           updatedAt: Date.now(),
         });
       } catch {
@@ -147,12 +158,6 @@ export function useScoreBattleSync({
     if (Object.keys(updates).length === 0) return;
     updateDoc(doc(db, 'scoreBattleRooms', gameId), updates).catch(console.error);
   }, [gameId, hostUid, phase, guesses, locked]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Radera rummet när spelet är slut ─────────────────────────────────────
-  useEffect(() => {
-    if (!gameId || phase !== 'game_over') return;
-    deleteDoc(doc(db, 'scoreBattleRooms', gameId)).catch(console.error);
-  }, [gameId, phase]);
 
   // ── Lyssna på webbgissningar ─────────────────────────────────────────────
   useEffect(() => {
@@ -190,9 +195,17 @@ export function useScoreBattleSync({
     } catch {}
   }, [gameId]);
 
+  // ── Radera rummet explicit (anropas när värden lämnar spelet) ─────────────
+  const deleteRoom = useCallback(async () => {
+    if (!gameId) return;
+    try {
+      await deleteDoc(doc(db, 'scoreBattleRooms', gameId));
+    } catch {}
+  }, [gameId]);
+
   const webUrl = gameId
     ? `https://musikquiz-app.web.app/?mode=scorebattle&gameId=${gameId}`
     : null;
 
-  return { webUrl, clearWebGuesses };
+  return { webUrl, clearWebGuesses, deleteRoom };
 }

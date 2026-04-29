@@ -24,6 +24,13 @@ interface RoundResult {
   skipped: boolean;
 }
 
+interface SongHistoryEntry {
+  artist: string;
+  title: string;
+  year: number;
+  results: (RoundResult | null)[];
+}
+
 interface ScoreBattleRoom {
   hostUid: string;
   phase: 'guessing' | 'song_summary' | 'game_over';
@@ -35,6 +42,7 @@ interface ScoreBattleRoom {
   card: RoomCard | null;
   roundResults: (RoundResult | null)[] | null;
   webGuesses: Record<string, { year: number; locked: boolean }>;
+  songHistory?: SongHistoryEntry[];
 }
 
 // ─── Hjälpfunktioner ─────────────────────────────────────────────────────────
@@ -167,6 +175,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
   const [room, setRoom] = useState<ScoreBattleRoom | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const frozenRoomRef = useRef<ScoreBattleRoom | null>(null);
 
   // Vilken spelare är jag?
   const [myPlayerIndex, setMyPlayerIndex] = useState<number | null>(null);
@@ -186,9 +195,9 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
       doc(db, 'scoreBattleRooms', gameId),
       (snap) => {
         if (!snap.exists()) {
-          // Spelet raderades (avslutat av värden eller game_over)
-          if (room !== null) {
-            // Vi hade ett aktivt spel → värden avslutade det manuellt
+          // Om vi redan sett game_over – behåll sista kända state (rummet raderas efter 3 min)
+          if (frozenRoomRef.current?.phase === 'game_over') return;
+          if (frozenRoomRef.current !== null) {
             setError('Spelet avslutades av värden.');
           } else {
             setError('Spelet hittades inte. Be värden starta om spelet.');
@@ -196,7 +205,9 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
           setLoading(false);
           return;
         }
-        setRoom(snap.data() as ScoreBattleRoom);
+        const data = snap.data() as ScoreBattleRoom;
+        frozenRoomRef.current = data;
+        setRoom(data);
         setLoading(false);
         setError(null);
       },
@@ -513,6 +524,49 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
                 </div>
               ))}
             </div>
+
+            {/* ── Spelhistorik ── */}
+            {room.songHistory && room.songHistory.length > 0 && (
+              <div className="sb-history">
+                <div className="sb-history-header">SPELHISTORIK</div>
+                {room.songHistory.map((entry, idx) => (
+                  <div key={idx} className="sb-history-card">
+                    <div className="sb-history-card-head">
+                      <span className="sb-history-num">#{ idx + 1}</span>
+                      <div className="sb-history-meta">
+                        <span className="sb-history-artist">{entry.artist}</span>
+                        <span className="sb-history-title-year">
+                          {entry.title} &middot; <strong>{entry.year}</strong>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sb-history-results">
+                      {entry.results.map((result, pi) => {
+                        if (!result) return null;
+                        const c = PLAYER_COLORS[pi % PLAYER_COLORS.length];
+                        const pts = result.points;
+                        const col = pointsColor(pts, result.skipped);
+                        return (
+                          <div key={pi} className="sb-history-player-row">
+                            <span className="sb-history-dot" style={{ backgroundColor: c.fill }} />
+                            <span className="sb-history-player-name">{room.playerNames[pi]}</span>
+                            <span className="sb-history-guess">
+                              {result.skipped ? '–' : result.guessYear}
+                            </span>
+                            <span
+                              className="sb-history-pts-badge"
+                              style={{ backgroundColor: col + '25', color: col }}
+                            >
+                              {result.skipped ? '–' : (pts >= 0 ? '+' : '') + pts + 'p'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
