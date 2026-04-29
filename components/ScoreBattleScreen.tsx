@@ -18,6 +18,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   Animated as RNAnimated,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -650,9 +651,22 @@ export default function ScoreBattleScreen({
 
             <RNAnimated.View style={{ width: '100%', transform: [{ scale: backMenuScaleAnim }] }}>
               <TouchableOpacity
-                onPress={async () => {
-                  await deleteRoom();
-                  onBackToMenu();
+                onPress={() => {
+                  Alert.alert(
+                    'Avsluta spelet?',
+                    'Spelet kommer att raderas för alla och ni måste starta om från början nästa gång. Är du säker?',
+                    [
+                      { text: 'Avbryt', style: 'cancel' },
+                      {
+                        text: 'Avsluta',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await deleteRoom();
+                          onBackToMenu();
+                        },
+                      },
+                    ]
+                  );
                 }}
                 onPressIn={() => {
                   RNAnimated.spring(backMenuScaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
@@ -661,9 +675,9 @@ export default function ScoreBattleScreen({
                   RNAnimated.spring(backMenuScaleAnim, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 8 }).start();
                 }}
                 activeOpacity={1}
-                style={s.outlineBtn}
+                style={s.destructiveBtn}
               >
-                <RNText style={s.outlineBtnText}>Avsluta spelet</RNText>
+                <RNText style={s.destructiveBtnText}>Avsluta spelet</RNText>
               </TouchableOpacity>
             </RNAnimated.View>
           </View>
@@ -986,6 +1000,17 @@ const s = StyleSheet.create({
     width: '100%',
   },
   outlineBtnText: { color: '#334155', fontSize: 15, fontWeight: '600' },
+
+  destructiveBtn: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239,68,68,0.35)',
+    backgroundColor: 'rgba(239,68,68,0.07)',
+    width: '100%',
+  },
+  destructiveBtnText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
 
   gameOverScroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
 
