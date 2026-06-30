@@ -900,7 +900,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
             transform: [{ translateY: headerTranslateY }],
           }}
         >
-          <GameHeader onBackToMenu={returnToMenu} />
+          <GameHeader gameMode={scoreBattleMode} onBackToMenu={returnToMenu} />
         </Animated.View>
 
         <Box flex={1} position="relative">
@@ -968,7 +968,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
           }}
           pointerEvents="box-none"
         >
-          <GameHeader onBackToMenu={returnToMenu} />
+          <GameHeader gameMode={scoreBattleMode} onBackToMenu={returnToMenu} />
         </Animated.View>
         <Box flex={1} position="relative">
           <ScoreBattleSetupScreen

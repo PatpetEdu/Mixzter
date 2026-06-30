@@ -50,6 +50,12 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.hostUid;
     }
 
+    // ── Användarens egna seenSongs ───────────────────────────────────────────
+    match /users/{uid}/seenSongs/{docId} {
+      // Endast inloggad användare med samma uid får läsa/skriva
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Deny-all fallback
     match /{document=**} {
       allow read, write: if false;

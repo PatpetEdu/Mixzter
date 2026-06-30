@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { KeyboardAvoidingView, Platform, TextInput, NativeSyntheticEvent, NativeScrollEvent, Animated, ScrollView, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VStack, Input, InputField, Button, ButtonText, Center, Text, HStack, Box } from '@gluestack-ui/themed';
-import { UserPlus, PlayCircle, Music2, Globe, Disc, Star, Film, Sparkles, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { UserPlus, PlayCircle, Music2, Globe, Disc, Star, Film, Sparkles, ChevronDown, ChevronUp, Sun, Trophy, Gift, Music } from 'lucide-react-native';
 
 type Props = {
   onStart: (playerNames: string[], gameMode: string) => void;
@@ -25,7 +25,14 @@ const GAME_MODES = [
   { id: 'melodifestivalen', label: `Melodifestivalen 1958-${CURRENT_YEAR}`, icon: Star },
   { id: 'kpop', label: `K-POP 2000-${CURRENT_YEAR}`, icon: Music2 },
   { id: 'eightiesnineties', label: '80s & 90s Hits 1980-1999', icon: Disc },
-  { id: 'modernahits', label: `Moderna Hits 2005-${CURRENT_YEAR}`, icon: Sparkles },
+  { id: 'modernahits',      label: `Moderna Hits 2005-${CURRENT_YEAR}`,      icon: Sparkles },
+  { id: 'sommarhits',      label: `Sommarhits 1960-${CURRENT_YEAR}`,         icon: Sun      },
+  { id: 'dance',           label: `Dance & EDM 1970-${CURRENT_YEAR}`,        icon: Music2   },
+  { id: 'julmusik',        label: `Julmusik 1940-${CURRENT_YEAR}`,           icon: Gift     },
+  { id: 'country',         label: `Country 1950-${CURRENT_YEAR}`,            icon: Music    },
+  { id: 'partylatar',      label: `Partylåtar 1960-${CURRENT_YEAR}`,         icon: Sparkles },
+  { id: 'sportlatar',      label: `Sportlåtar 1970-${CURRENT_YEAR}`,         icon: Trophy   },
+  { id: 'nordisk',         label: `Nordiska Hits 1960-${CURRENT_YEAR}`,      icon: Globe    },
 ];
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);

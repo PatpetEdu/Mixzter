@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { doc, getDoc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import './SpectatorView.css';
 import type { Game, Card, Player } from './types';
@@ -23,12 +23,50 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
   const [players, setPlayers] = useState<{ [key: string]: Player }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refreshInFlightRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showCardModal, setShowCardModal] = useState(false);
   const [carouselCards, setCarouselCards] = useState<Card[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [lastPlayedSong, setLastPlayedSong] = useState<Card | null>(null);
   const [expandCurrentSong, setExpandCurrentSong] = useState(false);
+
+  // Minimal fallback-refresh för iOS/WebKit där realtime ibland tappar synk
+  const refreshGameOnce = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastRefreshAtRef.current < 1200) return;
+    if (refreshInFlightRef.current) return;
+    if (document.visibilityState !== 'visible') return;
+
+    refreshInFlightRef.current = true;
+    lastRefreshAtRef.current = now;
+    try {
+      let snapshot;
+      try {
+        snapshot = await getDocFromServer(doc(db, 'games', gameId));
+      } catch {
+        // Fallback om server-read misslyckas tillfälligt
+        snapshot = await getDoc(doc(db, 'games', gameId));
+      }
+      if (!snapshot.exists()) {
+        setError('Spelet hittades inte');
+        setLoading(false);
+        return;
+      }
+      const data = snapshot.data() as Game;
+      setGame(data);
+      if (data.players) {
+        setPlayers(data.players);
+      }
+      setError(null);
+      setLoading(false);
+    } catch {
+      // Behåll nuvarande state; realtime eller nästa poll fångar upp.
+    } finally {
+      refreshInFlightRef.current = false;
+    }
+  }, [gameId]);
 
   useEffect(() => {
     // Lyssnare på game-dokumentet
@@ -60,6 +98,36 @@ export function SpectatorView({ gameId, token }: SpectatorViewProps) {
       unsubscribeGame();
     };
   }, [gameId, token]);
+
+  // Fallback: låg-frekvent polling + reconnect vid focus/online/pageshow/visibility
+  useEffect(() => {
+    const pollMs = 1500;
+    const interval = setInterval(() => {
+      void refreshGameOnce();
+    }, pollMs);
+
+    const onFocus = () => { void refreshGameOnce(true); };
+    const onPageShow = () => { void refreshGameOnce(true); };
+    const onOnline = () => { void refreshGameOnce(true); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshGameOnce(true);
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshGameOnce]);
 
   // Spåra när en ny låt har spelats
   useEffect(() => {

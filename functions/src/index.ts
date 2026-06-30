@@ -212,28 +212,52 @@ const getUidFromRequest = async (req: Request): Promise<string | null> => {
 };
 function getPrompts(n: number): Record<string, string> {
   return {
-    default: `Välj **${n} populära, välkända eller kulturellt betydelsefulla låtar** från perioden **1950 till ${CURRENT_YEAR}**.
-    Föredra låtar på engelska, men även andra språk är också acceptabla om de är kända globalt.`,
+    default: `Välj **${n} låtar** från perioden **1950 till ${CURRENT_YEAR}** med maximal variation i genre, decennium och ursprungsland.
 
-    svenska: `Välj **${n} svenska låtar** (sjungs på svenska eller av en mycket känd svensk artist) som är klassiker, hits eller allsångsfavoriter från **1960 till ${CURRENT_YEAR}**.`,
+Blanda tre nivåer:
+- Ungefär hälften: Hits som de flesta känner igen både gamla och nya
+- Ungefär en tredjedel: genreklassiker eller regionalt kända låtar (kända inom sin genre, sitt land eller sin era)
+- Resten: mer okända men musikquiz-lämpliga låtar – intressanta artister, bortglömda hits, albumspår som ändå är gissningsbara
 
-    eurovision: `Välj **${n} låtar** som har tävlat i **Eurovision Song Contest** (oavsett land och placering) mellan **1956 och ${CURRENT_YEAR}**. Det ska vara låtar som många känner igen.`,
+**Decenniumsspridning är obligatorisk** – välj låtar från minst 5 olika decennier. Minst 2–3 låtar ska vara från **2015 till ${CURRENT_YEAR}**, spridda över den perioden.
 
-    rock: `Välj **${n} låtar** inom genrerna **Rock, Hårdrock, Metal eller Punk** från perioden **1960 till ${CURRENT_YEAR}**. Det ska vara kända låtar inom genren.`,
+Alla låtar ska vara **gissningsbara för någon som är intresserad av musik** – undvik helt obskyra nischspår. Föredra låtar på engelska men andra språk är välkomna om de är kända i sitt sammanhang.
 
-    onehitwonder: `Välj **${n} klassiska One Hit Wonders** (artisten är främst känd för just denna låt) från **1970 till 2015**.`,
+Välj primärt låtar med tydlig sång/lead-vocals. Undvik låtar som är enbart instrumentala.`,
 
-    filmmusik: `Välj **${n} låtar** från **filmer eller TV-serier** från **1950 till ${CURRENT_YEAR}**. Låtarna måste vara starkt förknippade med de specifika filmerna eller serierna.`,
+    svenska: `Välj **${n} svenska låtar** (sjungs på svenska eller av en mycket känd svensk artist) som är klassiker, hits eller allsångsfavoriter från **1960 till ${CURRENT_YEAR}**. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
 
-    disney: `Välj **${n} populära låtar** från animerade filmer av **Disney, Pixar eller DreamWorks Animation** från **1937 till ${CURRENT_YEAR}**. Det ska vara välkända låtar från klassiska eller moderna animerade filmer.`,
+    eurovision: `Välj **${n} låtar** som har tävlat i **Eurovision Song Contest** (oavsett land och placering) mellan **1956 och ${CURRENT_YEAR}**. Det ska vara låtar som många känner igen. Välj låtar från minst 5 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
 
-    melodifestivalen: `Välj **${n} låtar** som har tävlat i **Melodifestivalen** (Sverige) mellan **1958 och ${CURRENT_YEAR}**. Det ska vara kända låtar från tävlingen, gärna vinnare eller finalister.`,
+    rock: `Välj **${n} låtar** inom genrerna **Rock, Hårdrock, Metal eller Punk** från perioden **1960 till ${CURRENT_YEAR}**. Det ska vara kända låtar inom genren. Välj låtar från minst 4 olika decennier.`,
 
-    kpop: `Välj **${n} K-POP låtar** (skapade av sydkoreanska artister) från **2000 till ${CURRENT_YEAR}**. Det ska vara välkända K-POP-låtar som många känner till globalt.`,
+    onehitwonder: `Välj **${n} One Hit Wonders** (artisten är främst känd för just denna låt) från **1970 till 2015**. Välj låtar från minst 4 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
 
-    eightiesnineties: `Välj **${n} populära och välkända låtar** från genrer som Pop, Rock, Hip-Hop eller Dance från **1980 till 1999**. Det ska vara klassiker från åttio- eller nittiotalet.`,
+    filmmusik: `Välj **${n} låtar** från **filmer eller TV-serier** från **1950 till ${CURRENT_YEAR}**. Låtarna måste vara starkt förknippade med de specifika filmerna eller serierna. Välj låtar från minst 5 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden.`,
 
-    modernahits: `Välj **${n} populära och välkända låtar** från **2005 till ${CURRENT_YEAR}**. Det kan vara från genrer som Pop, Rock, Hip-Hop, R&B eller Dance. Det ska vara hits som många känner igen.`,
+    disney: `Välj **${n} populära låtar** från animerade filmer av **Disney, Pixar eller DreamWorks Animation** från **1937 till ${CURRENT_YEAR}**. Det ska vara välkända låtar från klassiska eller moderna animerade filmer. Blanda klassiska filmer (före 1995) med moderna. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden.`,
+
+    melodifestivalen: `Välj **${n} låtar** som har tävlat i **Melodifestivalen** (Sverige) mellan **1958 och ${CURRENT_YEAR}**. Det ska vara kända låtar från tävlingen, gärna vinnare eller finalister. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    kpop: `Välj **${n} K-POP låtar** (skapade av sydkoreanska artister) från **2000 till ${CURRENT_YEAR}**. Det ska vara välkända K-POP-låtar som många känner till globalt. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    eightiesnineties: `Välj **${n} populära och välkända låtar** från genrer som Pop, Rock, Hip-Hop eller Dance från **1980 till 1999**. Det ska vara klassiker från åttio- eller nittiotalet. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    modernahits: `Välj **${n} populära och välkända låtar** från **2005 till ${CURRENT_YEAR}**. Det kan vara från genrer som Pop, Rock, Hip-Hop, R&B eller Dance. Det ska vara hits som många känner igen. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    sommarhits: `Välj **${n} sommarhits** – låtar som starkt förknippas med sommar, semester och fest från **1960 till ${CURRENT_YEAR}**. Det kan vara strandlåtar, dansgolvsklassiker och gladlynt musik som sätter sommarstemningen. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    dance: `Välj **${n} danslåtar** inom genrerna **Dance, EDM, House, Techno eller Disco** från **1970 till ${CURRENT_YEAR}**. Det ska vara kända låtar som passar på dansgolvet – från diskots guldålder till modern EDM. Välj låtar från minst 4 olika decennier.`,
+
+    julmusik: `Välj **${n} jullåtar och vinterhits** från **1940 till ${CURRENT_YEAR}**. Blanda klassiska julsånger, moderna julhits och vinterpop. Både svenska och internationella låtar är välkomna. Välj låtar från minst 3 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    country: `Välj **${n} countrylåtar** från perioden **1950 till ${CURRENT_YEAR}**. Det ska vara kända låtar inom countrygenren – från klassisk country (Johnny Cash, Dolly Parton) till modern country-pop (Shania Twain, Taylor Swifts tidiga karriär). Välj låtar från minst 4 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    partylatar: `Välj **${n} partylåtar** – låtar som regelbundet spelas på fester, bröllop och studentfiranden oavsett genre eller era, från **1960 till ${CURRENT_YEAR}**. Det ska vara låtar alla kan sjunga med i och som garanterat skapar stämning på dansgolvet. Välj låtar från minst 4 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    sportlatar: `Välj **${n} låtar** som är starkt förknippade med **sport, idrott och tävling** från **1970 till ${CURRENT_YEAR}**. Det kan vara OS-teman, VM-låtar, arenasånger eller låtar kopplade till kända sportevenemang (t.ex. Eye of the Tiger, We Are the Champions, Seven Nation Army). Välj låtar från minst 3 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+
+    nordisk: `Välj **${n} nordiska låtar** från **Sverige, Norge, Danmark, Finland eller Island** från **1960 till ${CURRENT_YEAR}**. Det ska vara kända låtar i Norden – nordiska artister som är kända internationellt eller regionalt (t.ex. norska, danska och finska hits). Undvik låtar som redan täcks av kategorin Svenska Hits – prioritera artister från de övriga nordiska länderna. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
   };
 }
 
@@ -411,7 +435,7 @@ ${jsonArrayExample}`;
 
         try {
           const completion = await openai.chat.completions.create({
-            model: "gpt-5-mini",
+            model: "gpt-5.4-mini",
             messages: [{ role: "user", content: retryPrompt }],
             temperature: 1.0,
           });

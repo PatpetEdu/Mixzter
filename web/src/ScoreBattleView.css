@@ -29,10 +29,10 @@
   gap: 12px;
 }
 .sb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
-  color: #475569;
-  letter-spacing: 0.5px;
+  color: #e2e8f0;
+  letter-spacing: 0.2px;
 }
 .sb-round-badge {
   background: rgba(99, 102, 241, 0.1);

@@ -38,6 +38,13 @@ const GAME_MODE_LABELS: Record<string, string> = {
   kpop: `K-POP 2000-${CURRENT_YEAR}`,
   eightiesnineties: '80s & 90s Hits 1980-1999',
   modernahits: `Moderna Hits 2005-${CURRENT_YEAR}`,
+  sommarhits: `Sommarhits 1960-${CURRENT_YEAR}`,
+  dance: `Dance & EDM 1970-${CURRENT_YEAR}`,
+  julmusik: `Julmusik 1940-${CURRENT_YEAR}`,
+  country: `Country 1950-${CURRENT_YEAR}`,
+  partylatar: `Partylatar 1960-${CURRENT_YEAR}`,
+  sportlatar: `Sportlatar 1970-${CURRENT_YEAR}`,
+  nordisk: `Nordiska Hits 1960-${CURRENT_YEAR}`,
 };
 
 export default function GameHeader({ gameMode, onBackToMenu }: Props) {

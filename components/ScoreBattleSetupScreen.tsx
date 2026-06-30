@@ -27,6 +27,7 @@ import {
 } from '@gluestack-ui/themed';
 import {
   Trophy,
+  RotateCw,
   Music2,
   Globe,
   Disc,
@@ -35,6 +36,9 @@ import {
   Film,
   Sparkles,
   UserPlus,
+  Sun,
+  Gift,
+  Music,
 } from 'lucide-react-native';
 
 type Props = {
@@ -64,6 +68,13 @@ const GAME_MODES = [
   { id: 'kpop',             label: `K-POP 2000–${CURRENT_YEAR}`,          icon: Music2     },
   { id: 'eightiesnineties', label: '80s & 90s Hits 1980–1999',            icon: Disc       },
   { id: 'modernahits',      label: `Moderna Hits 2005–${CURRENT_YEAR}`,   icon: Sparkles   },
+  { id: 'sommarhits',       label: `Sommarhits 1960–${CURRENT_YEAR}`,     icon: Sun        },
+  { id: 'dance',            label: `Dance & EDM 1970–${CURRENT_YEAR}`,   icon: Music2     },
+  { id: 'julmusik',         label: `Julmusik 1940–${CURRENT_YEAR}`,       icon: Gift       },
+  { id: 'country',          label: `Country 1950–${CURRENT_YEAR}`,        icon: Music      },
+  { id: 'partylatar',       label: `Partylåtar 1960–${CURRENT_YEAR}`,     icon: Sparkles   },
+  { id: 'sportlatar',       label: `Sportlåtar 1970–${CURRENT_YEAR}`,     icon: Trophy     },
+  { id: 'nordisk',          label: `Nordiska Hits 1960–${CURRENT_YEAR}`,  icon: Globe      },
 ];
 
 const TARGET_SCORES = [10, 15, 25, 30, 50];
@@ -82,8 +93,9 @@ const MIN_PLAYERS = 1;
 export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight }: Props) {
   const [playerNames, setPlayerNames] = useState<string[]>(['', '']);
   const [selectedMode, setSelectedMode] = useState('default');
+  const [gameType, setGameType] = useState<'score' | 'rounds'>('score');
   const [targetScore, setTargetScore] = useState<number>(30);
-  const [maxRounds, setMaxRounds] = useState<number | null>(null);
+  const [maxRounds, setMaxRounds] = useState<number>(10);
   const [error, setError] = useState('');
 
   const handleChangeName = (i: number, v: string) => {
@@ -113,7 +125,12 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
       return;
     }
     setError('');
-    onStart(trimmed, selectedMode, targetScore, maxRounds);
+    // Skicka bara det aktiva villkoret – det andra sätts till null/oändligt
+    if (gameType === 'score') {
+      onStart(trimmed, selectedMode, targetScore, null);
+    } else {
+      onStart(trimmed, selectedMode, Infinity, maxRounds);
+    }
   };
 
   const isFormValid = playerNames.every(n => n.trim() !== '');
@@ -214,153 +231,168 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
               ) : null}
             </VStack>
 
-            {/* ── Poänggräns ── */}
-            <VStack space="md">
-              <VStack space="xs">
-                <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
-                  VINNARMÅL – POÄNG
-                </Text>
-                <Text fontSize="$xs" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
-                  Spelet slutar när en spelare når detta antal poäng
-                </Text>
-              </VStack>
-              <HStack space="sm" flexWrap="wrap">
-                {TARGET_SCORES.map(score => {
-                  const active = targetScore === score;
-                  return (
-                    <Pressable key={score} onPress={() => setTargetScore(score)} style={{ marginBottom: 8 }}>
-                      <Box
-                        px="$4"
-                        py="$2.5"
-                        rounded="$2xl"
-                        borderWidth={2}
-                        borderColor={active ? '#4f46e5' : '$backgroundLight200'}
-                        bg={active ? 'rgba(79,70,229,0.1)' : '$backgroundLight50'}
-                        sx={{
-                          _dark: {
-                            borderColor: active ? '#4f46e5' : '$backgroundDark800',
-                            bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950',
-                          },
-                        }}
-                      >
-                        <HStack space="xs" alignItems="center">
-                          <Text
-                            fontWeight="black"
-                            fontSize="$md"
-                            color={active ? '#818cf8' : '$textLight400'}
-                            sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}
-                          >
-                            {score}p
-                          </Text>
-                          {score === 30 && (
-                            <Text fontSize="$xs" color={active ? '#818cf8' : '$textLight300'} sx={{ _dark: { color: active ? '#818cf8' : '$textDark600' } }}>
-                              ★
-                            </Text>
-                          )}
-                        </HStack>
-                      </Box>
-                    </Pressable>
-                  );
-                })}
-              </HStack>
-            </VStack>
-
-            {/* ── Antal omgångar ── */}
-            <VStack space="md">
-              <VStack space="xs">
-                <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
-                  ANTAL OMGÅNGAR
-                </Text>
-                <Text fontSize="$xs" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
-                  {maxRounds === null
-                    ? 'Styrs av poängen – ingen gräns på omgångar'
-                    : `Spelet slutar efter ${maxRounds} omgångar – spelaren med mest poäng vinner`}
-                </Text>
-              </VStack>
-              <HStack space="sm" flexWrap="wrap">
-                {MAX_ROUNDS_OPTIONS.map(opt => {
-                  const active = maxRounds === opt.value;
-                  return (
-                    <Pressable key={String(opt.value)} onPress={() => setMaxRounds(opt.value)} style={{ marginBottom: 8 }}>
-                      <Box
-                        px="$4"
-                        py="$2.5"
-                        rounded="$2xl"
-                        borderWidth={2}
-                        borderColor={active ? '#4f46e5' : '$backgroundLight200'}
-                        bg={active ? 'rgba(79,70,229,0.1)' : '$backgroundLight50'}
-                        sx={{
-                          _dark: {
-                            borderColor: active ? '#4f46e5' : '$backgroundDark800',
-                            bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950',
-                          },
-                        }}
-                      >
-                        <HStack space="xs" alignItems="center">
-                          <Text
-                            fontWeight="black"
-                            fontSize="$md"
-                            color={active ? '#818cf8' : '$textLight400'}
-                            sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}
-                          >
-                            {opt.label}
-                          </Text>
-                          {opt.value === null && (
-                            <Text fontSize="$xs" color={active ? '#818cf8' : '$textLight300'} sx={{ _dark: { color: active ? '#818cf8' : '$textDark600' } }}>
-                              ★
-                            </Text>
-                          )}
-                        </HStack>
-                      </Box>
-                    </Pressable>
-                  );
-                })}
-              </HStack>
-            </VStack>
-
-            {/* ── Musikgenre ── */}
+            {/* ── Spelläge ── */}
             <VStack space="md">
               <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
-                MUSIKGENRE
+                SPELLÄGE
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
-                <HStack space="sm" px="$1">
-                  {GAME_MODES.map(mode => {
-                    const Icon = mode.icon;
-                    const active = selectedMode === mode.id;
+              <HStack space="sm">
+                <Pressable style={{ flex: 1 }} onPress={() => setGameType('score')}>
+                  <Box
+                    py="$3" px="$3" minHeight={118} rounded="$2xl" borderWidth={2}
+                    borderColor={gameType === 'score' ? '#4f46e5' : '$backgroundLight200'}
+                    bg={gameType === 'score' ? 'rgba(79,70,229,0.10)' : '$backgroundLight50'}
+                    sx={{ _dark: { borderColor: gameType === 'score' ? '#4f46e5' : '$backgroundDark800', bg: gameType === 'score' ? 'rgba(79,70,229,0.18)' : '$backgroundDark950' } }}
+                  >
+                    <VStack flex={1} space="xs" alignItems="center" justifyContent="center">
+                      <Trophy size={20} color={gameType === 'score' ? '#818cf8' : '#6b7280'} />
+                      <Text fontWeight="black" fontSize="$sm" color={gameType === 'score' ? '#818cf8' : '$textLight400'} textAlign="center" sx={{ _dark: { color: gameType === 'score' ? '#818cf8' : '$textDark500' } }}>
+                        Poäng
+                      </Text>
+                      <Text fontSize="$2xs" color="$textLight300" textAlign="center" sx={{ _dark: { color: '$textDark600' } }}>
+                        Först till X poäng vinner
+                      </Text>
+                    </VStack>
+                  </Box>
+                </Pressable>
+                <Pressable style={{ flex: 1 }} onPress={() => setGameType('rounds')}>
+                  <Box
+                    py="$3" px="$3" minHeight={118} rounded="$2xl" borderWidth={2}
+                    borderColor={gameType === 'rounds' ? '#4f46e5' : '$backgroundLight200'}
+                    bg={gameType === 'rounds' ? 'rgba(79,70,229,0.10)' : '$backgroundLight50'}
+                    sx={{ _dark: { borderColor: gameType === 'rounds' ? '#4f46e5' : '$backgroundDark800', bg: gameType === 'rounds' ? 'rgba(79,70,229,0.18)' : '$backgroundDark950' } }}
+                  >
+                    <VStack flex={1} space="xs" alignItems="center" justifyContent="center">
+                      <RotateCw size={20} color={gameType === 'rounds' ? '#818cf8' : '#6b7280'} />
+                      <Text fontWeight="black" fontSize="$sm" color={gameType === 'rounds' ? '#818cf8' : '$textLight400'} textAlign="center" sx={{ _dark: { color: gameType === 'rounds' ? '#818cf8' : '$textDark500' } }}>
+                        Omgångar
+                      </Text>
+                      <Text fontSize="$2xs" color="$textLight300" textAlign="center" sx={{ _dark: { color: '$textDark600' } }}>
+                        Flest poäng efter X omgångar
+                      </Text>
+                    </VStack>
+                  </Box>
+                </Pressable>
+              </HStack>
+            </VStack>
+
+            {/* ── Poänggräns (bara vid poängjakt) ── */}
+            {gameType === 'score' && (
+              <VStack space="md">
+                <VStack space="xs">
+                  <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
+                    VINNARMÅL – POÄNG
+                  </Text>
+                  <Text fontSize="$xs" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
+                    Spelet slutar när en spelare når detta antal poäng
+                  </Text>
+                </VStack>
+                <HStack space="sm" flexWrap="wrap">
+                  {TARGET_SCORES.map(score => {
+                    const active = targetScore === score;
                     return (
-                      <Pressable key={mode.id} onPress={() => setSelectedMode(mode.id)}>
+                      <Pressable key={score} onPress={() => setTargetScore(score)} style={{ marginBottom: 8 }}>
                         <Box
-                          px="$3"
-                          py="$2"
-                          rounded="$xl"
-                          borderWidth={1.5}
+                          px="$4" py="$2.5" rounded="$2xl" borderWidth={2}
                           borderColor={active ? '#4f46e5' : '$backgroundLight200'}
-                          bg={active ? 'rgba(79,70,229,0.08)' : '$backgroundLight50'}
-                          sx={{
-                            _dark: {
-                              borderColor: active ? '#4f46e5' : '$backgroundDark800',
-                              bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950',
-                            },
-                          }}
+                          bg={active ? 'rgba(79,70,229,0.1)' : '$backgroundLight50'}
+                          sx={{ _dark: { borderColor: active ? '#4f46e5' : '$backgroundDark800', bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950' } }}
                         >
                           <HStack space="xs" alignItems="center">
-                            <Icon size={13} color={active ? '#818cf8' : '#6b7280'} />
-                            <Text
-                              fontSize="$xs"
-                              fontWeight="bold"
-                              color={active ? '#818cf8' : '$textLight400'}
-                              numberOfLines={1}
-                              sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}
-                            >
-                              {mode.label}
+                            <Text fontWeight="black" fontSize="$md" color={active ? '#818cf8' : '$textLight400'} sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}>
+                              {score}p
                             </Text>
+                            {score === 30 && (
+                              <Text fontSize="$xs" color={active ? '#818cf8' : '$textLight300'} sx={{ _dark: { color: active ? '#818cf8' : '$textDark600' } }}>★</Text>
+                            )}
                           </HStack>
                         </Box>
                       </Pressable>
                     );
                   })}
                 </HStack>
+              </VStack>
+            )}
+
+            {/* ── Antal omgångar (bara vid omgångsläge) ── */}
+            {gameType === 'rounds' && (
+              <VStack space="md">
+                <VStack space="xs">
+                  <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
+                    ANTAL OMGÅNGAR
+                  </Text>
+                  <Text fontSize="$xs" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
+                    Spelet slutar efter {maxRounds} omgångar – spelaren med mest poäng vinner
+                  </Text>
+                </VStack>
+                <HStack space="sm" flexWrap="wrap">
+                  {MAX_ROUNDS_OPTIONS.filter(o => o.value !== null).map(opt => {
+                    const active = maxRounds === opt.value;
+                    return (
+                      <Pressable key={String(opt.value)} onPress={() => setMaxRounds(opt.value!)} style={{ marginBottom: 8 }}>
+                        <Box
+                          px="$4" py="$2.5" rounded="$2xl" borderWidth={2}
+                          borderColor={active ? '#4f46e5' : '$backgroundLight200'}
+                          bg={active ? 'rgba(79,70,229,0.1)' : '$backgroundLight50'}
+                          sx={{ _dark: { borderColor: active ? '#4f46e5' : '$backgroundDark800', bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950' } }}
+                        >
+                          <Text fontWeight="black" fontSize="$md" color={active ? '#818cf8' : '$textLight400'} sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}>
+                            {opt.label}
+                          </Text>
+                        </Box>
+                      </Pressable>
+                    );
+                  })}
+                </HStack>
+              </VStack>
+            )}
+            {/* ── Musikgenre ── */}
+            <VStack space="md">
+              <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
+                MUSIKGENRE
+              </Text>
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                style={{ maxHeight: 300 }}
+                contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+              >
+                {GAME_MODES.map(mode => {
+                  const Icon = mode.icon;
+                  const active = selectedMode === mode.id;
+                  return (
+                    <Pressable key={mode.id} onPress={() => setSelectedMode(mode.id)} style={{ width: '48%' }}>
+                      <Box
+                        px="$3"
+                        py="$3"
+                        rounded="$2xl"
+                        borderWidth={2}
+                        borderColor={active ? '#4f46e5' : '$backgroundLight200'}
+                        bg={active ? 'rgba(79,70,229,0.10)' : '$backgroundLight50'}
+                        sx={{
+                          _dark: {
+                            borderColor: active ? '#4f46e5' : '$backgroundDark800',
+                            bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950',
+                          },
+                        }}
+                      >
+                        <HStack space="sm" alignItems="center">
+                          <Icon size={16} color={active ? '#818cf8' : '#6b7280'} />
+                          <Text
+                            fontSize="$xs"
+                            fontWeight="bold"
+                            color={active ? '#818cf8' : '$textLight400'}
+                            numberOfLines={2}
+                            flex={1}
+                            sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}
+                          >
+                            {mode.label}
+                          </Text>
+                        </HStack>
+                      </Box>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </VStack>
 

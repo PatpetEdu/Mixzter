@@ -35,6 +35,7 @@ export interface WebGuess {
 interface UseScoreBattleSyncProps {
   gameId: string | null;
   hostUid: string | null;
+  gameMode: string;
   phase: BattlePhase;
   playerNames: string[];
   scores: number[];
@@ -58,6 +59,7 @@ interface UseScoreBattleSyncProps {
 export function useScoreBattleSync({
   gameId,
   hostUid,
+  gameMode,
   phase,
   playerNames,
   scores,
@@ -85,6 +87,7 @@ export function useScoreBattleSync({
 
     setDoc(doc(db, 'scoreBattleRooms', gameId), {
       hostUid,
+      gameMode,
       phase: 'guessing',
       playerNames,
       scores,
@@ -96,7 +99,7 @@ export function useScoreBattleSync({
       webGuesses: {},
       updatedAt: Date.now(),
     }, { merge: false }).catch(console.error);
-  }, [gameId, hostUid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gameId, hostUid, gameMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Synka spelstate (debounced 600 ms) ───────────────────────────────────
   useEffect(() => {
@@ -116,6 +119,7 @@ export function useScoreBattleSync({
           : null;
 
         await updateDoc(doc(db, 'scoreBattleRooms', gameId), {
+          gameMode,
           phase,
           scores,
           stars,
@@ -132,7 +136,7 @@ export function useScoreBattleSync({
     }, 600);
 
     return () => { if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current); };
-  }, [gameId, hostUid, phase, scores, stars, songCount, card, roundResults]);
+  }, [gameId, hostUid, gameMode, phase, scores, stars, songCount, card, roundResults]);
 
   // ── Skriv tillbaka appens guesses/locked till webGuesses (App→Webb) ──────
   // Körs när appen ändrar locked/guesses lokalt (t.ex. host-toggle).

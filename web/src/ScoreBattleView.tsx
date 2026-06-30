@@ -3,8 +3,8 @@
 // Webbvy för Score Battle – spelarna scannar QR och gissar via sin telefon.
 // Skriver webGuesses till Firestore; appen läser och låser spelarens kort.
 
-import { useEffect, useState, useRef } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { doc, getDoc, getDocFromServer, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import './ScoreBattleView.css';
 
@@ -33,6 +33,7 @@ interface SongHistoryEntry {
 
 interface ScoreBattleRoom {
   hostUid: string;
+  gameMode?: string;
   phase: 'guessing' | 'song_summary' | 'game_over';
   playerNames: string[];
   scores: number[];
@@ -48,6 +49,35 @@ interface ScoreBattleRoom {
 // ─── Hjälpfunktioner ─────────────────────────────────────────────────────────
 
 const currentYear = new Date().getFullYear();
+
+const GAME_MODE_LABELS: Record<string, string> = {
+  default: `Blandat 1950-${currentYear}`,
+  svenska: `Svenska Hits 1960-${currentYear}`,
+  eurovision: `Eurovision 1956-${currentYear}`,
+  rock: `Rock/Metal 1960-${currentYear}`,
+  onehitwonder: 'One Hit Wonders 1970-2015',
+  filmmusik: `Film & TV Musik 1950-${currentYear}`,
+  disney: `Disney & Animerat 1937-${currentYear}`,
+  melodifestivalen: `Melodifestivalen 1958-${currentYear}`,
+  kpop: `K-POP 2000-${currentYear}`,
+  eightiesnineties: '80s & 90s Hits 1980-1999',
+  modernahits: `Moderna Hits 2005-${currentYear}`,
+  sommarhits: `Sommarhits 1960-${currentYear}`,
+  dance: `Dance & EDM 1970-${currentYear}`,
+  julmusik: `Julmusik 1940-${currentYear}`,
+  country: `Country 1950-${currentYear}`,
+  partylatar: `Partylatar 1960-${currentYear}`,
+  sportlatar: `Sportlatar 1970-${currentYear}`,
+  nordisk: `Nordiska Hits 1960-${currentYear}`,
+};
+
+function splitGameModeName(fullName: string): { name: string; years: string } {
+  const match = fullName.match(/^(.*?)\s+(\d{4}(?:-\d{4})?)$/);
+  if (match) {
+    return { name: match[1], years: match[2] };
+  }
+  return { name: fullName, years: '' };
+}
 
 function isValidYear(s: string): boolean {
   if (!/^[0-9]{4}$/.test(s)) return false;
@@ -176,6 +206,8 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const frozenRoomRef = useRef<ScoreBattleRoom | null>(null);
+  const refreshInFlightRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
 
   // Vilken spelare är jag?
   const [myPlayerIndex, setMyPlayerIndex] = useState<number | null>(null);
@@ -189,6 +221,45 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
   const lastSongCountRef = useRef<number>(-1);
   // Spåra vad vi senast skickade till Firestore → loop-skydd
   const lastSubmittedRef = useRef<{ year: number; locked: boolean } | null>(null);
+
+  // Minimal fallback-refresh för enheter där realtime ibland tappar synk (främst iOS)
+  const refreshRoomOnce = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastRefreshAtRef.current < 1200) return;
+    if (refreshInFlightRef.current) return;
+    if (document.visibilityState !== 'visible') return;
+
+    refreshInFlightRef.current = true;
+    lastRefreshAtRef.current = now;
+    try {
+      let snap;
+      try {
+        snap = await getDocFromServer(doc(db, 'scoreBattleRooms', gameId));
+      } catch {
+        // Fallback om server-read misslyckas tillfälligt
+        snap = await getDoc(doc(db, 'scoreBattleRooms', gameId));
+      }
+      if (!snap.exists()) {
+        if (frozenRoomRef.current?.phase === 'game_over') return;
+        if (frozenRoomRef.current !== null) {
+          setError('Spelet avslutades av värden.');
+        } else {
+          setError('Spelet hittades inte. Be värden starta om spelet.');
+        }
+        setLoading(false);
+        return;
+      }
+      const data = snap.data() as ScoreBattleRoom;
+      frozenRoomRef.current = data;
+      setRoom(data);
+      setLoading(false);
+      setError(null);
+    } catch {
+      // Behåll senaste state; onSnapshot eller nästa poll tar igen.
+    } finally {
+      refreshInFlightRef.current = false;
+    }
+  }, [gameId]);
 
   // ── Lyssna på rummet ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -219,6 +290,37 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
     );
     return unsub;
   }, [gameId]);
+
+  // Fallback: låg-frekvent polling + reconnect vid focus/online/pageshow/visibility
+  useEffect(() => {
+    const pollMs = room?.phase === 'guessing' || room?.phase === 'song_summary' ? 1400 : 2200;
+    const interval = setInterval(() => {
+      if (room?.phase === 'game_over') return;
+      void refreshRoomOnce();
+    }, pollMs);
+
+    const onFocus = () => { void refreshRoomOnce(true); };
+    const onPageShow = () => { void refreshRoomOnce(true); };
+    const onOnline = () => { void refreshRoomOnce(true); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshRoomOnce(true);
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshRoomOnce, room?.phase]);
 
   // ── Återställ gissning vid ny runda ──────────────────────────────────────
   useEffect(() => {
@@ -354,6 +456,8 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
   const myWebGuess = room.webGuesses[String(myPlayerIndex)];
   const inputValid = isValidYear(myGuess);
+  const modeLabel = GAME_MODE_LABELS[room.gameMode ?? 'default'] ?? GAME_MODE_LABELS.default;
+  const modeParts = splitGameModeName(modeLabel);
 
   const c = PLAYER_COLORS[myPlayerIndex % PLAYER_COLORS.length];
 
@@ -361,7 +465,12 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
     <div className="sb-root">
       {/* ── Header ── */}
       <div className="sb-header">
-        <span className="sb-title">Score Battle</span>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <span className="sb-title">Score Battle - {modeParts.name}</span>
+          {modeParts.years ? (
+            <span style={{ color: '#64748b', fontSize: 12, fontWeight: 500 }}>{modeParts.years}</span>
+          ) : null}
+        </div>
         <span className="sb-round-badge">
           Omgång {room.songCount + 1}
         </span>

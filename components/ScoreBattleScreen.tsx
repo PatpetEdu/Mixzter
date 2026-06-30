@@ -67,6 +67,33 @@ const PERSIST_QUEUE_KEY = (uid: string, gid: string) => `nextCard:${uid}:${gid}`
 const currentYear = new Date().getFullYear();
 const isValidYear = (s: string) => /^[0-9]{4}$/.test(s) && parseInt(s, 10) >= 1900 && parseInt(s, 10) <= currentYear;
 
+const GAME_MODE_LABELS: Record<string, string> = {
+  default: `Blandat 1950-${currentYear}`,
+  svenska: `Svenska Hits 1960-${currentYear}`,
+  eurovision: `Eurovision 1956-${currentYear}`,
+  rock: `Rock/Metal 1960-${currentYear}`,
+  onehitwonder: 'One Hit Wonders 1970-2015',
+  filmmusik: `Film & TV Musik 1950-${currentYear}`,
+  disney: `Disney & Animerat 1937-${currentYear}`,
+  melodifestivalen: `Melodifestivalen 1958-${currentYear}`,
+  kpop: `K-POP 2000-${currentYear}`,
+  eightiesnineties: '80s & 90s Hits 1980-1999',
+  modernahits: `Moderna Hits 2005-${currentYear}`,
+  sommarhits: `Sommarhits 1960-${currentYear}`,
+  dance: `Dance & EDM 1970-${currentYear}`,
+  julmusik: `Julmusik 1940-${currentYear}`,
+  country: `Country 1950-${currentYear}`,
+  partylatar: `Partylatar 1960-${currentYear}`,
+  sportlatar: `Sportlatar 1970-${currentYear}`,
+  nordisk: `Nordiska Hits 1960-${currentYear}`,
+};
+
+function splitGameModeName(fullName: string): { name: string; years: string } {
+  const match = fullName.match(/^(.*?)\s+(\d{4}(?:-\d{4})?)$/);
+  if (match) return { name: match[1], years: match[2] };
+  return { name: fullName, years: '' };
+}
+
 // ─── ScoreCard – poängkort med inbyggd gissningsruta ─────────────────────────
 
 // Per-player accent palette – 5 distinct hues that work on dark backgrounds
@@ -477,6 +504,7 @@ export default function ScoreBattleScreen({
   const { webUrl, clearWebGuesses, deleteRoom } = useScoreBattleSync({
     gameId,
     hostUid: user?.uid ?? null,
+    gameMode,
     phase,
     playerNames,
     scores,
@@ -557,6 +585,9 @@ export default function ScoreBattleScreen({
   }, [resetRound, generateCard]);
 
   const isGuessingPhase = phase === 'guessing';
+  const modeLabel = GAME_MODE_LABELS[gameMode] ?? GAME_MODE_LABELS.default;
+  const modeParts = splitGameModeName(modeLabel);
+  const modeInlineLabel = modeParts.years ? `${modeParts.name} ${modeParts.years}` : modeParts.name;
 
   // ─── Game Over ─────────────────────────────────────────────────────────────
 
@@ -725,6 +756,12 @@ export default function ScoreBattleScreen({
       >
         {/* ── Omgångsindikator + QR-knapp ── */}
         <View style={s.roundBadgeRow}>
+          <View style={s.modeInlinePill}>
+            <RNText style={s.modeInlineText} numberOfLines={1} ellipsizeMode="tail">
+              {modeInlineLabel}
+            </RNText>
+          </View>
+
           <View style={s.roundBadge}>
             <RNText style={s.roundBadgeText}>
               {maxRounds !== null
@@ -935,6 +972,20 @@ const s = StyleSheet.create({
 
   // Round badge
   roundBadgeRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  modeInlinePill: {
+    maxWidth: '52%',
+    backgroundColor: '#0f0f17',
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+    borderRadius: 99,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  modeInlineText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   roundBadge: {
     backgroundColor: 'rgba(99,102,241,0.1)',
     borderWidth: 1,
