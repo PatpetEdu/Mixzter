@@ -257,7 +257,7 @@ Välj primärt låtar med tydlig sång/lead-vocals. Undvik låtar som är enbart
 
     sportlatar: `Välj **${n} låtar** som är starkt förknippade med **sport, idrott och tävling** från **1970 till ${CURRENT_YEAR}**. Det kan vara OS-teman, VM-låtar, arenasånger eller låtar kopplade till kända sportevenemang (t.ex. Eye of the Tiger, We Are the Champions, Seven Nation Army). Välj låtar från minst 3 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
 
-    nordisk: `Välj **${n} nordiska låtar** från **Sverige, Norge, Danmark, Finland eller Island** från **1960 till ${CURRENT_YEAR}**. Det ska vara kända låtar i Norden – nordiska artister som är kända internationellt eller regionalt (t.ex. norska, danska och finska hits). Undvik låtar som redan täcks av kategorin Svenska Hits – prioritera artister från de övriga nordiska länderna. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+    nordisk: `Välj **${n} nordiska låtar** från **Sverige, Norge, Danmark, Finland eller Island** från **1960 till ${CURRENT_YEAR}**. Det ska vara kända låtar i Norden – nordiska artister som är kända internationellt eller regionalt (t.ex. svenska, norska, danska och finska hits). Välj låtar från alla nordiska länder. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
   };
 }
 
