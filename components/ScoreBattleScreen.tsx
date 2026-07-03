@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Trophy, Star, Eye, EyeOff, QrCode, Info } from 'lucide-react-native';
+import { Trophy, Eye, EyeOff, QrCode, Info } from 'lucide-react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import AnimatedCard from './AnimatedCard';
@@ -45,6 +45,8 @@ import { useScoreBattleSync } from '../hooks/useScoreBattleSync';
 type Props = {
   playerNames: string[];
   gameMode: string;
+  hostPlayerIndex: number;
+  onChangeHostPlayerIndex: (index: number) => void;
   targetScore: number;
   maxRounds: number | null;
   gameId: string | null;
@@ -131,7 +133,13 @@ const scStyles = StyleSheet.create({
     marginTop: 4,
   },
   name: { color: '#64748b', fontSize: 13, fontWeight: '600', flex: 1, marginRight: 4 },
-  starsRow: { flexDirection: 'row', gap: 2 },
+  starsRow: { flexDirection: 'row', minHeight: 16, justifyContent: 'center' },
+  starsText: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   track: { height: 3, backgroundColor: '#1a1a2e', borderRadius: 99, overflow: 'hidden' },
   fill: { height: 3, borderRadius: 99, backgroundColor: '#312e81' },
   score: { color: '#e2e8f0', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
@@ -167,6 +175,24 @@ const scStyles = StyleSheet.create({
     marginTop: -4,
   },
   lockedBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  hostBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    backgroundColor: 'rgba(148,163,184,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(226,232,240,0.5)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    zIndex: 2,
+  },
+  hostBadgeText: {
+    color: '#e2e8f0',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
 });
 
 function ScoreCard({
@@ -180,6 +206,7 @@ function ScoreCard({
   onToggleLock,
   isGuessingPhase,
   playerIndex,
+  isHostPlayer,
 }: {
   name: string;
   score: number;
@@ -191,18 +218,26 @@ function ScoreCard({
   onToggleLock: () => void;
   isGuessingPhase: boolean;
   playerIndex: number;
+  isHostPlayer: boolean;
 }) {
   const pct = Math.max(0, Math.min(score / targetScore, 1));
   const isNeg = score < 0;
   const isValid = isValidYear(guess);
   const c = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
+  const starIndicator = stars <= 0 ? null : (stars === 1 ? '✦' : `✦ ${stars}`);
 
   return (
     <View style={[
       scStyles.wrap,
       { borderColor: isGuessLocked ? c.locked : c.border },
       isGuessLocked && { backgroundColor: '#0d0d1a' },
+      isHostPlayer && { borderColor: '#e2e8f0', borderWidth: 2 },
     ]}>
+      {isHostPlayer && (
+        <View style={scStyles.hostBadge}>
+          <RNText style={scStyles.hostBadgeText}>DU</RNText>
+        </View>
+      )}
       {isGuessLocked && (
         <View style={[scStyles.lockedLine, { backgroundColor: c.locked }]} />
       )}
@@ -214,10 +249,8 @@ function ScoreCard({
         >
           {name}
         </RNText>
-        <View style={scStyles.starsRow}>
-          {Array.from({ length: Math.max(0, stars) }).map((_, i) => (
-            <Star key={i} size={11} color="#f59e0b" fill="#f59e0b" />
-          ))}
+        <View style={[scStyles.starsRow, isHostPlayer && { marginRight: 34 }]}> 
+          {starIndicator ? <RNText style={scStyles.starsText}>{starIndicator}</RNText> : null}
         </View>
       </View>
 
@@ -339,6 +372,8 @@ const rrStyles = StyleSheet.create({
 export default function ScoreBattleScreen({
   playerNames,
   gameMode,
+  hostPlayerIndex,
+  onChangeHostPlayerIndex,
   targetScore,
   maxRounds,
   gameId,
@@ -355,7 +390,7 @@ export default function ScoreBattleScreen({
   const {
     scores, stars, phase,
     soloMode,
-    roundResults, songCount, winnerIdx,
+    roundResults, songCount, winnerIdxs,
     pendingGameOver,
     confirmGuesses, nextSong, resetGame,
     _restore,
@@ -477,6 +512,7 @@ export default function ScoreBattleScreen({
   const [locked, setLocked]   = useState<boolean[]>(() => Array(numPlayers).fill(false));
   const [showQR, setShowQR]   = useState(false);
   const [isSongInfoVisible, setIsSongInfoVisible] = useState(false);
+  const [hostSelectorExpanded, setHostSelectorExpanded] = useState(false);
   const songInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressDidFireRef = useRef(false);
   const [songHistory, setSongHistory] = useState<SongHistoryEntry[]>([]);
@@ -588,11 +624,16 @@ export default function ScoreBattleScreen({
   const modeLabel = GAME_MODE_LABELS[gameMode] ?? GAME_MODE_LABELS.default;
   const modeParts = splitGameModeName(modeLabel);
   const modeInlineLabel = modeParts.years ? `${modeParts.name} ${modeParts.years}` : modeParts.name;
+  const safeHostPlayerIndex = Math.min(Math.max(hostPlayerIndex, 0), Math.max(playerNames.length - 1, 0));
 
   // ─── Game Over ─────────────────────────────────────────────────────────────
 
   if (phase === 'game_over') {
-    const winner = winnerIdx !== null ? playerNames[winnerIdx] : '?';
+    const hasCoWinners = winnerIdxs.length > 1;
+    const winnerSet = new Set(winnerIdxs);
+    const winner = winnerIdxs.length > 0
+      ? winnerIdxs.map(i => playerNames[i] ?? `Spelare ${i + 1}`).join(' & ')
+      : '?';
     const HISTORY_PREVIEW = 3;
     const sortedByInterest = songHistory
       .map((entry, origIdx) => ({ entry, origIdx }))
@@ -612,16 +653,16 @@ export default function ScoreBattleScreen({
             <View style={s.trophyCircle}>
               <Trophy size={52} color="#f59e0b" />
             </View>
-            <RNText style={s.winnerSub}>Vinnaren är</RNText>
+            <RNText style={s.winnerSub}>{hasCoWinners ? 'Vinnarna är' : 'Vinnaren är'}</RNText>
             <RNText style={s.winnerName}>🏆 {winner}</RNText>
 
             <View style={s.finalScores}>
               {playerNames.map((name, i) => (
                 <View key={name} style={[s.finalRow, i < playerNames.length - 1 && s.finalRowBorder]}>
-                  <RNText style={[s.finalName, i === winnerIdx && s.finalNameWinner]}>
-                    {i === winnerIdx ? '🏆 ' : ''}{name}
+                  <RNText style={[s.finalName, winnerSet.has(i) && s.finalNameWinner]}>
+                    {winnerSet.has(i) ? '🏆 ' : ''}{name}
                   </RNText>
-                  <RNText style={[s.finalPts, i === winnerIdx && s.finalPtsWinner]}>
+                  <RNText style={[s.finalPts, winnerSet.has(i) && s.finalPtsWinner]}>
                     {scores[i]}p
                   </RNText>
                 </View>
@@ -776,6 +817,42 @@ export default function ScoreBattleScreen({
           )}
         </View>
 
+        <View style={s.hostSelectorWrap}>
+          <TouchableOpacity
+            onPress={() => setHostSelectorExpanded(v => !v)}
+            activeOpacity={0.8}
+            style={s.hostSelectorToggle}
+          >
+            <RNText style={s.hostSelectorToggleText} numberOfLines={1}>
+              {`Jag: ${playerNames[safeHostPlayerIndex] ?? `Spelare ${safeHostPlayerIndex + 1}`}`}
+            </RNText>
+            <RNText style={s.hostSelectorToggleChevron}>{hostSelectorExpanded ? '▴' : '▾'}</RNText>
+          </TouchableOpacity>
+
+          {hostSelectorExpanded && (
+            <View style={s.hostSelectorRow}>
+              {playerNames.map((name, i) => {
+                const active = safeHostPlayerIndex === i;
+                return (
+                  <TouchableOpacity
+                    key={`host-${name}-${i}`}
+                    onPress={() => {
+                      onChangeHostPlayerIndex(i);
+                      setHostSelectorExpanded(false);
+                    }}
+                    activeOpacity={0.8}
+                    style={[s.hostSelectorPill, active && s.hostSelectorPillActive]}
+                  >
+                    <RNText style={[s.hostSelectorText, active && s.hostSelectorTextActive]} numberOfLines={1}>
+                      {name}
+                    </RNText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         {/* ── QR Modal ── */}
         {showQR && webUrl && gameId && (
           <QRCodeModal
@@ -796,13 +873,14 @@ export default function ScoreBattleScreen({
                 name={name}
                 score={scores[i] ?? 0}
                 targetScore={targetScore}
-                stars={stars[i] ?? 1}
+                stars={stars[i] ?? 0}
                 guess={guesses[i] ?? ''}
                 onChangeGuess={v => handleChangeGuess(i, v)}
                 isGuessLocked={locked[i] ?? false}
                 onToggleLock={() => handleToggleLock(i)}
                 isGuessingPhase={isGuessingPhase}
                 playerIndex={i}
+                isHostPlayer={safeHostPlayerIndex === i}
               />
             </View>
           ))}
@@ -1009,6 +1087,58 @@ const s = StyleSheet.create({
     borderColor: 'rgba(79,70,229,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hostSelectorWrap: {
+    gap: 7,
+    marginTop: -4,
+  },
+  hostSelectorToggle: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+    backgroundColor: '#0f0f17',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  hostSelectorToggleText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hostSelectorToggleChevron: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  hostSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hostSelectorPill: {
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+    backgroundColor: '#0f0f17',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    maxWidth: '48%',
+  },
+  hostSelectorPillActive: {
+    borderColor: '#4f46e5',
+    backgroundColor: 'rgba(79,70,229,0.16)',
+  },
+  hostSelectorText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hostSelectorTextActive: {
+    color: '#c7d2fe',
   },
 
   // Score row

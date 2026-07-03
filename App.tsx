@@ -56,6 +56,7 @@ function AppContent() {
   const [scoreBattleTarget, setScoreBattleTarget] = useState<number>(30);
   const [scoreBattleMaxRounds, setScoreBattleMaxRounds] = useState<number | null>(null);
   const [scoreBattleGameId, setScoreBattleGameId] = useState<string | null>(null);
+  const [scoreBattleHostPlayerIndex, setScoreBattleHostPlayerIndex] = useState<number>(0);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation logic
@@ -261,6 +262,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
       setScoreBattleTarget(meta.targetScore ?? 30);
       setScoreBattleMaxRounds(meta.maxRounds ?? null);
       setScoreBattleGameId(meta.id);
+      setScoreBattleHostPlayerIndex(0);
       setMode('score');
     } else {
       setActiveGameId(meta.id);
@@ -337,6 +339,7 @@ const resumeGame = (meta: ActiveGameMeta) => {
     setScoreBattleTarget(30);
     setScoreBattleMaxRounds(null);
     setScoreBattleGameId(null);
+    setScoreBattleHostPlayerIndex(0);
     setMode('menu');
     refreshActiveGames();
   };
@@ -972,12 +975,13 @@ const resumeGame = (meta: ActiveGameMeta) => {
         </Animated.View>
         <Box flex={1} position="relative">
           <ScoreBattleSetupScreen
-            onStart={(names, selectedMode, target, rounds) => {
+            onStart={(names, selectedMode, target, rounds, hostPlayerIndex) => {
               setScoreBattlePlayers(names);
               setScoreBattleMode(selectedMode);
               setScoreBattleTarget(target);
               setScoreBattleMaxRounds(rounds);
               setScoreBattleGameId(generateGameId());
+              setScoreBattleHostPlayerIndex(hostPlayerIndex);
               setMode('score');
             }}
             onScroll={handleScroll}
@@ -1004,12 +1008,14 @@ const resumeGame = (meta: ActiveGameMeta) => {
           }}
           pointerEvents="box-none"
         >
-          <GameHeader onBackToMenu={returnToMenu} />
+          <GameHeader gameMode={scoreBattleMode} onBackToMenu={returnToMenu} />
         </Animated.View>
         <Box flex={1} position="relative">
           <ScoreBattleScreen
             playerNames={scoreBattlePlayers}
             gameMode={scoreBattleMode}
+            hostPlayerIndex={scoreBattleHostPlayerIndex}
+            onChangeHostPlayerIndex={setScoreBattleHostPlayerIndex}
             targetScore={scoreBattleTarget}
             maxRounds={scoreBattleMaxRounds}
             gameId={scoreBattleGameId}

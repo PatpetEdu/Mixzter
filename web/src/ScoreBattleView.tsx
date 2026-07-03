@@ -87,7 +87,7 @@ function isValidYear(s: string): boolean {
 
 function pointsLabel(pts: number, skipped = false): string {
   if (skipped)     return '⏭ Skippad';
-  if (pts === 10)  return '🎯 Exakt!';
+  if (pts === 8)   return '🎯 Exakt!';
   if (pts === 6)   return '🔥 1 år fel';
   if (pts === 5)   return '🔥 2 år fel';
   if (pts === 4)   return '👍 3 år fel';
@@ -106,6 +106,20 @@ function pointsColor(pts: number, skipped = false): string {
   if (pts >= 1)  return '#818cf8';
   if (pts === 0) return '#f59e0b';
   return '#ef4444';
+}
+
+function resolveWinningPlayerIndices(scores: number[], stars: number[]): number[] {
+  if (scores.length === 0) return [];
+  const maxScore = Math.max(...scores);
+  const scoreLeaders = scores
+    .map((score, idx) => ({ score, idx }))
+    .filter(entry => entry.score === maxScore)
+    .map(entry => entry.idx);
+
+  if (scoreLeaders.length <= 1) return scoreLeaders;
+
+  const maxStars = Math.max(...scoreLeaders.map(idx => stars[idx] ?? 0));
+  return scoreLeaders.filter(idx => (stars[idx] ?? 0) === maxStars);
 }
 
 // ─── Spelarpaletten (identisk med appen) ─────────────────────────────────────
@@ -136,7 +150,7 @@ const PLAYER_COLORS = [
 // ─── ScoreCard ────────────────────────────────────────────────────────────────
 
 function ScoreCard({
-  name, score, targetScore, stars, isLocked, playerIndex,
+  name, score, targetScore, stars, isLocked, playerIndex, isMe, animationDelayMs,
 }: {
   name: string;
   score: number;
@@ -144,19 +158,36 @@ function ScoreCard({
   stars: number;
   isLocked: boolean;
   playerIndex: number;
+  isMe: boolean;
+  animationDelayMs?: number;
 }) {
   const c = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
   const pct = Math.max(0, Math.min(score / targetScore, 1));
   const isNeg = score < 0;
+  const starIndicator = stars <= 0 ? null : (stars === 1 ? '✦' : `✦ ${stars}`);
+  const [scoreBump, setScoreBump] = useState(false);
+  const prevScoreRef = useRef(score);
+
+  useEffect(() => {
+    if (prevScoreRef.current !== score) {
+      setScoreBump(true);
+      prevScoreRef.current = score;
+      const t = window.setTimeout(() => setScoreBump(false), 460);
+      return () => window.clearTimeout(t);
+    }
+    return;
+  }, [score]);
 
   return (
     <div
-      className="sb-score-card"
+      className={`sb-score-card sb-score-card-animate${isMe ? ' sb-score-card-me' : ''}${scoreBump ? ' sb-score-card-scored' : ''}`}
       style={{
         borderColor: isLocked ? c.locked : c.border,
         backgroundColor: isLocked ? '#0d0d1a' : '#0f0f17',
+        animationDelay: `${animationDelayMs ?? 0}ms`,
       }}
     >
+      {isMe ? <span className="sb-host-badge">DU</span> : null}
       {isLocked && (
         <div className="sb-score-card-locked-line" style={{ backgroundColor: c.locked }} />
       )}
@@ -168,21 +199,19 @@ function ScoreCard({
           {name}
         </span>
         <span className="sb-stars">
-          {Array.from({ length: Math.max(0, stars) }).map((_, i) => (
-            <span key={i} className="sb-star">⭐</span>
-          ))}
+          {starIndicator ? <span className="sb-star-count">{starIndicator}</span> : null}
         </span>
       </div>
-      <div className="sb-track">
+      <div className={`sb-track${scoreBump ? ' sb-track-pop' : ''}`}>
         <div
-          className="sb-fill"
+          className={`sb-fill${scoreBump ? ' sb-fill-pop' : ''}`}
           style={{
             width: `${pct * 100}%`,
             backgroundColor: isLocked ? c.fill : c.fillDim,
           }}
         />
       </div>
-      <span className={`sb-score-num${isNeg ? ' sb-score-neg' : ''}`}
+      <span className={`sb-score-num${isNeg ? ' sb-score-neg' : ''}${scoreBump ? ' sb-score-num-pop' : ''}`}
         style={isLocked ? { color: c.nameLocked } : undefined}>
         {score}
         <span className="sb-score-target">/{targetScore}</span>
@@ -441,20 +470,23 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
   }
 
   // ── Spelvy ───────────────────────────────────────────────────────────────
-  const myName    = room.playerNames[myPlayerIndex];
   const isGuessing = room.phase === 'guessing';
   const isSummary  = room.phase === 'song_summary';
   const isGameOver = room.phase === 'game_over';
 
   // Beräkna vinnare vid game_over
-  const winnerIdx = isGameOver
-    ? room.scores.indexOf(Math.max(...room.scores))
-    : null;
+  const winnerIdxs = isGameOver ? resolveWinningPlayerIndices(room.scores, room.stars) : [];
+  const winnerSet = new Set(winnerIdxs);
+  const hasCoWinners = winnerIdxs.length > 1;
 
   // targetScore: hämtas från rummet, fallback 50 om gamla spel saknar fältet
   const targetScore = room.targetScore ?? 50;
 
   const myWebGuess = room.webGuesses[String(myPlayerIndex)];
+  const allPlayersLocked = room.playerNames.every((_, i) => {
+    if (i === myPlayerIndex) return isLocked;
+    return room.webGuesses[String(i)]?.locked === true;
+  });
   const inputValid = isValidYear(myGuess);
   const modeLabel = GAME_MODE_LABELS[room.gameMode ?? 'default'] ?? GAME_MODE_LABELS.default;
   const modeParts = splitGameModeName(modeLabel);
@@ -464,20 +496,21 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
   return (
     <div className="sb-root">
       {/* ── Header ── */}
-      <div className="sb-header">
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <span className="sb-title">Score Battle - {modeParts.name}</span>
-          {modeParts.years ? (
-            <span style={{ color: '#64748b', fontSize: 12, fontWeight: 500 }}>{modeParts.years}</span>
-          ) : null}
+      <div className="sb-header sb-animate-in">
+        <div className="sb-header-card">
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span className="sb-title">Score Battle - {modeParts.name}</span>
+            {modeParts.years ? (
+              <span className="sb-title-years">{modeParts.years}</span>
+            ) : null}
+          </div>
+          <span className="sb-round-badge">
+            Omgång {room.songCount + 1}
+          </span>
         </div>
-        <span className="sb-round-badge">
-          Omgång {room.songCount + 1}
-        </span>
       </div>
 
       <div className="sb-content">
-
         {/* ── Alla spelarpoäng ── */}
         <div className="sb-score-grid">
           {room.playerNames.map((name, i) => {
@@ -492,9 +525,11 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
                 name={name}
                 score={room.scores[i] ?? 0}
                 targetScore={targetScore}
-                stars={room.stars[i] ?? 1}
+                stars={room.stars[i] ?? 0}
                 isLocked={cardLocked}
                 playerIndex={i}
+                isMe={i === myPlayerIndex}
+                animationDelayMs={i * 50}
               />
             );
           })}
@@ -502,8 +537,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
         {/* ── Gissningsfas: min inmatning ── */}
         {isGuessing && (
-          <div className="sb-guess-section">
-            <span className="sb-guess-label">Din gissning, {myName}</span>
+          <div className="sb-guess-section sb-animate-in">
             <div className="sb-guess-row">
               <input
                 className={[
@@ -536,13 +570,27 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
                   onClick={handleToggleLock}
                   title={isLocked ? 'Ändra gissning' : 'Lås gissning'}
                 >
-                  {isLocked ? '🔒' : '🔓'}
+                  <span className={`sb-lock-icon-wrap${isLocked ? ' locked' : ''}`}>
+                    {isLocked ? (
+                      <svg className="sb-lock-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="5" y="11" width="14" height="10" rx="2.2" stroke="currentColor" strokeWidth="2" />
+                        <path d="M8 11V8a4 4 0 1 1 8 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <svg className="sb-lock-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="5" y="11" width="14" height="10" rx="2.2" stroke="currentColor" strokeWidth="2" />
+                        <path d="M16 11V8a4 4 0 1 0-8 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </span>
                 </button>
               )}
             </div>
             {isLocked && (
               <p style={{ color: c.badgeText, fontSize: 13, textAlign: 'center', fontWeight: 600, margin: 0 }}>
-                ✓ Gissning låst — väntar på de andra…
+                {allPlayersLocked
+                  ? '✓ Alla klara - väntar på svar...'
+                  : '✓ Gissning låst - väntar på de andra...'}
               </p>
             )}
             {!isLocked && myGuess.length === 4 && !inputValid && (
@@ -555,7 +603,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
         {/* ── Väntar på svar (gissningsfas, men ej aktiv input) ── */}
         {isGuessing && isLocked && !myWebGuess?.locked && (
-          <div className="sb-phase-banner">
+          <div className="sb-phase-banner waiting">
             Skickar gissning…
           </div>
         )}
@@ -563,7 +611,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
         {/* ── Song summary ── */}
         {isSummary && room.card && (
           <>
-            <div className="sb-summary-card">
+            <div className="sb-summary-card sb-animate-in">
               {room.card.artworkUrl && (
                 <div className="sb-artwork-wrap">
                   <img
@@ -580,7 +628,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
             </div>
 
             {room.roundResults && (
-              <div className="sb-result-list">
+              <div className="sb-result-list sb-animate-in">
                 {room.playerNames.map((name, i) => {
                   const r = room.roundResults?.[i];
                   if (!r) return null;
@@ -608,7 +656,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
               </div>
             )}
 
-            <div className="sb-phase-banner summary">
+            <div className="sb-phase-banner summary waiting">
               ⏳ Väntar på nästa låt…
             </div>
           </>
@@ -616,19 +664,21 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
         {/* ── Game over ── */}
         {isGameOver && (
-          <div className="sb-gameover">
+          <div className="sb-gameover sb-animate-in">
             <div className="sb-trophy">🏆</div>
-            <p className="sb-winner-sub">Vinnaren är</p>
+            <p className="sb-winner-sub">{hasCoWinners ? 'Vinnarna är' : 'Vinnaren är'}</p>
             <p className="sb-winner-name">
-              🏆 {winnerIdx !== null ? room.playerNames[winnerIdx] : '?'}
+              🏆 {winnerIdxs.length > 0
+                ? winnerIdxs.map(i => room.playerNames[i] ?? `Spelare ${i + 1}`).join(' & ')
+                : '?'}
             </p>
             <div className="sb-final-scores">
               {room.playerNames.map((name, i) => (
                 <div key={i} className="sb-final-row">
-                  <span className={`sb-final-name${i === winnerIdx ? ' winner' : ''}`}>
-                    {i === winnerIdx ? '🏆 ' : ''}{name}
+                  <span className={`sb-final-name${winnerSet.has(i) ? ' winner' : ''}`}>
+                    {winnerSet.has(i) ? '🏆 ' : ''}{name}
                   </span>
-                  <span className={`sb-final-pts${i === winnerIdx ? ' winner' : ''}`}>
+                  <span className={`sb-final-pts${winnerSet.has(i) ? ' winner' : ''}`}>
                     {room.scores[i]}p
                   </span>
                 </div>

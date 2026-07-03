@@ -47,6 +47,7 @@ type Props = {
     gameMode: string,
     targetScore: number,
     maxRounds: number | null,
+    hostPlayerIndex: number,
   ) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: number;
@@ -92,6 +93,7 @@ const MIN_PLAYERS = 1;
 
 export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight }: Props) {
   const [playerNames, setPlayerNames] = useState<string[]>(['', '']);
+  const [hostPlayerIndex, setHostPlayerIndex] = useState<number>(0);
   const [selectedMode, setSelectedMode] = useState('default');
   const [gameType, setGameType] = useState<'score' | 'rounds'>('score');
   const [targetScore, setTargetScore] = useState<number>(30);
@@ -110,7 +112,14 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
   };
 
   const handleRemovePlayer = (i: number) => {
-    if (playerNames.length > MIN_PLAYERS) setPlayerNames(playerNames.filter((_, idx) => idx !== i));
+    if (playerNames.length > MIN_PLAYERS) {
+      setPlayerNames(playerNames.filter((_, idx) => idx !== i));
+      setHostPlayerIndex(prev => {
+        if (i === prev) return Math.max(0, prev - 1);
+        if (i < prev) return prev - 1;
+        return prev;
+      });
+    }
   };
 
   const handleStart = () => {
@@ -126,10 +135,11 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
     }
     setError('');
     // Skicka bara det aktiva villkoret – det andra sätts till null/oändligt
+    const safeHostPlayerIndex = Math.min(Math.max(hostPlayerIndex, 0), trimmed.length - 1);
     if (gameType === 'score') {
-      onStart(trimmed, selectedMode, targetScore, null);
+      onStart(trimmed, selectedMode, targetScore, null, safeHostPlayerIndex);
     } else {
-      onStart(trimmed, selectedMode, Infinity, maxRounds);
+      onStart(trimmed, selectedMode, Infinity, maxRounds, safeHostPlayerIndex);
     }
   };
 
@@ -230,6 +240,51 @@ export default function ScoreBattleSetupScreen({ onStart, onScroll, headerHeight
                 <Text color="$error500" fontSize="$sm">{error}</Text>
               ) : null}
             </VStack>
+
+              {/* ── Host spelar som ── */}
+              <VStack space="md">
+                <VStack space="xs">
+                  <Text fontSize="$xs" fontWeight="black" color="$textLight400" letterSpacing={1} sx={{ _dark: { color: '$textDark500' } }}>
+                    HOST SPELAR SOM
+                  </Text>
+                  <Text fontSize="$xs" color="$textLight300" sx={{ _dark: { color: '$textDark600' } }}>
+                    Standard ar spelare 1, men du kan byta innan matchstart
+                  </Text>
+                </VStack>
+                <HStack space="sm" flexWrap="wrap">
+                  {playerNames.map((name, i) => {
+                    const active = hostPlayerIndex === i;
+                    const label = name.trim() || `Spelare ${i + 1}`;
+                    return (
+                      <Pressable key={`host-${i}`} onPress={() => setHostPlayerIndex(i)} style={{ marginBottom: 8 }}>
+                        <Box
+                          px="$4"
+                          py="$2.5"
+                          rounded="$2xl"
+                          borderWidth={2}
+                          borderColor={active ? '#4f46e5' : '$backgroundLight200'}
+                          bg={active ? 'rgba(79,70,229,0.1)' : '$backgroundLight50'}
+                          sx={{
+                            _dark: {
+                              borderColor: active ? '#4f46e5' : '$backgroundDark800',
+                              bg: active ? 'rgba(79,70,229,0.18)' : '$backgroundDark950',
+                            },
+                          }}
+                        >
+                          <Text
+                            fontWeight="black"
+                            fontSize="$sm"
+                            color={active ? '#818cf8' : '$textLight400'}
+                            sx={{ _dark: { color: active ? '#818cf8' : '$textDark500' } }}
+                          >
+                            {active ? `Du: ${label}` : label}
+                          </Text>
+                        </Box>
+                      </Pressable>
+                    );
+                  })}
+                </HStack>
+              </VStack>
 
             {/* ── Spelläge ── */}
             <VStack space="md">

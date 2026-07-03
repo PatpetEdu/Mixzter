@@ -2,7 +2,7 @@
 //
 // Spellogik för Score Battle – simultaneous guessing.
 // Alla spelare gissar på SAMMA låt på en gång.
-// Poäng: nytt system med 10p exakt ner till -15p för >20 år ifrån.
+// Poäng: exakt träff ger 8p och skalan går ner till -6p för >20 år ifrån.
 
 import { useState, useRef, useCallback } from 'react';
 
@@ -64,6 +64,20 @@ export function pointsColor(points: number, skipped = false): string {
   return '#ef4444';
 }
 
+function resolveWinnerIndices(scores: number[], stars: number[]): number[] {
+  if (scores.length === 0) return [];
+  const maxScore = Math.max(...scores);
+  const scoreLeaders = scores
+    .map((score, idx) => ({ score, idx }))
+    .filter(entry => entry.score === maxScore)
+    .map(entry => entry.idx);
+
+  if (scoreLeaders.length <= 1) return scoreLeaders;
+
+  const maxStars = Math.max(...scoreLeaders.map(idx => stars[idx] ?? 0));
+  return scoreLeaders.filter(idx => (stars[idx] ?? 0) === maxStars);
+}
+
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useScoreBattleLogic(
@@ -75,41 +89,51 @@ export function useScoreBattleLogic(
   const numPlayers = playerNames.length;
 
   const [scores, setScores]         = useState<number[]>(() => Array(numPlayers).fill(0));
-  const [stars, setStars]           = useState<number[]>(() => Array(numPlayers).fill(1));
+  const [stars, setStars]           = useState<number[]>(() => Array(numPlayers).fill(0));
   const [phase, setPhase]           = useState<BattlePhase>('guessing');
   const [roundResults, setRoundResults] = useState<(RoundResult | null)[]>(() => Array(numPlayers).fill(null));
   const [songCount, setSongCount]   = useState(0);
   const [winnerIdx, setWinnerIdx]   = useState<number | null>(null);
+  const [winnerIdxs, setWinnerIdxs] = useState<number[]>([]);
   const [pendingGameOver, setPendingGameOver] = useState(false);
 
   const scoresRef    = useRef<number[]>(Array(numPlayers).fill(0));
+  const starsRef     = useRef<number[]>(Array(numPlayers).fill(0));
   const songCountRef = useRef(0);
 
   // ─── Intern ───────────────────────────────────────────────────────────────
 
   const commitRound = useCallback(
-    (results: RoundResult[]) => {
+    (results: RoundResult[], actualYear: number) => {
       // Floor each score at 0 — no negative totals
       const newScores = scoresRef.current.map(
         (s, i) => Math.max(0, s + (results[i]?.points ?? 0))
       );
+      const newStars = starsRef.current.map((s, i) => {
+        const r = results[i];
+        if (!r || r.skipped) return s;
+        return r.guessYear === actualYear ? s + 1 : s;
+      });
       scoresRef.current = newScores;
+      starsRef.current = newStars;
       setScores(newScores);
+      setStars(newStars);
       setRoundResults(results);
-
-      setStars(prev => prev.map((s, i) => results[i]?.points === 10 ? s + 1 : s));
 
       const roundsPlayed = songCountRef.current + 1;
       const reachedScoreTarget = newScores.some(s => s >= targetScore);
       const reachedRoundLimit  = maxRounds !== null && roundsPlayed >= maxRounds;
 
       if (reachedScoreTarget || reachedRoundLimit) {
-        const maxScore = Math.max(...newScores);
-        setWinnerIdx(newScores.indexOf(maxScore));
+        const winners = resolveWinnerIndices(newScores, newStars);
+        setWinnerIdxs(winners);
+        setWinnerIdx(winners.length > 0 ? winners[0] : null);
         // Show summary of the final round before going to game_over
         setPendingGameOver(true);
         setPhase('song_summary');
       } else {
+        setWinnerIdxs([]);
+        setWinnerIdx(null);
         setPhase('song_summary');
       }
     },
@@ -126,7 +150,7 @@ export function useScoreBattleLogic(
         if (!g || g.skipped) return { guessYear: 0, points: 0, skipped: true };
         return { guessYear: g.guessYear, points: calcPoints(g.guessYear, actualYear), skipped: false };
       });
-      commitRound(results);
+      commitRound(results, actualYear);
     },
     [numPlayers, commitRound]
   );
@@ -145,12 +169,14 @@ export function useScoreBattleLogic(
 
   const resetGame = useCallback(() => {
     scoresRef.current = Array(numPlayers).fill(0);
+    starsRef.current = Array(numPlayers).fill(0);
     songCountRef.current = 0;
     setScores(Array(numPlayers).fill(0));
-    setStars(Array(numPlayers).fill(1));
+    setStars(Array(numPlayers).fill(0));
     setRoundResults(Array(numPlayers).fill(null));
     setSongCount(0);
     setWinnerIdx(null);
+    setWinnerIdxs([]);
     setPendingGameOver(false);
     setPhase('guessing');
   }, [numPlayers]);
@@ -158,26 +184,32 @@ export function useScoreBattleLogic(
   /** Återställ från persisted snapshot */
   const _restore = useCallback((snap: {
     scores: number[];
-    stars: number[];
+    stars?: number[];
     songCount: number;
     phase?: BattlePhase;
     roundResults?: (RoundResult | null)[];
   }) => {
+    const safeStars = Array.from({ length: numPlayers }, (_, i) => {
+      const v = snap.stars?.[i];
+      return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    });
     scoresRef.current = snap.scores;
+    starsRef.current = safeStars;
     songCountRef.current = snap.songCount;
     setScores(snap.scores);
-    setStars(snap.stars);
+    setStars(safeStars);
     setSongCount(snap.songCount);
     setRoundResults(snap.roundResults ?? Array(snap.scores.length).fill(null));
     setWinnerIdx(null);
+    setWinnerIdxs([]);
     setPendingGameOver(false);
     setPhase(snap.phase ?? 'guessing');
-  }, []);
+  }, [numPlayers]);
 
   return {
     scores, stars, phase,
     soloMode, numPlayers,
-    roundResults, songCount, winnerIdx,
+    roundResults, songCount, winnerIdx, winnerIdxs,
     pendingGameOver,
     playerNames,
     confirmGuesses,
