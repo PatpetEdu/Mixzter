@@ -44,7 +44,7 @@ const GAME_MODE_LABELS: Record<string, string> = {
   country: `Country 1950-${CURRENT_YEAR}`,
   partylatar: `Partylatar 1960-${CURRENT_YEAR}`,
   sportlatar: `Sportlatar 1970-${CURRENT_YEAR}`,
-  nordisk: `Nordiska Hits 1960-${CURRENT_YEAR}`,
+  nordisk: `Skandinaviska Hits 1960-${CURRENT_YEAR}`,
 };
 
 export default function GameHeader({ gameMode, onBackToMenu }: Props) {

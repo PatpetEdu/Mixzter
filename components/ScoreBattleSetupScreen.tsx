@@ -75,7 +75,7 @@ const GAME_MODES = [
   { id: 'country',          label: `Country 1950–${CURRENT_YEAR}`,        icon: Music      },
   { id: 'partylatar',       label: `Partylåtar 1960–${CURRENT_YEAR}`,     icon: Sparkles   },
   { id: 'sportlatar',       label: `Sportlåtar 1970–${CURRENT_YEAR}`,     icon: Trophy     },
-  { id: 'nordisk',          label: `Nordiska Hits 1960–${CURRENT_YEAR}`,  icon: Globe      },
+  { id: 'nordisk',          label: `Skandinaviska Hits 1960–${CURRENT_YEAR}`, icon: Globe   },
 ];
 
 const TARGET_SCORES = [10, 15, 25, 30, 50];

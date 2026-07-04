@@ -87,7 +87,7 @@ const GAME_MODE_LABELS: Record<string, string> = {
   country: `Country 1950-${currentYear}`,
   partylatar: `Partylatar 1960-${currentYear}`,
   sportlatar: `Sportlatar 1970-${currentYear}`,
-  nordisk: `Nordiska Hits 1960-${currentYear}`,
+  nordisk: `Skandinaviska Hits 1960-${currentYear}`,
 };
 
 function splitGameModeName(fullName: string): { name: string; years: string } {

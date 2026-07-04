@@ -257,7 +257,7 @@ Välj primärt låtar med tydlig sång/lead-vocals. Undvik låtar som är enbart
 
     sportlatar: `Välj **${n} låtar** som är starkt förknippade med **sport, idrott och tävling** från **1970 till ${CURRENT_YEAR}**. Det kan vara OS-teman, VM-låtar, arenasånger eller låtar kopplade till kända sportevenemang (t.ex. Eye of the Tiger, We Are the Champions, Seven Nation Army). Välj låtar från minst 3 olika decennier. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
 
-    nordisk: `Välj **${n} nordiska låtar** från **Sverige, Norge, Danmark, Finland eller Island** från **1960 till ${CURRENT_YEAR}**. Det ska vara kända låtar i Norden – nordiska artister som är kända internationellt eller regionalt (t.ex. svenska, norska, danska och finska hits). Välj låtar från alla nordiska länder. Välj låtar från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala.`,
+    nordisk: `Välj **${n} skandinaviska hits** från **Sverige, Norge, Danmark, Finland eller Island** från **1960 till ${CURRENT_YEAR}**. Det ska vara välkända låtar från dessa fem länder, av artister som är kända regionalt eller internationellt. Välj låtar från alla fem länder och från minst 4 olika decennier. Minst 1–2 låtar ska vara från **2010 till ${CURRENT_YEAR}**, spridda över den perioden. Välj primärt låtar med tydlig sång. Undvik låtar som är enbart instrumentala. **Välj inte låtar från Storbritannien, Tyskland eller andra länder utanför de fem angivna länderna.**`,
   };
 }
 
@@ -392,7 +392,7 @@ export const generateCard = onRequest(
       const selectedModeDescription = getPrompts(batchCount)[gameMode] || getPrompts(batchCount)['default'];
 
       // När många låtar är sedda – lägg till uppmaning om bredare urval utan att ändra huvudprompten
-      const depthInstruction = allSeenSongs.size > 200
+      const depthInstruction = allSeenSongs.size > 350
         ? `\nObs: Många låtar är redan spelade. Gå gärna på djupet – mindre kända singlar, albumspår och bortglömda artister är välkomna så länge de håller kvalitet.`
         : '';
 
