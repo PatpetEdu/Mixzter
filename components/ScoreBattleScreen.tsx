@@ -109,14 +109,46 @@ const PLAYER_COLORS = [
 
 const scStyles = StyleSheet.create({
   wrap: {
-    flex: 1,
+    width: '100%',
     backgroundColor: '#0f0f17',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     borderWidth: 1,
     borderColor: '#1a1a2e',
     overflow: 'hidden',
     gap: 8,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rankBadge: {
+    minWidth: 28,
+    height: 20,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0a0a14',
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+  },
+  rankBadgeText: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  nameDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  nameBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
   lockedLine: {
     position: 'absolute',
@@ -128,12 +160,11 @@ const scStyles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
+    gap: 6,
   },
-  name: { color: '#64748b', fontSize: 13, fontWeight: '600', flex: 1, marginRight: 4 },
-  starsRow: { flexDirection: 'row', minHeight: 16, justifyContent: 'center' },
+  name: { color: '#cbd5e1', fontSize: 14, fontWeight: '700', flex: 1 },
+  starsRow: { flexDirection: 'row', minHeight: 16, justifyContent: 'flex-start' },
   starsText: {
     color: '#fbbf24',
     fontSize: 11,
@@ -142,27 +173,59 @@ const scStyles = StyleSheet.create({
   },
   track: { height: 3, backgroundColor: '#1a1a2e', borderRadius: 99, overflow: 'hidden' },
   fill: { height: 3, borderRadius: 99, backgroundColor: '#312e81' },
-  score: { color: '#e2e8f0', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  scoreWrap: { alignItems: 'flex-end', minWidth: 80 },
+  score: { color: '#e2e8f0', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   scoreNeg: { color: '#ef4444' },
   target: { color: '#334155', fontSize: 13, fontWeight: '400' },
+  lockStatus: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  roundDeltaBadge: {
+    marginTop: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    backgroundColor: 'rgba(100,116,139,0.2)',
+  },
+  roundDeltaBadgePos: {
+    backgroundColor: 'rgba(16,185,129,0.2)',
+  },
+  roundDeltaBadgeNeg: {
+    backgroundColor: 'rgba(239,68,68,0.2)',
+  },
+  roundDeltaText: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  roundDeltaTextPos: {
+    color: '#34d399',
+  },
+  roundDeltaTextNeg: {
+    color: '#f87171',
+  },
   guessRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   guessInputWrap: { flex: 1 },
   guessInput: {
     backgroundColor: '#0a0a14',
-    borderRadius: 10,
+    borderRadius: 9,
     borderWidth: 1.5,
     borderColor: '#1a1a2e',
     color: '#f8fafc',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 8,
   },
   guessInputError: { borderColor: '#7f1d1d' },
   lockBtn: {
-    width: 38, height: 38,
-    borderRadius: 10,
+    width: 34, height: 34,
+    borderRadius: 9,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -176,47 +239,53 @@ const scStyles = StyleSheet.create({
   },
   lockedBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
   hostBadge: {
-    position: 'absolute',
-    top: 7,
-    right: 7,
+    marginLeft: 4,
     backgroundColor: 'rgba(148,163,184,0.2)',
     borderWidth: 1,
     borderColor: 'rgba(226,232,240,0.5)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     zIndex: 2,
   },
   hostBadgeText: {
     color: '#e2e8f0',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 0.5,
   },
 });
 
 function ScoreCard({
   name,
+  rank,
   score,
   targetScore,
   stars,
+  roundDeltaPoints,
   guess,
   onChangeGuess,
   isGuessLocked,
   onToggleLock,
   isGuessingPhase,
+  isSummaryPhase,
+  canEditGuess,
   playerIndex,
   isHostPlayer,
 }: {
   name: string;
+  rank: number;
   score: number;
   targetScore: number;
   stars: number;
+  roundDeltaPoints: number | null;
   guess: string;
   onChangeGuess: (v: string) => void;
   isGuessLocked: boolean;
   onToggleLock: () => void;
   isGuessingPhase: boolean;
+  isSummaryPhase: boolean;
+  canEditGuess: boolean;
   playerIndex: number;
   isHostPlayer: boolean;
 }) {
@@ -225,32 +294,88 @@ function ScoreCard({
   const isValid = isValidYear(guess);
   const c = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
   const starIndicator = stars <= 0 ? null : (stars === 1 ? '✦' : `✦ ${stars}`);
+  const scoreScale = useRef(new RNAnimated.Value(1)).current;
+  const prevScoreRef = useRef(score);
+
+  useEffect(() => {
+    if (prevScoreRef.current === score) return;
+    prevScoreRef.current = score;
+    RNAnimated.sequence([
+      RNAnimated.timing(scoreScale, { toValue: 1.05, duration: 140, useNativeDriver: true }),
+      RNAnimated.spring(scoreScale, { toValue: 1, useNativeDriver: true, speed: 22, bounciness: 7 }),
+    ]).start();
+  }, [score, scoreScale]);
 
   return (
-    <View style={[
+    <RNAnimated.View style={[
       scStyles.wrap,
       { borderColor: isGuessLocked ? c.locked : c.border },
       isGuessLocked && { backgroundColor: '#0d0d1a' },
       isHostPlayer && { borderColor: '#e2e8f0', borderWidth: 2 },
+      { transform: [{ scale: scoreScale }] },
     ]}>
-      {isHostPlayer && (
-        <View style={scStyles.hostBadge}>
-          <RNText style={scStyles.hostBadgeText}>DU</RNText>
-        </View>
-      )}
       {isGuessLocked && (
         <View style={[scStyles.lockedLine, { backgroundColor: c.locked }]} />
       )}
 
-      <View style={scStyles.header}>
-        <RNText
-          style={[scStyles.name, isGuessLocked && { color: c.nameLocked }]}
-          numberOfLines={1}
-        >
-          {name}
-        </RNText>
-        <View style={[scStyles.starsRow, isHostPlayer && { marginRight: 34 }]}> 
-          {starIndicator ? <RNText style={scStyles.starsText}>{starIndicator}</RNText> : null}
+      <View style={scStyles.topRow}>
+        <View style={scStyles.rankBadge}>
+          <RNText style={scStyles.rankBadgeText}>#{rank}</RNText>
+        </View>
+        <View style={[scStyles.nameDot, { backgroundColor: c.fill }]} />
+
+        <View style={scStyles.nameBlock}>
+          <View style={scStyles.header}>
+            <RNText
+              style={[scStyles.name, isGuessLocked && { color: c.nameLocked }]}
+              numberOfLines={1}
+            >
+              {name}
+            </RNText>
+            {isHostPlayer && (
+              <View style={scStyles.hostBadge}>
+                <RNText style={scStyles.hostBadgeText}>DU</RNText>
+              </View>
+            )}
+          </View>
+          <View style={scStyles.starsRow}>
+            {starIndicator ? <RNText style={scStyles.starsText}>{starIndicator}</RNText> : null}
+          </View>
+        </View>
+
+        <View style={scStyles.scoreWrap}>
+          <RNText style={[
+            scStyles.score,
+            isNeg && scStyles.scoreNeg,
+            isGuessLocked && { color: c.scoreLocked },
+          ]}>
+            {score}
+            <RNText style={scStyles.target}>/{targetScore}</RNText>
+          </RNText>
+          {isSummaryPhase && roundDeltaPoints !== null && (
+            <View
+              style={[
+                scStyles.roundDeltaBadge,
+                roundDeltaPoints > 0 && scStyles.roundDeltaBadgePos,
+                roundDeltaPoints < 0 && scStyles.roundDeltaBadgeNeg,
+              ]}
+            >
+              <RNText
+                style={[
+                  scStyles.roundDeltaText,
+                  roundDeltaPoints > 0 && scStyles.roundDeltaTextPos,
+                  roundDeltaPoints < 0 && scStyles.roundDeltaTextNeg,
+                ]}
+              >
+                {`${roundDeltaPoints > 0 ? '+' : ''}${roundDeltaPoints}`}
+              </RNText>
+            </View>
+          )}
+          {isGuessingPhase && (
+            <RNText style={[scStyles.lockStatus, isGuessLocked && { color: c.badgeText }]}>
+              {isGuessLocked ? 'KLAR' : 'GISSAR'}
+            </RNText>
+          )}
         </View>
       </View>
 
@@ -259,17 +384,8 @@ function ScoreCard({
         <View style={[scStyles.fill, { width: `${pct * 100}%`, backgroundColor: isGuessLocked ? c.fill : c.fillDim }]} />
       </View>
 
-      <RNText style={[
-        scStyles.score,
-        isNeg && scStyles.scoreNeg,
-        isGuessLocked && { color: c.scoreLocked },
-      ]}>
-        {score}
-        <RNText style={scStyles.target}>/{targetScore}</RNText>
-      </RNText>
-
       {/* Gissningsfält – visas bara under gissningsfasen */}
-      {isGuessingPhase && (
+      {isGuessingPhase && canEditGuess && (
         <View style={scStyles.guessRow}>
           <View style={scStyles.guessInputWrap}>
             <TextInput
@@ -302,13 +418,7 @@ function ScoreCard({
           )}
         </View>
       )}
-
-      {isGuessLocked && isGuessingPhase && (
-        <View style={[scStyles.lockedBadge, { backgroundColor: c.badgeBg }]}>
-          <RNText style={[scStyles.lockedBadgeText, { color: c.badgeText }]}>KLAR ✓</RNText>
-        </View>
-      )}
-    </View>
+    </RNAnimated.View>
   );
 }
 
@@ -621,6 +731,39 @@ export default function ScoreBattleScreen({
   }, [resetRound, generateCard]);
 
   const isGuessingPhase = phase === 'guessing';
+  const isSummaryPhase = phase === 'song_summary';
+  const inputOrder = useMemo(
+    () => Array.from({ length: playerNames.length }, (_, idx) => idx),
+    [playerNames.length]
+  );
+  const rankingOrder = useMemo(() => {
+    return [...inputOrder].sort((a, b) => {
+      const scoreDiff = (scores[b] ?? 0) - (scores[a] ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      const starDiff = (stars[b] ?? 0) - (stars[a] ?? 0);
+      if (starDiff !== 0) return starDiff;
+      return a - b;
+    });
+  }, [inputOrder, scores, stars]);
+  const summaryOrder = useMemo(() => {
+    return [...inputOrder].sort((a, b) => {
+      const pointsDiff = (roundResults[b]?.points ?? -999) - (roundResults[a]?.points ?? -999);
+      if (pointsDiff !== 0) return pointsDiff;
+      const scoreDiff = (scores[b] ?? 0) - (scores[a] ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      const starDiff = (stars[b] ?? 0) - (stars[a] ?? 0);
+      if (starDiff !== 0) return starDiff;
+      return a - b;
+    });
+  }, [inputOrder, roundResults, scores, stars]);
+  const playerRenderOrder = rankingOrder;
+  const rankByIndex = useMemo(() => {
+    const map: Record<number, number> = {};
+    playerRenderOrder.forEach((playerIndex, rank) => {
+      map[playerIndex] = rank + 1;
+    });
+    return map;
+  }, [playerRenderOrder]);
   const modeLabel = GAME_MODE_LABELS[gameMode] ?? GAME_MODE_LABELS.default;
   const modeParts = splitGameModeName(modeLabel);
   const modeInlineLabel = modeParts.years ? `${modeParts.name} ${modeParts.years}` : modeParts.name;
@@ -657,16 +800,18 @@ export default function ScoreBattleScreen({
             <RNText style={s.winnerName}>🏆 {winner}</RNText>
 
             <View style={s.finalScores}>
-              {playerNames.map((name, i) => (
-                <View key={name} style={[s.finalRow, i < playerNames.length - 1 && s.finalRowBorder]}>
-                  <RNText style={[s.finalName, winnerSet.has(i) && s.finalNameWinner]}>
-                    {winnerSet.has(i) ? '🏆 ' : ''}{name}
+              {rankingOrder.map((playerIndex, rank) => {
+                const name = playerNames[playerIndex] ?? `Spelare ${playerIndex + 1}`;
+                return (
+                <View key={`${name}-${playerIndex}`} style={[s.finalRow, rank < rankingOrder.length - 1 && s.finalRowBorder]}>
+                  <RNText style={[s.finalName, winnerSet.has(playerIndex) && s.finalNameWinner]}>
+                    {winnerSet.has(playerIndex) ? '🏆 ' : ''}{name}
                   </RNText>
-                  <RNText style={[s.finalPts, winnerSet.has(i) && s.finalPtsWinner]}>
-                    {scores[i]}p
+                  <RNText style={[s.finalPts, winnerSet.has(playerIndex) && s.finalPtsWinner]}>
+                    {scores[playerIndex]}p
                   </RNText>
                 </View>
-              ))}
+              )})}
             </View>
 
             <RNText style={s.songCount}>{songCount + 1} omgångar spelades</RNText>
@@ -862,28 +1007,31 @@ export default function ScoreBattleScreen({
           />
         )}
 
-        {/* ── Score-kort med inbyggda gissningar ── */}
-        <View style={s.scoreGrid}>
-          {playerNames.map((name, i) => (
-            <View
-              key={name + i}
-              style={playerNames.length === 1 ? s.scoreGridFull : s.scoreGridItem}
-            >
+        {/* ── Spelarlista i banner-stil ── */}
+        <View style={s.scoreList}>
+          {playerRenderOrder.map((playerIndex) => {
+            const name = playerNames[playerIndex] ?? `Spelare ${playerIndex + 1}`;
+            return (
+            <View key={`${name}-${playerIndex}`}>
               <ScoreCard
                 name={name}
-                score={scores[i] ?? 0}
+                rank={rankByIndex[playerIndex] ?? playerIndex + 1}
+                score={scores[playerIndex] ?? 0}
                 targetScore={targetScore}
-                stars={stars[i] ?? 0}
-                guess={guesses[i] ?? ''}
-                onChangeGuess={v => handleChangeGuess(i, v)}
-                isGuessLocked={locked[i] ?? false}
-                onToggleLock={() => handleToggleLock(i)}
+                stars={stars[playerIndex] ?? 0}
+                roundDeltaPoints={isSummaryPhase ? (roundResults[playerIndex]?.points ?? null) : null}
+                guess={guesses[playerIndex] ?? ''}
+                onChangeGuess={v => handleChangeGuess(playerIndex, v)}
+                isGuessLocked={locked[playerIndex] ?? false}
+                onToggleLock={() => handleToggleLock(playerIndex)}
                 isGuessingPhase={isGuessingPhase}
-                playerIndex={i}
-                isHostPlayer={safeHostPlayerIndex === i}
+                isSummaryPhase={isSummaryPhase}
+                canEditGuess={safeHostPlayerIndex === playerIndex}
+                playerIndex={playerIndex}
+                isHostPlayer={safeHostPlayerIndex === playerIndex}
               />
             </View>
-          ))}
+          )})}
         </View>
 
         {/* ── Laddning ── */}
@@ -993,9 +1141,17 @@ export default function ScoreBattleScreen({
             </LinearGradient>
 
             <View style={s.resultList}>
-              {playerNames.map((name, i) => (
-                <ResultRow key={name} name={name} result={roundResults[i] ?? null} actualYear={card.year} />
-              ))}
+              {summaryOrder.map(playerIndex => {
+                const name = playerNames[playerIndex] ?? `Spelare ${playerIndex + 1}`;
+                return (
+                  <ResultRow
+                    key={`${name}-${playerIndex}`}
+                    name={name}
+                    result={roundResults[playerIndex] ?? null}
+                    actualYear={card.year}
+                  />
+                );
+              })}
             </View>
 
             <RNAnimated.View style={{ width: '100%', transform: [{ scale: nextSongScaleAnim }] }}>
@@ -1141,15 +1297,10 @@ const s = StyleSheet.create({
     color: '#c7d2fe',
   },
 
-  // Score row
-  scoreGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 8,
+  // Player list
+  scoreList: {
+    gap: 8,
   },
-  scoreGridItem: { width: '48.5%' },
-  scoreGridFull: { width: '100%' },
 
   // Loading
   // Guessing

@@ -147,23 +147,38 @@ const PLAYER_COLORS = [
     btnBg: 'rgba(6,182,212,0.1)', btnBorder: 'rgba(6,182,212,0.4)' },
 ] as const;
 
-// ─── ScoreCard ────────────────────────────────────────────────────────────────
+// ─── ScoreBanner ──────────────────────────────────────────────────────────────
 
-function ScoreCard({
-  name, score, targetScore, stars, isLocked, playerIndex, isMe, animationDelayMs,
+function ScoreBanner({
+  name,
+  rank,
+  score,
+  targetScore,
+  stars,
+  roundDeltaPoints,
+  isLocked,
+  isGuessingPhase,
+  isSummaryPhase,
+  playerIndex,
+  isMe,
+  animationDelayMs,
 }: {
   name: string;
+  rank: number;
   score: number;
   targetScore: number;
   stars: number;
+  roundDeltaPoints: number | null;
   isLocked: boolean;
+  isGuessingPhase: boolean;
+  isSummaryPhase: boolean;
   playerIndex: number;
   isMe: boolean;
   animationDelayMs?: number;
 }) {
   const c = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
   const pct = Math.max(0, Math.min(score / targetScore, 1));
-  const isNeg = score < 0;
+  const lockLabel = isLocked ? 'KLAR' : 'GISSAR';
   const starIndicator = stars <= 0 ? null : (stars === 1 ? '✦' : `✦ ${stars}`);
   const [scoreBump, setScoreBump] = useState(false);
   const prevScoreRef = useRef(score);
@@ -180,29 +195,53 @@ function ScoreCard({
 
   return (
     <div
-      className={`sb-score-card sb-score-card-animate${isMe ? ' sb-score-card-me' : ''}${scoreBump ? ' sb-score-card-scored' : ''}`}
+      className={`sb-banner-item sb-banner-animate${isMe ? ' sb-banner-me' : ''}${scoreBump ? ' sb-banner-scored' : ''}`}
       style={{
         borderColor: isLocked ? c.locked : c.border,
         backgroundColor: isLocked ? '#0d0d1a' : '#0f0f17',
         animationDelay: `${animationDelayMs ?? 0}ms`,
       }}
     >
-      {isMe ? <span className="sb-host-badge">DU</span> : null}
+      <span className="sb-banner-rank">#{rank}</span>
+      <span className="sb-banner-dot" style={{ backgroundColor: c.fill }} />
       {isLocked && (
-        <div className="sb-score-card-locked-line" style={{ backgroundColor: c.locked }} />
+        <div className="sb-banner-locked-line" style={{ backgroundColor: c.locked }} />
       )}
-      <div className="sb-score-card-header">
-        <span
-          className="sb-score-card-name"
-          style={isLocked ? { color: c.nameLocked } : undefined}
-        >
-          {name}
-        </span>
-        <span className="sb-stars">
+      <div className="sb-banner-main">
+        <div className="sb-banner-header">
+          <span
+            className="sb-banner-name"
+            style={isLocked ? { color: c.nameLocked } : undefined}
+          >
+            {name}
+          </span>
+          {isMe ? <span className="sb-host-badge">DU</span> : null}
+        </div>
+        <span className="sb-banner-stars">
           {starIndicator ? <span className="sb-star-count">{starIndicator}</span> : null}
         </span>
       </div>
-      <div className={`sb-track${scoreBump ? ' sb-track-pop' : ''}`}>
+
+      <div className="sb-banner-right">
+        <span className={`sb-banner-score${scoreBump ? ' sb-banner-score-pop' : ''}`}>
+          {score}
+          <span className="sb-score-target">/{targetScore}</span>
+        </span>
+        {isGuessingPhase && (
+          <span className="sb-banner-lock" style={isLocked ? { color: c.badgeText } : undefined}>
+            {lockLabel}
+          </span>
+        )}
+        {isSummaryPhase && roundDeltaPoints !== null && (
+          <span
+            className={`sb-round-delta${roundDeltaPoints > 0 ? ' pos' : roundDeltaPoints < 0 ? ' neg' : ''}`}
+          >
+            {`${roundDeltaPoints > 0 ? '+' : ''}${roundDeltaPoints}`}
+          </span>
+        )}
+      </div>
+
+      <div className={`sb-track sb-banner-track${scoreBump ? ' sb-track-pop' : ''}`}>
         <div
           className={`sb-fill${scoreBump ? ' sb-fill-pop' : ''}`}
           style={{
@@ -211,19 +250,6 @@ function ScoreCard({
           }}
         />
       </div>
-      <span className={`sb-score-num${isNeg ? ' sb-score-neg' : ''}${scoreBump ? ' sb-score-num-pop' : ''}`}
-        style={isLocked ? { color: c.nameLocked } : undefined}>
-        {score}
-        <span className="sb-score-target">/{targetScore}</span>
-      </span>
-      {isLocked && (
-        <span
-          className="sb-locked-badge"
-          style={{ backgroundColor: c.badgeBg, color: c.badgeText }}
-        >
-          KLAR ✓
-        </span>
-      )}
     </div>
   );
 }
@@ -481,6 +507,28 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
   // targetScore: hämtas från rummet, fallback 50 om gamla spel saknar fältet
   const targetScore = room.targetScore ?? 50;
+  const inputOrder = room.playerNames.map((_, idx) => idx);
+  const rankingOrder = [...inputOrder].sort((a, b) => {
+    const scoreDiff = (room.scores[b] ?? 0) - (room.scores[a] ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    const starDiff = (room.stars[b] ?? 0) - (room.stars[a] ?? 0);
+    if (starDiff !== 0) return starDiff;
+    return a - b;
+  });
+  const summaryOrder = [...inputOrder].sort((a, b) => {
+    const pointsDiff = (room.roundResults?.[b]?.points ?? -999) - (room.roundResults?.[a]?.points ?? -999);
+    if (pointsDiff !== 0) return pointsDiff;
+    const scoreDiff = (room.scores[b] ?? 0) - (room.scores[a] ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    const starDiff = (room.stars[b] ?? 0) - (room.stars[a] ?? 0);
+    if (starDiff !== 0) return starDiff;
+    return a - b;
+  });
+  const playerRenderOrder = rankingOrder;
+  const rankByIndex: Record<number, number> = {};
+  playerRenderOrder.forEach((playerIndex, rank) => {
+    rankByIndex[playerIndex] = rank + 1;
+  });
 
   const myWebGuess = room.webGuesses[String(myPlayerIndex)];
   const allPlayersLocked = room.playerNames.every((_, i) => {
@@ -512,24 +560,29 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
       <div className="sb-content">
         {/* ── Alla spelarpoäng ── */}
-        <div className="sb-score-grid">
-          {room.playerNames.map((name, i) => {
-            const webG = room.webGuesses[String(i)];
+        <div className="sb-banner-list">
+          {playerRenderOrder.map((playerIndex, rowIndex) => {
+            const webG = room.webGuesses[String(playerIndex)];
             // Använd lokal isLocked för min egen spelare (omedelbar feedback)
             const cardLocked = isGuessing
-              ? (i === myPlayerIndex ? isLocked : webG?.locked === true)
+              ? (playerIndex === myPlayerIndex ? isLocked : webG?.locked === true)
               : false;
+            const name = room.playerNames[playerIndex] ?? `Spelare ${playerIndex + 1}`;
             return (
-              <ScoreCard
-                key={i}
+              <ScoreBanner
+                key={`player-${playerIndex}`}
                 name={name}
-                score={room.scores[i] ?? 0}
+                rank={rankByIndex[playerIndex] ?? playerIndex + 1}
+                score={room.scores[playerIndex] ?? 0}
                 targetScore={targetScore}
-                stars={room.stars[i] ?? 0}
+                stars={room.stars[playerIndex] ?? 0}
+                roundDeltaPoints={isSummary ? (room.roundResults?.[playerIndex]?.points ?? null) : null}
                 isLocked={cardLocked}
-                playerIndex={i}
-                isMe={i === myPlayerIndex}
-                animationDelayMs={i * 50}
+                isGuessingPhase={isGuessing}
+                isSummaryPhase={isSummary}
+                playerIndex={playerIndex}
+                isMe={playerIndex === myPlayerIndex}
+                animationDelayMs={rowIndex * 35}
               />
             );
           })}
@@ -629,13 +682,14 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
 
             {room.roundResults && (
               <div className="sb-result-list sb-animate-in">
-                {room.playerNames.map((name, i) => {
-                  const r = room.roundResults?.[i];
+                {summaryOrder.map((playerIndex) => {
+                  const r = room.roundResults?.[playerIndex];
                   if (!r) return null;
                   const diff = r.skipped ? null : Math.abs(r.guessYear - (room.card?.year ?? 0));
                   const col  = pointsColor(r.points, r.skipped);
+                  const name = room.playerNames[playerIndex] ?? `Spelare ${playerIndex + 1}`;
                   return (
-                    <div key={i} className="sb-result-row">
+                    <div key={`result-${playerIndex}`} className="sb-result-row">
                       <div className="sb-result-left">
                         <div className="sb-result-name">{name}</div>
                         <div className="sb-result-detail">
@@ -656,9 +710,7 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
               </div>
             )}
 
-            <div className="sb-phase-banner summary waiting">
-              ⏳ Väntar på nästa låt…
-            </div>
+            <div className="sb-phase-banner summary waiting">▶ Väntar på nästa låt…</div>
           </>
         )}
 
@@ -673,16 +725,18 @@ export function ScoreBattleView({ gameId }: { gameId: string }) {
                 : '?'}
             </p>
             <div className="sb-final-scores">
-              {room.playerNames.map((name, i) => (
-                <div key={i} className="sb-final-row">
-                  <span className={`sb-final-name${winnerSet.has(i) ? ' winner' : ''}`}>
-                    {winnerSet.has(i) ? '🏆 ' : ''}{name}
+              {rankingOrder.map((playerIndex) => {
+                const name = room.playerNames[playerIndex] ?? `Spelare ${playerIndex + 1}`;
+                return (
+                <div key={`final-${playerIndex}`} className="sb-final-row">
+                  <span className={`sb-final-name${winnerSet.has(playerIndex) ? ' winner' : ''}`}>
+                    {winnerSet.has(playerIndex) ? '🏆 ' : ''}{name}
                   </span>
-                  <span className={`sb-final-pts${winnerSet.has(i) ? ' winner' : ''}`}>
-                    {room.scores[i]}p
+                  <span className={`sb-final-pts${winnerSet.has(playerIndex) ? ' winner' : ''}`}>
+                    {room.scores[playerIndex]}p
                   </span>
                 </div>
-              ))}
+              )})}
             </div>
 
             {/* ── Spelhistorik ── */}
